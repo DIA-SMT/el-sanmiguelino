@@ -8,6 +8,7 @@ import { FiguraNota } from "@/components/figura-nota";
 import { MigueChat } from "@/components/migue/migue-chat";
 import { ColumnaDelLector } from "@/components/comentarios/columna-del-lector";
 import { edicionActual, getNota } from "@/lib/data/edicion-actual";
+import { slugificarSeccion } from "@/lib/data/secciones";
 import { getUsuario } from "@/lib/auth/session";
 import type { BloqueNota } from "@/lib/types";
 
@@ -64,7 +65,11 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
 
   return (
     <>
-      <Masthead edicion={edicionActual} usuario={usuario} />
+      <Masthead
+        edicion={edicionActual}
+        usuario={usuario}
+        seccionActiva={slugificarSeccion(nota.seccion)}
+      />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <nav aria-label="Volver" className="mb-6">

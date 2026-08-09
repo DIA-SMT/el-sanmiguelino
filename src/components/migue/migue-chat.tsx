@@ -32,6 +32,13 @@ export function MigueChat({ notaSlug }: { notaSlug?: string }) {
     listaRef.current?.scrollTo({ top: listaRef.current.scrollHeight });
   }, [mensajes, cargando]);
 
+  // La barra de secciones puede abrir el chat ("Migue" a la derecha)
+  useEffect(() => {
+    const abrir = () => setAbierto(true);
+    window.addEventListener("migue:abrir", abrir);
+    return () => window.removeEventListener("migue:abrir", abrir);
+  }, []);
+
   const enviar = useCallback(
     async (pregunta: string) => {
       const limpia = pregunta.trim();
