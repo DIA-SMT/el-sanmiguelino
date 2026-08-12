@@ -73,6 +73,175 @@ export const edicionActual: Edicion = {
       ],
     },
     {
+      slug: "septiembre-musical-plaza-independencia",
+      seccion: "Cultura",
+      titulo: "El Septiembre Musical vuelve a la plaza Independencia con un show de apertura gratuito",
+      bajada:
+        "El festival más tradicional de la provincia abre su edición 2026 en el corazón fundacional de la ciudad: un espectáculo al aire libre con la Orquesta Estable, artistas locales y un mapping sobre los edificios históricos.",
+      imagen: {
+        src: "/notas/plaza-independencia.webp",
+        alt: "Vista aérea de la plaza Independencia de San Miguel de Tucumán, rodeada por los edificios del centro",
+        epigrafe:
+          "La plaza Independencia, corazón fundacional de la ciudad, será el escenario de la apertura del festival.",
+      },
+      cuerpo: [
+        {
+          tipo: "parrafo",
+          texto:
+            "La plaza Independencia se prepara para una noche que promete quedar en la memoria de los sanmiguelinos. El viernes 4 de septiembre, desde las 20, el tradicional Septiembre Musical abrirá su edición 2026 con un gran espectáculo gratuito al aire libre: la Orquesta Estable de la Provincia compartirá escenario con artistas tucumanos de folclore, rock y música urbana, en un recorrido pensado para todas las generaciones.",
+        },
+        {
+          tipo: "parrafo",
+          texto:
+            "El cierre estará a cargo de un mapping monumental proyectado sobre las fachadas del Casino y de la Casa de Gobierno, que repasará la historia del festival y los paisajes de la provincia. Habrá además una feria de emprendedores y food trucks sobre calle 25 de Mayo, con propuestas de gastronomía regional.",
+        },
+        {
+          tipo: "cita",
+          texto:
+            "Queremos que la apertura sea una fiesta de todos: que la música vuelva a llenar la plaza y que cada vecino sienta que el festival también le pertenece.",
+          autor: "Carolina Páez",
+          cargo: "secretaria de Cultura",
+        },
+        { tipo: "subtitulo", texto: "Un escenario con historia" },
+        {
+          tipo: "parrafo",
+          texto:
+            "No es casual la elección del lugar: la plaza Independencia fue escenario de las grandes celebraciones de la ciudad desde el siglo XIX, y volverá a serlo con una puesta que combina tradición y tecnología. El escenario principal se montará frente a la fuente central, con pantallas laterales para que el show se disfrute desde cualquier sector del paseo.",
+        },
+        { tipo: "subtitulo", texto: "Operativo y accesos" },
+        {
+          tipo: "parrafo",
+          texto:
+            "Desde las 18 se cortará el tránsito en las cuatro calles perimetrales y se dispondrán accesos señalizados, sanitarios y un sector reservado para personas con movilidad reducida frente al Correo. La programación completa del festival puede consultarse en los canales oficiales y preguntándole a Migue desde este diario.",
+        },
+      ],
+    },
+    {
+      slug: "casa-historica-reconocimiento-nacional",
+      seccion: "Historia",
+      titulo: "La Casa Histórica recibió a autoridades nacionales por un nuevo reconocimiento patrimonial",
+      bajada:
+        "La presidenta de la Comisión Nacional de Monumentos encabezó el acto en el que el museo más visitado del norte argentino fue distinguido por su plan de conservación, un trabajo conjunto entre Nación, provincia y municipio.",
+      imagen: {
+        src: "/notas/casa-historica.jpg",
+        alt: "Fachada restaurada de la Casa Histórica de la Independencia, blanca con puerta azul y banderas argentinas",
+        epigrafe:
+          "La fachada de la Casa Histórica, restaurada con técnicas tradicionales, lució sus banderas para recibir a la comitiva.",
+      },
+      cuerpo: [
+        {
+          tipo: "parrafo",
+          texto:
+            "La Casa Histórica de la Independencia volvió a vestirse de gala. Una comitiva encabezada por la presidenta de la Comisión Nacional de Monumentos, de Lugares y de Bienes Históricos recorrió el museo y encabezó el acto en el que se distinguió el plan integral de conservación del edificio donde se declaró la Independencia argentina en 1816.",
+        },
+        {
+          tipo: "parrafo",
+          texto:
+            "El reconocimiento pone en valor casi una década de trabajo silencioso: la restauración de la fachada con cal y técnicas tradicionales, la recuperación del mobiliario original del Salón de la Jura y la modernización del guion museográfico, que hoy combina piezas históricas con recursos interactivos y visitas accesibles.",
+        },
+        {
+          tipo: "cita",
+          texto:
+            "Esta casa no es solo de los tucumanos: es el living de la Patria. Cuidarla entre todos los niveles del Estado es la mejor manera de honrar lo que acá se juró.",
+          autor: "María Inés Rodríguez",
+          cargo: "presidenta de la Comisión Nacional de Monumentos",
+        },
+        { tipo: "subtitulo", texto: "Un símbolo que se renueva" },
+        {
+          tipo: "parrafo",
+          texto:
+            "Con más de medio millón de visitantes por año, la Casa Histórica es el museo más concurrido del norte argentino. Durante el acto se anunció además la ampliación del espectáculo nocturno de luz y sonido, que desde octubre sumará una función accesible con intérprete de lengua de señas y audiodescripción.",
+        },
+        {
+          tipo: "parrafo",
+          texto:
+            "La jornada cerró con un detalle que emocionó a los presentes: el izamiento conjunto de las banderas de las catorce provincias que juraron la Independencia, a cargo de estudiantes de escuelas públicas de la ciudad.",
+        },
+      ],
+    },
+    {
+      slug: "plan-bacheo-integral",
+      seccion: "Obras",
+      titulo: "Bacheo en marcha: la Municipalidad repara más de 200 cuadras en toda la ciudad",
+      bajada:
+        "Cuadrillas trabajan de día y de noche con asfalto en caliente sobre los corredores del transporte público y las avenidas troncales; el plan sigue por los barrios con un cronograma semanal.",
+      imagen: {
+        src: "/notas/bacheo-calles.jpg",
+        alt: "Operarios municipales con palas y una minicargadora reparando el pavimento en una avenida, con un colectivo detrás",
+        epigrafe:
+          "Cuadrillas municipales trabajan sobre la avenida Sáenz Peña, uno de los corredores priorizados por el plan.",
+      },
+      cuerpo: [
+        {
+          tipo: "parrafo",
+          texto:
+            "El plan integral de bacheo ya se siente en las calles: más de 200 cuadras fueron intervenidas en los primeros dos meses de trabajo, con cuadrillas propias que operan en simultáneo en distintos puntos de la ciudad. La prioridad son los corredores por donde circula el transporte público y las avenidas de acceso al microcentro, donde el deterioro del pavimento afectaba a miles de vecinos por día.",
+        },
+        {
+          tipo: "parrafo",
+          texto:
+            "La novedad de esta etapa es la incorporación de asfalto en caliente de producción propia, que permite reparaciones más durables y reduce los tiempos de corte: un bache tipo se cierra y queda habilitado al tránsito en menos de tres horas. En los corredores más transitados, los equipos trabajan en horario nocturno para no entorpecer la circulación.",
+        },
+        {
+          tipo: "cita",
+          texto:
+            "No es parche sobre parche: cada intervención se hace con base compactada y asfalto en caliente, para que la reparación dure. La meta es llegar a fin de año con los cuarenta corredores del transporte público al cien por ciento.",
+          autor: "Gustavo Medina",
+          cargo: "secretario de Obras Públicas",
+        },
+        { tipo: "subtitulo", texto: "Cronograma por barrios" },
+        {
+          tipo: "parrafo",
+          texto:
+            "Superada la etapa de corredores, el plan continúa por los barrios con un cronograma semanal que se publica en los canales oficiales del municipio. Los vecinos pueden reportar baches directamente a Migue, el asistente virtual, indicando la esquina: el reclamo se georreferencia y entra en la programación de las cuadrillas.",
+        },
+      ],
+    },
+    {
+      slug: "nuevo-sistema-transporte-publico",
+      seccion: "Transporte",
+      titulo: "El transporte público se renueva: pago con QR y colectivos en tiempo real",
+      bajada:
+        "La ciudad avanza hacia un sistema de transporte inteligente: a la tarjeta se suma el pago con código QR desde el celular, y una app mostrará en qué momento llega cada colectivo a la parada.",
+      imagen: {
+        src: "/notas/colectivo-101.webp",
+        alt: "Pasajeros subiendo a un colectivo rojo de la línea 101 en una parada del centro de San Miguel de Tucumán",
+        epigrafe:
+          "La línea 101, una de las primeras en incorporar los validadores con lectura de código QR.",
+      },
+      cuerpo: [
+        {
+          tipo: "parrafo",
+          texto:
+            "Viajar en colectivo por San Miguel de Tucumán está por cambiar. El nuevo sistema de transporte público, que comienza a implementarse por etapas este mes, suma el pago con código QR desde cualquier billetera virtual a la tarjeta tradicional, y pone en marcha el seguimiento satelital de toda la flota: cada unidad informará su posición en tiempo real.",
+        },
+        {
+          tipo: "parrafo",
+          texto:
+            "Para el pasajero, la diferencia se notará en la espera: una aplicación gratuita —y las pantallas que se instalarán en las paradas de mayor demanda— mostrarán cuántos minutos falta para que llegue cada línea. Se acabó el asomarse a la esquina a adivinar: la información estará en el bolsillo.",
+        },
+        { tipo: "subtitulo", texto: "Cómo funciona" },
+        {
+          tipo: "parrafo",
+          texto:
+            "El validador de cada unidad aceptará tres formas de pago: la tarjeta de siempre, el código QR generado desde la app o la billetera virtual, y en una etapa posterior las tarjetas bancarias sin contacto. El boleto estudiantil y los pases especiales migran automáticamente al nuevo sistema, sin trámites adicionales.",
+        },
+        {
+          tipo: "cita",
+          texto:
+            "El colectivo es el modo en que se mueve la mayoría de la ciudad. Modernizarlo no es solo tecnología: es devolverle tiempo a la gente, que es lo más valioso que tiene.",
+          autor: "Javier Núñez",
+          cargo: "subsecretario de Movilidad Urbana",
+        },
+        { tipo: "subtitulo", texto: "Etapas de implementación" },
+        {
+          tipo: "parrafo",
+          texto:
+            "La primera etapa alcanza a las líneas 101, 102 y 8, que concentran un tercio de los viajes diarios; el resto de la flota se incorporará antes de fin de año. Los horarios y recorridos también podrán consultarse conversando con Migue, que ya está aprendiendo a responder sobre el nuevo sistema.",
+        },
+      ],
+    },
+    {
       slug: "peatonal-luminarias-led",
       seccion: "Obras",
       titulo: "La peatonal se renueva: nuevas luminarias LED y más accesibilidad",

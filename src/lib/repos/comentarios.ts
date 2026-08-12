@@ -48,9 +48,21 @@ function seed(): Store {
           "Estaría bueno que armen visitas guiadas los fines de semana para recorrer todas las esculturas con este contexto histórico.",
         fecha: hace(5),
       },
+      {
+        id: "c3",
+        notaSlug: "nuevo-sistema-transporte-publico",
+        usuarioId: "cidituc-vec-033",
+        usuarioNombre: "Ramiro Díaz",
+        texto:
+          "Por fin saber cuándo llega el colectivo sin adivinar. Ojalá las pantallas lleguen pronto a las paradas de la zona sur.",
+        fecha: hace(12),
+      },
     ],
-    votos: new Map([["c1:cidituc-vec-021", 1]]),
-    seq: 3,
+    votos: new Map([
+      ["c1:cidituc-vec-021", 1],
+      ["c3:cidituc-vec-014", 1],
+    ]),
+    seq: 4,
   };
 }
 

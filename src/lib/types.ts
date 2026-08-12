@@ -22,6 +22,9 @@ export interface Nota {
     /** epígrafe en itálica bajo la imagen */
     epigrafe: string;
     alt: string;
+    /** ruta bajo /public (ej. "/notas/foto.jpg"); si el archivo no existe
+     *  todavía, se renderiza el placeholder editorial */
+    src?: string;
   };
 }
 

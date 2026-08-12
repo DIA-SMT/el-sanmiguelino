@@ -99,6 +99,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
             <FiguraNota
               alt={nota.imagen.alt}
               epigrafe={nota.imagen.epigrafe}
+              src={nota.imagen.src}
               className="mx-auto mt-8 max-w-4xl"
             />
           )}

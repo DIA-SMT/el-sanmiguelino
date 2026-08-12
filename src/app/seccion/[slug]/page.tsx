@@ -84,6 +84,7 @@ export default async function SeccionPage({
                   <FiguraNota
                     alt={nota.imagen.alt}
                     epigrafe={nota.imagen.epigrafe}
+                    src={nota.imagen.src}
                     className="sm:w-40"
                   />
                 )}

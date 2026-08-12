@@ -5,7 +5,9 @@ import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
 import { MigueChat } from "@/components/migue/migue-chat";
+import Image from "next/image";
 import { edicionActual } from "@/lib/data/edicion-actual";
+import { imagenDisponible } from "@/lib/data/imagenes";
 import { comentariosRepo } from "@/lib/repos/comentarios";
 import { getUsuario } from "@/lib/auth/session";
 import { tiempoRelativo } from "@/lib/utils";
@@ -69,6 +71,7 @@ export default async function Portada() {
               <FiguraNota
                 alt={segunda.imagen.alt}
                 epigrafe={segunda.imagen.epigrafe}
+                src={segunda.imagen.src}
                 className="mt-4"
               />
             )}
@@ -80,6 +83,7 @@ export default async function Portada() {
               <FiguraNota
                 alt={principal.imagen.alt}
                 epigrafe={principal.imagen.epigrafe}
+                src={principal.imagen.src}
               />
             )}
             <p className="drop-cap mt-4 text-justify font-serif text-[0.95rem] leading-relaxed text-ink">
@@ -125,6 +129,22 @@ export default async function Portada() {
         >
           {cajas.map((nota) => (
             <article key={nota.slug} className="border border-line bg-chrome p-4">
+              {nota.imagen && imagenDisponible(nota.imagen.src) && (
+                <Link
+                  href={`/nota/${nota.slug}`}
+                  className="relative mb-3 block aspect-[16/9] overflow-hidden border border-line"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                >
+                  <Image
+                    src={nota.imagen.src}
+                    alt=""
+                    fill
+                    sizes="(min-width: 768px) 360px, 100vw"
+                    className="object-cover"
+                  />
+                </Link>
+              )}
               <p className="font-sans text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-accent">
                 {nota.seccion}
               </p>
@@ -142,7 +162,7 @@ export default async function Portada() {
             </article>
           ))}
 
-          <article className="border border-line bg-bg p-4">
+          <article className="border border-line bg-bg p-4 md:col-span-3">
             <p className="flex items-center gap-1.5 font-sans text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-accent">
               <ThumbsUp className="h-3 w-3" aria-hidden="true" />
               Columna del lector
