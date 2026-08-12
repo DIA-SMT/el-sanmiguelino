@@ -23,6 +23,8 @@
   --ink: #141210;
   --ink-2: #4a463f;
   --line: #d8d2c4;
+  /* escritorio: la superficie sobre la que se apoya la hoja */
+  --escritorio: #ddd6c6;
 
   /* acento activo: azul en claro, celeste en oscuro */
   --accent: var(--azul);
@@ -38,6 +40,7 @@
   --ink: #eef2f8;
   --ink-2: #b7c0ce;
   --line: #243146;
+  --escritorio: #060a12;
   --accent: var(--celeste);
   --accent-strong: #5cbdf8;
   --accent-contrast: #06121f;
@@ -53,6 +56,7 @@
     --ink: #eef2f8;
     --ink-2: #b7c0ce;
     --line: #243146;
+    --escritorio: #060a12;
     --accent: var(--celeste);
     --accent-strong: #5cbdf8;
     --accent-contrast: #06121f;
@@ -66,6 +70,7 @@
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-line: var(--line);
+  --color-escritorio: var(--escritorio);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-contrast: var(--accent-contrast);
@@ -195,6 +200,86 @@ body {
     color-mix(in srgb, var(--ink) 28%, transparent) 0 2px,
     transparent 2px 7px
   );
+}
+
+/* ---------------------------------------------------------------------------
+   Paso de página (View Transitions): la hoja gira sobre su lomo izquierdo y
+   deja ver la siguiente. Solo transform/opacity, por debajo de 300ms.
+--------------------------------------------------------------------------- */
+
+::view-transition {
+  /* que un clic durante la animación no se pierda */
+  pointer-events: none;
+}
+
+::view-transition-old(.pagina-adelante) {
+  transform-origin: left center;
+  animation: 280ms ease-out both hoja-se-pasa;
+  z-index: 2;
+}
+::view-transition-new(.pagina-adelante) {
+  animation: 280ms ease-out both hoja-se-revela;
+  z-index: 1;
+}
+
+::view-transition-new(.pagina-atras) {
+  transform-origin: left center;
+  animation: 280ms ease-out both hoja-vuelve;
+  z-index: 2;
+}
+::view-transition-old(.pagina-atras) {
+  animation: 280ms ease-out both hoja-queda-atras;
+  z-index: 1;
+}
+
+@keyframes hoja-se-pasa {
+  from {
+    transform: perspective(2200px) rotateY(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: perspective(2200px) rotateY(-72deg);
+    opacity: 0.1;
+  }
+}
+@keyframes hoja-se-revela {
+  from {
+    transform: scale(0.994);
+    opacity: 0.65;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes hoja-vuelve {
+  from {
+    transform: perspective(2200px) rotateY(-72deg);
+    opacity: 0.1;
+  }
+  to {
+    transform: perspective(2200px) rotateY(0deg);
+    opacity: 1;
+  }
+}
+@keyframes hoja-queda-atras {
+  from {
+    transform: none;
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.994);
+    opacity: 0.65;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

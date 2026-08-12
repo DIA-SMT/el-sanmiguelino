@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
-import { MigueChat } from "@/components/migue/migue-chat";
+import { HojaDiario } from "@/components/hoja-diario";
 import { edicionActual } from "@/lib/data/edicion-actual";
 import { getSeccion, notasPorSeccion } from "@/lib/data/secciones";
 import { getUsuario } from "@/lib/auth/session";
@@ -30,17 +30,17 @@ export default async function SeccionPage({
   const notas = notasPorSeccion(edicionActual, slug);
 
   return (
-    <>
+    <HojaDiario numeroPagina={null}>
       <Masthead
         edicion={edicionActual}
         usuario={usuario}
         seccionActiva={seccion.slug}
       />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-        <h2 className="border-b-2 border-ink pb-2 font-sans text-sm font-bold uppercase tracking-[0.22em] text-ink">
+      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+        <h1 className="border-b-2 border-ink pb-2 font-sans text-sm font-bold uppercase tracking-[0.22em] text-ink">
           {seccion.nombre}
-        </h2>
+        </h1>
 
         {notas.length === 0 ? (
           <div className="mt-10 border border-dashed border-line p-10 text-center">
@@ -95,7 +95,6 @@ export default async function SeccionPage({
       </main>
 
       <SiteFooter />
-      <MigueChat />
-    </>
+    </HojaDiario>
   );
 }

@@ -37,10 +37,12 @@ export function Masthead({
           <LogoHoja className="h-8 w-8 sm:h-11 sm:w-11" />
         </div>
         <div className="min-w-0 text-center">
+          {/* El nombre del diario es la bandera, no el encabezado del
+              contenido: el h1 de cada página es su propio titular. */}
           <Link href="/diario" className="inline-block">
-            <h1 className="font-display text-3xl font-black uppercase leading-none tracking-tight text-ink sm:text-5xl">
+            <p className="font-display text-3xl font-black uppercase leading-none tracking-tight text-ink sm:text-5xl">
               El Sanmiguelino
-            </h1>
+            </p>
           </Link>
           <p className="mt-1.5 font-sans text-[0.6rem] uppercase tracking-[0.22em] text-ink-2 sm:text-[0.7rem]">
             San Miguel de Tucumán · {edicion.mes} · N.º {edicion.numero}

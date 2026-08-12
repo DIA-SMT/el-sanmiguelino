@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { MessageCircle, RefreshCw, Send, X } from "lucide-react";
@@ -18,7 +19,13 @@ const SUGERENCIAS = [
   "¿Qué hay en la agenda cultural?",
 ];
 
-export function MigueChat({ notaSlug }: { notaSlug?: string }) {
+/** Vive en el layout del diario: la conversación sobrevive al paso de página
+ *  y el contexto (la nota abierta) sale del pathname. */
+export function MigueChat() {
+  const pathname = usePathname();
+  const notaSlug = pathname.startsWith("/nota/")
+    ? pathname.slice("/nota/".length)
+    : undefined;
   const [abierto, setAbierto] = useState(false);
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [texto, setTexto] = useState("");
