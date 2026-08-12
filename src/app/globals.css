@@ -232,6 +232,19 @@ body {
   z-index: 1;
 }
 
+/* Las flechas laterales quedan quietas mientras la hoja gira: son el mando,
+   no parte del papel. */
+::view-transition-group(flechas-pagina) {
+  animation: none;
+  z-index: 30;
+}
+::view-transition-old(flechas-pagina) {
+  display: none;
+}
+::view-transition-new(flechas-pagina) {
+  animation: none;
+}
+
 @keyframes hoja-se-pasa {
   from {
     transform: perspective(2200px) rotateY(0deg);
