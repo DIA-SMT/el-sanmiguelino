@@ -193,6 +193,41 @@ body {
   animation: fade-up 0.28s ease-out 0.16s both;
 }
 
+/* ---------------------------------------------------------------------------
+   Llegada de la página: el contenido se acomoda en vez de aparecer de golpe.
+--------------------------------------------------------------------------- */
+
+.entra {
+  animation: entra-suave 400ms cubic-bezier(0.32, 0.72, 0.24, 1) both;
+}
+.entra-2 {
+  animation-delay: 70ms;
+}
+.entra-3 {
+  animation-delay: 140ms;
+}
+
+@keyframes entra-suave {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* La foto se asienta, como una cámara que termina de encuadrar */
+.foto-asienta {
+  animation: foto-asienta 1200ms cubic-bezier(0.22, 0.68, 0.28, 1) both;
+}
+
+@keyframes foto-asienta {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
 /* Líneas de texto simuladas para la miniatura del diario */
 .fake-lines {
   background-image: repeating-linear-gradient(
@@ -204,7 +239,12 @@ body {
 
 /* ---------------------------------------------------------------------------
    Paso de página (View Transitions): la hoja gira sobre su lomo izquierdo y
-   deja ver la siguiente. Solo transform/opacity, por debajo de 300ms.
+   deja ver la siguiente. Solo transform/opacity.
+
+   Las micro-interacciones del sistema van por debajo de 300ms; esto es el
+   traslado de una hoja entera, así que necesita recorrido para leerse como
+   papel y no como un corte: 440ms con una curva que arranca decidida y
+   frena al apoyar.
 --------------------------------------------------------------------------- */
 
 ::view-transition {
@@ -214,21 +254,21 @@ body {
 
 ::view-transition-old(.pagina-adelante) {
   transform-origin: left center;
-  animation: 280ms ease-out both hoja-se-pasa;
+  animation: 440ms cubic-bezier(0.32, 0.72, 0.24, 1) both hoja-se-pasa;
   z-index: 2;
 }
 ::view-transition-new(.pagina-adelante) {
-  animation: 280ms ease-out both hoja-se-revela;
+  animation: 440ms cubic-bezier(0.32, 0.72, 0.24, 1) both hoja-se-revela;
   z-index: 1;
 }
 
 ::view-transition-new(.pagina-atras) {
   transform-origin: left center;
-  animation: 280ms ease-out both hoja-vuelve;
+  animation: 440ms cubic-bezier(0.32, 0.72, 0.24, 1) both hoja-vuelve;
   z-index: 2;
 }
 ::view-transition-old(.pagina-atras) {
-  animation: 280ms ease-out both hoja-queda-atras;
+  animation: 440ms cubic-bezier(0.32, 0.72, 0.24, 1) both hoja-queda-atras;
   z-index: 1;
 }
 
@@ -245,44 +285,52 @@ body {
   animation: none;
 }
 
+/* La hoja se mantiene entera casi todo el giro y recién se desvanece al
+   final: si se apaga temprano, el ojo lee un fundido, no una hoja. */
 @keyframes hoja-se-pasa {
-  from {
-    transform: perspective(2200px) rotateY(0deg);
+  0% {
+    transform: perspective(2600px) rotateY(0deg);
     opacity: 1;
   }
-  to {
-    transform: perspective(2200px) rotateY(-72deg);
-    opacity: 0.1;
+  70% {
+    opacity: 0.94;
+  }
+  100% {
+    transform: perspective(2600px) rotateY(-86deg);
+    opacity: 0;
   }
 }
 @keyframes hoja-se-revela {
-  from {
-    transform: scale(0.994);
-    opacity: 0.65;
+  0% {
+    transform: scale(0.985);
+    opacity: 0.5;
   }
-  to {
+  100% {
     transform: none;
     opacity: 1;
   }
 }
 @keyframes hoja-vuelve {
-  from {
-    transform: perspective(2200px) rotateY(-72deg);
-    opacity: 0.1;
+  0% {
+    transform: perspective(2600px) rotateY(-86deg);
+    opacity: 0;
   }
-  to {
-    transform: perspective(2200px) rotateY(0deg);
+  30% {
+    opacity: 0.94;
+  }
+  100% {
+    transform: perspective(2600px) rotateY(0deg);
     opacity: 1;
   }
 }
 @keyframes hoja-queda-atras {
-  from {
+  0% {
     transform: none;
     opacity: 1;
   }
-  to {
-    transform: scale(0.994);
-    opacity: 0.65;
+  100% {
+    transform: scale(0.985);
+    opacity: 0.5;
   }
 }
 

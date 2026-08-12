@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { PaginaEdicion } from "@/lib/data/paginas";
 
@@ -22,6 +22,8 @@ export function PasadorPaginas({
   total: number;
 }) {
   const router = useRouter();
+  // Mantener apretada la flecha encadenaba giros a medio hacer
+  const enCurso = useRef(false);
 
   useEffect(() => {
     function alPresionar(e: KeyboardEvent) {
@@ -42,6 +44,11 @@ export function PasadorPaginas({
       const destino = e.key === "ArrowRight" ? siguiente : anterior;
       if (!destino) return;
       e.preventDefault();
+      if (enCurso.current) return;
+      enCurso.current = true;
+      window.setTimeout(() => {
+        enCurso.current = false;
+      }, 450);
       router.push(destino.href, {
         transitionTypes: [
           e.key === "ArrowRight" ? "pagina-adelante" : "pagina-atras",
@@ -70,6 +77,7 @@ export function PasadorPaginas({
           <Link
             href={anterior.href}
             transitionTypes={["pagina-atras"]}
+            prefetch
             rel="prev"
             aria-label={`Página anterior: ${anterior.titulo}`}
             className={claseFlecha}
@@ -83,6 +91,7 @@ export function PasadorPaginas({
           <Link
             href={siguiente.href}
             transitionTypes={["pagina-adelante"]}
+            prefetch
             rel="next"
             aria-label={`Página siguiente: ${siguiente.titulo}`}
             className={claseFlecha}
@@ -101,6 +110,7 @@ export function PasadorPaginas({
             <Link
               href={anterior.href}
               transitionTypes={["pagina-atras"]}
+            prefetch
               className={claseBoton}
             >
               <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -122,6 +132,7 @@ export function PasadorPaginas({
             <Link
               href={siguiente.href}
               transitionTypes={["pagina-adelante"]}
+            prefetch
               className={claseBoton}
             >
               <span className="truncate">

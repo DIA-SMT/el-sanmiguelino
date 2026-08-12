@@ -46,7 +46,7 @@ export default async function Portada() {
 
         <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
           {/* Titular central */}
-          <h1 className="text-center font-display text-3xl font-black leading-[1.08] text-ink sm:text-5xl">
+          <h1 className="entra text-center font-display text-3xl font-black leading-[1.08] text-ink sm:text-5xl">
             <Link
               href={`/nota/${principal.slug}`}
               transitionTypes={["pagina-adelante"]}
@@ -57,7 +57,7 @@ export default async function Portada() {
           </h1>
 
           {/* Grilla principal a tres columnas */}
-          <div className="mt-6 grid gap-6 md:grid-cols-[1fr_1.4fr_1fr] md:gap-0">
+          <div className="entra entra-2 mt-6 grid gap-6 md:grid-cols-[1fr_1.4fr_1fr] md:gap-0">
             {/* Segundo titular */}
             <article className="md:border-r md:border-line md:pr-6">
               <p className="font-sans text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-accent">
@@ -134,7 +134,7 @@ export default async function Portada() {
           {/* Fila inferior: notas en recuadro + columna del lector */}
           <section
             aria-label="Más notas de esta edición"
-            className="grid gap-4 md:grid-cols-3"
+            className="entra entra-3 grid gap-4 md:grid-cols-3"
           >
             {cajas.map((nota) => (
               <article

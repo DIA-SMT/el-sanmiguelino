@@ -90,7 +90,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
           </nav>
 
           <article>
-            <header className="mx-auto max-w-3xl text-center">
+            <header className="entra mx-auto max-w-3xl text-center">
               <p className="font-sans text-xs font-semibold uppercase tracking-[0.18em] text-accent">
                 {nota.seccion}
               </p>
@@ -107,11 +107,11 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                 alt={nota.imagen.alt}
                 epigrafe={nota.imagen.epigrafe}
                 src={nota.imagen.src}
-                className="mx-auto mt-8 max-w-4xl"
+                className="entra entra-2 mx-auto mt-8 max-w-4xl"
               />
             )}
 
-            <div className="note-columns mx-auto mt-8 max-w-6xl">
+            <div className="entra entra-3 note-columns mx-auto mt-8 max-w-6xl">
               {nota.cuerpo.map((bloque, i) => (
                 <Bloque
                   key={i}

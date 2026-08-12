@@ -29,7 +29,7 @@ export function FiguraNota({
             alt={alt}
             fill
             sizes="(min-width: 1024px) 640px, 100vw"
-            className="object-cover"
+            className="foto-asienta object-cover"
           />
         </div>
       ) : (
