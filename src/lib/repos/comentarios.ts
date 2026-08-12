@@ -91,6 +91,17 @@ export const comentariosRepo = {
       .map((c) => proyectar(c, usuarioId));
   },
 
+  /** Comentario más reciente de toda la edición, para destacar en portada. */
+  async ultimoDeEdicion(
+    notaSlugs: string[],
+    usuarioId: string,
+  ): Promise<Comentario | null> {
+    const row = store.comentarios
+      .filter((c) => notaSlugs.includes(c.notaSlug))
+      .sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+    return row ? proyectar(row, usuarioId) : null;
+  },
+
   async crear(datos: {
     notaSlug: string;
     usuarioId: string;

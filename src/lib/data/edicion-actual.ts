@@ -10,6 +10,50 @@ export const edicionActual: Edicion = {
   etiqueta: "Edición mensual",
   notas: [
     {
+      slug: "septiembre-musical-plaza-independencia",
+      seccion: "Cultura",
+      titulo: "El Septiembre Musical vuelve a la plaza Independencia con un show de apertura gratuito",
+      bajada:
+        "El festival más tradicional de la provincia abre su edición 2026 en el corazón fundacional de la ciudad: un espectáculo al aire libre con la Orquesta Estable, artistas locales y un mapping sobre los edificios históricos.",
+      imagen: {
+        src: "/notas/plaza-independencia.webp",
+        alt: "Vista aérea de la plaza Independencia de San Miguel de Tucumán, rodeada por los edificios del centro",
+        epigrafe:
+          "La plaza Independencia, corazón fundacional de la ciudad, será el escenario de la apertura del festival.",
+      },
+      cuerpo: [
+        {
+          tipo: "parrafo",
+          texto:
+            "La plaza Independencia se prepara para una noche que promete quedar en la memoria de los sanmiguelinos. El viernes 4 de septiembre, desde las 20, el tradicional Septiembre Musical abrirá su edición 2026 con un gran espectáculo gratuito al aire libre: la Orquesta Estable de la Provincia compartirá escenario con artistas tucumanos de folclore, rock y música urbana, en un recorrido pensado para todas las generaciones.",
+        },
+        {
+          tipo: "parrafo",
+          texto:
+            "El cierre estará a cargo de un mapping monumental proyectado sobre las fachadas del Casino y de la Casa de Gobierno, que repasará la historia del festival y los paisajes de la provincia. Habrá además una feria de emprendedores y food trucks sobre calle 25 de Mayo, con propuestas de gastronomía regional.",
+        },
+        {
+          tipo: "cita",
+          texto:
+            "Queremos que la apertura sea una fiesta de todos: que la música vuelva a llenar la plaza y que cada vecino sienta que el festival también le pertenece.",
+          autor: "Carolina Páez",
+          cargo: "secretaria de Cultura",
+        },
+        { tipo: "subtitulo", texto: "Un escenario con historia" },
+        {
+          tipo: "parrafo",
+          texto:
+            "No es casual la elección del lugar: la plaza Independencia fue escenario de las grandes celebraciones de la ciudad desde el siglo XIX, y volverá a serlo con una puesta que combina tradición y tecnología. El escenario principal se montará frente a la fuente central, con pantallas laterales para que el show se disfrute desde cualquier sector del paseo.",
+        },
+        { tipo: "subtitulo", texto: "Operativo y accesos" },
+        {
+          tipo: "parrafo",
+          texto:
+            "Desde las 18 se cortará el tránsito en las cuatro calles perimetrales y se dispondrán accesos señalizados, sanitarios y un sector reservado para personas con movilidad reducida frente al Correo. La programación completa del festival puede consultarse en los canales oficiales y preguntándole a Migue desde este diario.",
+        },
+      ],
+    },
+    {
       slug: "parque-9-de-julio-museo-a-cielo-abierto",
       seccion: "Ciudad",
       titulo: "El Parque 9 de Julio, un museo a cielo abierto a descubrir",
@@ -69,50 +113,6 @@ export const edicionActual: Edicion = {
           tipo: "parrafo",
           texto:
             "La invitación queda hecha: recorrer el Parque 9 de Julio con otros ojos, descubrir sus esculturas y reencontrarse con un patrimonio que es de todos los sanmiguelinos.",
-        },
-      ],
-    },
-    {
-      slug: "septiembre-musical-plaza-independencia",
-      seccion: "Cultura",
-      titulo: "El Septiembre Musical vuelve a la plaza Independencia con un show de apertura gratuito",
-      bajada:
-        "El festival más tradicional de la provincia abre su edición 2026 en el corazón fundacional de la ciudad: un espectáculo al aire libre con la Orquesta Estable, artistas locales y un mapping sobre los edificios históricos.",
-      imagen: {
-        src: "/notas/plaza-independencia.webp",
-        alt: "Vista aérea de la plaza Independencia de San Miguel de Tucumán, rodeada por los edificios del centro",
-        epigrafe:
-          "La plaza Independencia, corazón fundacional de la ciudad, será el escenario de la apertura del festival.",
-      },
-      cuerpo: [
-        {
-          tipo: "parrafo",
-          texto:
-            "La plaza Independencia se prepara para una noche que promete quedar en la memoria de los sanmiguelinos. El viernes 4 de septiembre, desde las 20, el tradicional Septiembre Musical abrirá su edición 2026 con un gran espectáculo gratuito al aire libre: la Orquesta Estable de la Provincia compartirá escenario con artistas tucumanos de folclore, rock y música urbana, en un recorrido pensado para todas las generaciones.",
-        },
-        {
-          tipo: "parrafo",
-          texto:
-            "El cierre estará a cargo de un mapping monumental proyectado sobre las fachadas del Casino y de la Casa de Gobierno, que repasará la historia del festival y los paisajes de la provincia. Habrá además una feria de emprendedores y food trucks sobre calle 25 de Mayo, con propuestas de gastronomía regional.",
-        },
-        {
-          tipo: "cita",
-          texto:
-            "Queremos que la apertura sea una fiesta de todos: que la música vuelva a llenar la plaza y que cada vecino sienta que el festival también le pertenece.",
-          autor: "Carolina Páez",
-          cargo: "secretaria de Cultura",
-        },
-        { tipo: "subtitulo", texto: "Un escenario con historia" },
-        {
-          tipo: "parrafo",
-          texto:
-            "No es casual la elección del lugar: la plaza Independencia fue escenario de las grandes celebraciones de la ciudad desde el siglo XIX, y volverá a serlo con una puesta que combina tradición y tecnología. El escenario principal se montará frente a la fuente central, con pantallas laterales para que el show se disfrute desde cualquier sector del paseo.",
-        },
-        { tipo: "subtitulo", texto: "Operativo y accesos" },
-        {
-          tipo: "parrafo",
-          texto:
-            "Desde las 18 se cortará el tránsito en las cuatro calles perimetrales y se dispondrán accesos señalizados, sanitarios y un sector reservado para personas con movilidad reducida frente al Correo. La programación completa del festival puede consultarse en los canales oficiales y preguntándole a Migue desde este diario.",
         },
       ],
     },

@@ -29,10 +29,13 @@ export default async function Portada() {
   const [principal, segunda, ...cajas] = edicionActual.notas;
   const parrafos = parrafosDe(principal);
   const cita = citaDe(principal);
-  const [comentarioDestacado] = await comentariosRepo.listar(
-    principal.slug,
+  const comentarioDestacado = await comentariosRepo.ultimoDeEdicion(
+    edicionActual.notas.map((n) => n.slug),
     usuario.id,
   );
+  const notaComentada = comentarioDestacado
+    ? edicionActual.notas.find((n) => n.slug === comentarioDestacado.notaSlug)
+    : null;
 
   return (
     <>
@@ -177,6 +180,17 @@ export default async function Portada() {
                     {comentarioDestacado.usuarioNombre}
                   </span>
                   <span>{tiempoRelativo(comentarioDestacado.fecha)}</span>
+                  {notaComentada && (
+                    <span>
+                      sobre{" "}
+                      <Link
+                        href={`/nota/${notaComentada.slug}`}
+                        className="italic text-accent underline-offset-2 hover:underline"
+                      >
+                        {notaComentada.titulo}
+                      </Link>
+                    </span>
+                  )}
                   <span className="inline-flex items-center gap-1 tabular-nums">
                     <ThumbsUp className="h-3 w-3" aria-hidden="true" />
                     {comentarioDestacado.likes}
@@ -194,7 +208,7 @@ export default async function Portada() {
               </p>
             )}
             <Link
-              href={`/nota/${principal.slug}#columna-lector`}
+              href={`/nota/${notaComentada?.slug ?? principal.slug}#columna-lector`}
               className="mt-3 inline-block font-sans text-xs font-semibold text-accent underline-offset-2 hover:underline"
             >
               Sumá tu opinión
