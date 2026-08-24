@@ -26,7 +26,19 @@ export function ThemeToggle() {
 
   function alternar() {
     const proximo = tema === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = proximo;
+    const raiz = document.documentElement;
+
+    // El cambio de tema va sin transiciones (ver globals.css): se apagan, se
+    // fuerza el recálculo con el tema nuevo ya puesto, y se vuelven a
+    // encender en el cuadro siguiente. Sin esto, todo lo que tenga transición
+    // de color queda pintado con el tema anterior.
+    raiz.setAttribute("data-cambiando-tema", "");
+    raiz.dataset.theme = proximo;
+    void raiz.offsetHeight;
+    requestAnimationFrame(() => {
+      raiz.removeAttribute("data-cambiando-tema");
+    });
+
     try {
       localStorage.setItem("sm-theme", proximo);
     } catch {
@@ -42,15 +54,30 @@ export function ThemeToggle() {
       onClick={alternar}
       aria-label={esOscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
       aria-pressed={esOscuro}
-      className="pressable inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-chrome text-ink-2 transition-colors hover:text-ink"
+      title={esOscuro ? "Edición de día" : "Edición nocturna"}
+      className="pressable relative inline-flex h-9 w-9 items-center justify-center overflow-hidden border border-line bg-chrome text-ink-2 hover:border-ink hover:text-ink"
     >
-      {tema === null ? (
-        <span className="h-4 w-4" aria-hidden="true" />
-      ) : esOscuro ? (
-        <Sun className="h-4 w-4" aria-hidden="true" />
-      ) : (
-        <Moon className="h-4 w-4" aria-hidden="true" />
-      )}
+      {/* Los dos iconos conviven y se cruzan: el cambio de tema se ve. */}
+      <Sun
+        aria-hidden="true"
+        className={`absolute h-4 w-4 transition-all duration-300 ${
+          tema === null
+            ? "opacity-0"
+            : esOscuro
+              ? "rotate-0 opacity-100"
+              : "-rotate-90 opacity-0"
+        }`}
+      />
+      <Moon
+        aria-hidden="true"
+        className={`absolute h-4 w-4 transition-all duration-300 ${
+          tema === null
+            ? "opacity-0"
+            : esOscuro
+              ? "rotate-90 opacity-0"
+              : "rotate-0 opacity-100"
+        }`}
+      />
     </button>
   );
 }

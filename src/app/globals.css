@@ -1,79 +1,189 @@
 @import "tailwindcss";
 
-/* ---------------------------------------------------------------------------
-   El Sanmiguelino — design tokens
+/* ===========================================================================
+   El Sanmiguelino — sistema visual
+   ---------------------------------------------------------------------------
    Paleta derivada del logo de la Municipalidad de San Miguel de Tucumán.
-   Modo claro = papel de diario; modo oscuro = edición nocturna (acento celeste).
---------------------------------------------------------------------------- */
+   Modo claro = papel de diario recién impreso; modo oscuro = edición nocturna.
+
+   La paleta nocturna se escribe DOS veces: una para la elección explícita del
+   toggle y otra para la preferencia del sistema. Es fea pero es la única
+   correcta.
+
+   Acá hubo un `light-dark()` que declaraba cada token una sola vez, y hubo que
+   sacarlo: `light-dark()` se resuelve recién en el valor usado, así que cambiar
+   `color-scheme` no modifica el valor *computado* del token. El navegador no ve
+   cambio, no dispara la transición, y todo elemento con `transition-colors`
+   —titulares, botones, enlaces— se quedaba pintado con el color del tema
+   anterior hasta que algo forzara un recálculo. Con los tokens declarados por
+   tema el valor computado sí cambia y la cascada funciona.
+=========================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* marca */
+  /* --- marca (fija, no cambia con el tema: es el logo) ------------------- */
   --azul: #0a5ce8;
   --azul-fuerte: #0847c4;
   --celeste: #22a7f5;
   --amarillo: #f5ce00;
   --sol: #ffd617;
 
-  /* superficie (papel de diario) */
-  --bg: #efebe1;
-  --paper: #fbf9f3;
-  --chrome: #ffffff;
-  --ink: #141210;
-  --ink-2: #4a463f;
-  --line: #d8d2c4;
-  /* escritorio: la superficie sobre la que se apoya la hoja */
-  --escritorio: #ddd6c6;
+  /* --- superficies ------------------------------------------------------ */
+  /* escritorio: la mesa sobre la que se apoya la hoja */
+  --escritorio: #d9d1bf;
+  /* bg: fondo general fuera de la hoja (landing, login) */
+  --bg: #ece7db;
+  /* paper: la hoja */
+  --paper: #fcfaf4;
+  /* paper-2: recuadros hundidos dentro de la hoja */
+  --paper-2: #f4efe3;
+  /* chrome: recuadros elevados, controles */
+  --chrome: #fffefb;
 
-  /* acento activo: azul en claro, celeste en oscuro */
-  --accent: var(--azul);
-  --accent-strong: var(--azul-fuerte);
+  /* --- tinta ------------------------------------------------------------ */
+  --ink: #17140e;
+  --ink-2: #575145;
+  /* ink-3: epígrafes, metadatos, foliado. Es el tono más claro que sigue
+     pasando 4.5:1 sobre --paper-2, el fondo más exigente en el que aparece. */
+  --ink-3: #736c5b;
+
+  /* --- filetes ---------------------------------------------------------- */
+  --line: #ddd6c5;
+  /* hairline: el filete más fino, para columnas y separadores internos */
+  --hairline: #e6e0d2;
+
+  /* --- acento activo: azul en claro, celeste en oscuro ------------------- */
+  --accent: #0a5ce8;
+  --accent-strong: #0847c4;
   --accent-contrast: #ffffff;
+  /* lavado de acento para fondos y estados */
+  --accent-wash: rgb(10 92 232 / 0.08);
+
+  /* --- textura y velos -------------------------------------------------- */
+  --grano-tinta: rgb(26 22 14 / 0.055);
+  /* velo sobre las fotos: en nocturno bajan un punto para no encandilar */
+  --velo-foto: rgb(0 0 0 / 0);
+  /* velo del panorama de fondo, que ahora es el fondo de todo el sitio. Como
+     el contenido se apoya en hojas opacas, este velo ya no tiene que sostener
+     el contraste de nada: sólo manda la foto al fondo y la pasa al tono de la
+     edición. Por eso pudo bajar de 0.76 —donde la ciudad casi no se veía— a
+     0.58. El único lugar donde hay texto directamente encima es el hero de la
+     landing, y ahí se suma un velo local. */
+  --velo-panorama: rgb(252 250 244 / 0.58);
+  /* trama de semitono: el punto de la foto impresa */
+  --punto-trama: rgb(23 20 14 / 0.16);
+
+  /* --- sombras ---------------------------------------------------------- */
+  /* la hoja: contacto corto + difusión larga, como papel sobre madera */
+  --sombra-hoja:
+    0 1px 1px rgb(0 0 0 / 0.05), 0 2px 4px rgb(0 0 0 / 0.05),
+    0 12px 28px -10px rgb(0 0 0 / 0.22), 0 30px 60px -30px rgb(0 0 0 / 0.3);
+  --sombra-flotante: 0 2px 6px rgb(0 0 0 / 0.08),
+    0 14px 34px -12px rgb(0 0 0 / 0.28);
+  --sombra-control: 0 1px 2px rgb(0 0 0 / 0.07),
+    0 4px 10px -4px rgb(0 0 0 / 0.16);
+
+  /* --- curvas ----------------------------------------------------------- */
+  --curva-papel: cubic-bezier(0.32, 0.72, 0.24, 1);
+  --curva-suave: cubic-bezier(0.22, 0.68, 0.28, 1);
+
+  /* trama de fibra de papel, usada como máscara (el color lo pone el token) */
+  --grano-textura: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
 }
+
+/* --- Edición nocturna ------------------------------------------------------
+   Las dos reglas de abajo comparten la MISMA lista de declaraciones. Si se
+   toca una, hay que tocar la otra: la primera es la elección del toggle, la
+   segunda es la preferencia del sistema cuando no hay elección (y es lo único
+   que da tema oscuro si el usuario tiene JavaScript apagado, porque el script
+   anti-destello del layout siempre escribe un data-theme explícito).
+--------------------------------------------------------------------------- */
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0a0f1a;
-  --paper: #111826;
-  --chrome: #0e1522;
-  --ink: #eef2f8;
-  --ink-2: #b7c0ce;
-  --line: #243146;
-  --escritorio: #060a12;
-  --accent: var(--celeste);
-  --accent-strong: #5cbdf8;
-  --accent-contrast: #06121f;
+
+  --escritorio: #05070b;
+  --bg: #0a0d13;
+  --paper: #141922;
+  --paper-2: #191f2a;
+  --chrome: #10151d;
+
+  --ink: #edf0f5;
+  --ink-2: #a9b1bf;
+  --ink-3: #8b95a5;
+
+  --line: #263040;
+  --hairline: #1f2835;
+
+  --accent: #38b6ff;
+  --accent-strong: #7fcfff;
+  --accent-contrast: #05131f;
+  --accent-wash: rgb(56 182 255 / 0.12);
+
+  --grano-tinta: rgb(196 210 232 / 0.045);
+  --velo-foto: rgb(8 12 20 / 0.2);
+  --velo-panorama: rgb(9 13 21 / 0.68);
+  --punto-trama: rgb(8 12 20 / 0.3);
 }
 
-/* Fallback sin JS: respetar la preferencia del sistema */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0a0f1a;
-    --paper: #111826;
-    --chrome: #0e1522;
-    --ink: #eef2f8;
-    --ink-2: #b7c0ce;
-    --line: #243146;
-    --escritorio: #060a12;
-    --accent: var(--celeste);
-    --accent-strong: #5cbdf8;
-    --accent-contrast: #06121f;
+
+    --escritorio: #05070b;
+    --bg: #0a0d13;
+    --paper: #141922;
+    --paper-2: #191f2a;
+    --chrome: #10151d;
+
+    --ink: #edf0f5;
+    --ink-2: #a9b1bf;
+    --ink-3: #8b95a5;
+
+    --line: #263040;
+    --hairline: #1f2835;
+
+    --accent: #38b6ff;
+    --accent-strong: #7fcfff;
+    --accent-contrast: #05131f;
+    --accent-wash: rgb(56 182 255 / 0.12);
+
+    --grano-tinta: rgb(196 210 232 / 0.045);
+    --velo-foto: rgb(8 12 20 / 0.2);
+    --velo-panorama: rgb(9 13 21 / 0.68);
+    --punto-trama: rgb(8 12 20 / 0.3);
   }
+}
+
+/* Cambiar de tema no es una animación. Mientras el toggle cambia el tema no
+   corre ninguna transición, por dos razones: la página no se funde entera de
+   un color al otro, y —sobre todo— los elementos con transición de color no se
+   quedan pintados con el tema anterior. Una propiedad en transición no se
+   reevalúa cuando lo que cambió es el token del que sale su valor: el color
+   queda clavado hasta que algo fuerce un recálculo sin transición.
+   Lo pone y lo saca `ThemeToggle`, en el mismo cuadro. */
+:root[data-cambiando-tema] *,
+:root[data-cambiando-tema] *::before,
+:root[data-cambiando-tema] *::after {
+  transition: none !important;
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
   --color-chrome: var(--chrome);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
   --color-line: var(--line);
+  --color-hairline: var(--hairline);
   --color-escritorio: var(--escritorio);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-contrast: var(--accent-contrast);
+  --color-accent-wash: var(--accent-wash);
   --color-azul: var(--azul);
   --color-azul-fuerte: var(--azul-fuerte);
   --color-celeste: var(--celeste);
@@ -81,170 +191,487 @@
   --color-sol: var(--sol);
 
   --font-display: var(--font-playfair), "Playfair Display", georgia, serif;
-  --font-serif: var(--font-source-serif), "Source Serif 4", georgia, serif;
+  --font-serif: var(--font-newsreader), "Newsreader", georgia, serif;
   --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
-}
 
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-serif), georgia, serif;
-}
-
-/* Foco visible siempre (WCAG 2.4.7) */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
-::selection {
-  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  --shadow-hoja: var(--sombra-hoja);
+  --shadow-flotante: var(--sombra-flotante);
+  --shadow-control: var(--sombra-control);
 }
 
 /* ---------------------------------------------------------------------------
-   Utilidades editoriales
+   Base
 --------------------------------------------------------------------------- */
 
-/* Filete doble, como la fecha del impreso */
-.rule-double {
-  border-block: 1px solid var(--ink);
-  position: relative;
-}
-.rule-double::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  bottom: -4px;
-  border-bottom: 3px solid var(--ink);
+@layer base {
+  html {
+    scrollbar-color: color-mix(in srgb, var(--ink) 28%, transparent) transparent;
+    scrollbar-width: thin;
+    /* el ancla de la columna del lector no queda pegada al borde */
+    scroll-padding-top: 2rem;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-serif), georgia, serif;
+    /* Newsreader es variable con eje óptico: que lo use. */
+    font-optical-sizing: auto;
+    font-variant-ligatures: common-ligatures contextual;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Foco visible siempre (WCAG 2.4.7) */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* Lo resaltado por el buscador: subrayado grueso de acento, no un bloque
+     fluo. Con `color: inherit` la tinta sigue siendo tinta y el contraste no
+     depende del fondo del resalte. */
+  mark {
+    background: var(--accent-wash);
+    box-shadow: inset 0 -0.32em 0 var(--accent-wash);
+    color: inherit;
+    padding-inline: 0.1em;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--ink);
+  }
 }
 
-.rule-thin {
-  border-top: 1px solid var(--line);
-}
+@layer components {
+  /* ---------------------------------------------------------------------------
+     Superficies: el escritorio y la hoja
+  --------------------------------------------------------------------------- */
 
-/* Cuerpo de nota a columnas */
-.note-columns {
-  column-gap: 2.5rem;
-  column-rule: 1px solid var(--line);
-}
-@media (min-width: 768px) {
+  /* La mesa sobre la que se apoya la hoja. Ya no es un color: es la
+     panorámica fija del layout, que se ve por acá. Sólo queda el golpe de luz
+     cenital —para que la hoja reciba el foco y los bordes caigan— y un tinte
+     mínimo del color de escritorio, que es lo único que se ve si la foto no
+     está en /public. */
+  .escritorio {
+    background-color: color-mix(in srgb, var(--escritorio) 16%, transparent);
+    background-image: radial-gradient(
+      120% 70% at 50% -10%,
+      color-mix(in srgb, var(--paper) 20%, transparent) 0%,
+      transparent 62%
+    );
+  }
+
+  /* Trama de fibra. El color sale del token, así sirve en claro y en oscuro.
+     Va en una capa de z negativo dentro de un contexto aislado: queda sobre el
+     fondo del elemento y debajo de todo su contenido, sin obligar a los hijos a
+     declarar z-index (que rompería el sticky de la barra de secciones). */
+  .grano {
+    position: relative;
+    isolation: isolate;
+  }
+  .grano::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--grano-tinta);
+    mask-image: var(--grano-textura);
+    mask-size: 160px 160px;
+    mask-repeat: repeat;
+  }
+
+  /* El cuerpo de la hoja es superficie de gesto: `pan-y` le dice al navegador
+     que el desplazamiento vertical es suyo pero el horizontal no, así deja de
+     quedarse con el gesto y de cortarnos los `pointermove` con un
+     `pointercancel`. Sin esto el paso de página con el dedo no funciona en un
+     celular real, aunque los eventos sintéticos digan que sí.
+
+     `pinch-zoom` va explícito para no romperle el zoom a nadie.
+
+     Va en `main` y `footer` y NO en `.hoja`: la barra de secciones se desplaza
+     sola en horizontal, y `pan-y` en un ancestro se lo prohíbe. Poniéndolo en
+     los hermanos de la cabecera, la barra queda libre. */
+  .hoja main,
+  .hoja footer {
+    touch-action: pan-y pinch-zoom;
+  }
+
+  /* La hoja del diario apoyada sobre el escritorio. */
+  .hoja {
+    border: 1px solid var(--line);
+    background-color: var(--paper);
+    /* el lomo izquierdo y el canto derecho, apenas insinuados */
+    background-image: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--ink) 5%, transparent) 0,
+      transparent 14px,
+      transparent calc(100% - 8px),
+      color-mix(in srgb, var(--ink) 3%, transparent) 100%
+    );
+    box-shadow: var(--sombra-hoja);
+  }
+
+  /* ---------------------------------------------------------------------------
+     Tipografía editorial
+  --------------------------------------------------------------------------- */
+
+  /* Bandera del diario: display al máximo peso, tracking cerrado. */
+  .bandera {
+    font-family: var(--font-display), georgia, serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.022em;
+    line-height: 0.9;
+  }
+
+  /* Titulares: display con ajuste óptico y corte de línea equilibrado. */
+  .titular {
+    font-family: var(--font-display), georgia, serif;
+    letter-spacing: -0.016em;
+    text-wrap: balance;
+  }
+
+  /* Volanta / antetítulo: sans en versalitas espaciadas. */
+  .volanta {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.66rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+
+  /* Metadatos de la hoja: fecha, foliado, créditos. */
+  .meta {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Cuerpo de nota justificado, con partición de palabras: sin guiones, el
+     texto justificado abre ríos blancos. El idioma lo da <html lang="es-AR">. */
+  .texto-diario {
+    text-align: justify;
+    text-justify: inter-word;
+    hyphens: auto;
+    hyphenate-limit-chars: 7 3 3;
+    text-wrap: pretty;
+  }
+
+  /* Cuerpo a columnas, como el impreso. */
   .note-columns {
-    column-count: 2;
+    column-gap: 2.75rem;
+    column-rule: 1px solid var(--hairline);
+  }
+  @media (min-width: 768px) {
+    .note-columns {
+      column-count: 2;
+    }
+  }
+  @media (min-width: 1100px) {
+    .note-columns {
+      column-count: 3;
+    }
+  }
+  .note-columns > * {
+    break-inside: avoid-column;
+  }
+  .note-columns p {
+    break-inside: auto;
+  }
+
+  /* Letra capitular: se apoya en la línea base de la tercera línea sin empujar
+     al párrafo. */
+  .drop-cap::first-letter {
+    font-family: var(--font-display), georgia, serif;
+    font-weight: 700;
+    font-size: 3.5em;
+    line-height: 0.8;
+    float: left;
+    margin-right: 0.07em;
+    padding-top: 0.06em;
+    color: var(--ink);
+  }
+
+  /* Filete doble, como la fecha del impreso. */
+  .rule-double {
+    border-block: 1px solid var(--ink);
+    position: relative;
+  }
+  .rule-double::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: -4px;
+    border-bottom: 3px solid var(--ink);
+  }
+
+  .rule-thin {
+    border-top: 1px solid var(--line);
+  }
+
+  /* Filete de sección: acento corto sobre hairline al ancho total. */
+  .filete-seccion {
+    position: relative;
+    border-bottom: 1px solid var(--line);
+  }
+  .filete-seccion::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    width: 3.5rem;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  /* ---------------------------------------------------------------------------
+     Fotos
+  --------------------------------------------------------------------------- */
+
+  .foto-editorial {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--paper-2);
+  }
+  .foto-editorial > img,
+  .foto-editorial > svg {
+    transition: transform 800ms var(--curva-suave);
+  }
+  /* borde interior de un pelo + velo nocturno, sin tocar el layout */
+  .foto-editorial::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: var(--velo-foto);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent);
+  }
+  a:hover .foto-editorial > img,
+  a:focus-visible .foto-editorial > img {
+    transform: scale(1.035);
+  }
+
+  /* Trama de semitono: el punto de la foto de diario. Sobre el panorama de
+     fondo hace que la foto se lea como impresa y no como un wallpaper. */
+  .trama-punto {
+    background-image: radial-gradient(
+      var(--punto-trama) 0.9px,
+      transparent 1px
+    );
+    background-size: 3px 3px;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Enlaces y controles
+  --------------------------------------------------------------------------- */
+
+  /* Titular enlazado: el subrayado crece desde la izquierda al pasar. */
+  .titular-link {
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 2px;
+    transition:
+      background-size 320ms var(--curva-suave),
+      color 200ms ease-out;
+  }
+  .titular-link:hover,
+  .titular-link:focus-visible {
+    color: var(--accent-strong);
+    background-size: 100% 2px;
+  }
+
+  /* Enlace en texto corrido. */
+  .enlace {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+    transition:
+      text-decoration-color 180ms ease-out,
+      color 180ms ease-out;
+  }
+  .enlace:hover {
+    color: var(--accent-strong);
+    text-decoration-color: currentColor;
+  }
+
+  /* Feedback táctil. */
+  .pressable {
+    transition:
+      transform 140ms var(--curva-suave),
+      border-color 180ms ease-out,
+      background-color 180ms ease-out,
+      color 180ms ease-out,
+      box-shadow 180ms ease-out;
+  }
+  .pressable:active {
+    transform: scale(0.975);
+  }
+
+  /* ---------------------------------------------------------------------------
+     Movimiento
+  --------------------------------------------------------------------------- */
+
+  /* Llegada de la página: el contenido se acomoda en vez de aparecer de golpe. */
+  .entra {
+    animation: entra-suave 460ms var(--curva-papel) both;
+  }
+  .entra-2 {
+    animation-delay: 80ms;
+  }
+  .entra-3 {
+    animation-delay: 160ms;
+  }
+  .entra-4 {
+    animation-delay: 240ms;
+  }
+
+  @keyframes entra-suave {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+
+  /* Entrada de la landing. */
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+  .fade-up {
+    animation: fade-up 520ms var(--curva-papel) both;
+  }
+  .fade-up-2 {
+    animation: fade-up 520ms var(--curva-papel) 90ms both;
+  }
+  .fade-up-3 {
+    animation: fade-up 520ms var(--curva-papel) 180ms both;
+  }
+  .fade-up-4 {
+    animation: fade-up 520ms var(--curva-papel) 270ms both;
+  }
+
+  /* La foto se asienta, como una cámara que termina de encuadrar. El relleno
+     es `backwards` y no `both`: con `both` el transform del último fotograma
+     queda fijado para siempre y el hover de la foto no podría moverla. */
+  .foto-asienta {
+    animation: foto-asienta 1400ms var(--curva-suave) backwards;
+  }
+  @keyframes foto-asienta {
+    from {
+      transform: scale(1.05);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  /* Líneas de texto simuladas para la miniatura del impreso. */
+  .fake-lines {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--ink) 26%, transparent) 0 2px,
+      transparent 2px 7px
+    );
+  }
+
+  /* Barra de avance de lectura, movida por el scroll: sin JavaScript. */
+  .progreso-lectura {
+    display: none;
+  }
+  @supports (animation-timeline: scroll()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .progreso-lectura {
+        display: block;
+        position: fixed;
+        inset-block-start: 0;
+        inset-inline: 0;
+        z-index: 45;
+        height: 2px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+        transform-origin: 0 50%;
+        animation: avanza-lectura linear both;
+        animation-timeline: scroll(root block);
+      }
+    }
+  }
+  @keyframes avanza-lectura {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  /* Aparición al entrar en cuadro, también movida por el scroll. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .revela {
+        animation: revela-suave linear both;
+        animation-timeline: view();
+        animation-range: entry 4% cover 26%;
+      }
+    }
+  }
+  @keyframes revela-suave {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
-@media (min-width: 1100px) {
-  .note-columns {
-    column-count: 3;
-  }
-}
-.note-columns > * {
-  break-inside: avoid-column;
-}
-.note-columns p {
-  break-inside: auto;
-}
-
-/* Letra capitular en el primer párrafo */
-.drop-cap::first-letter {
-  font-family: var(--font-display), georgia, serif;
-  font-weight: 700;
-  font-size: 3.4em;
-  line-height: 0.82;
-  float: left;
-  padding-right: 0.08em;
-  padding-top: 0.04em;
-}
-
-/* Feedback táctil en botones */
-.pressable {
-  transition: transform 120ms ease-out;
-}
-.pressable:active {
-  transform: scale(0.97);
-}
-
-/* Texturita de papel muy sutil, solo en claro */
-.paper-grain {
-  background-image: radial-gradient(
-    color-mix(in srgb, var(--ink) 3%, transparent) 1px,
-    transparent 1px
-  );
-  background-size: 5px 5px;
-}
-:root[data-theme="dark"] .paper-grain {
-  background-image: none;
-}
-
-/* Entrada suave para la landing (la anula prefers-reduced-motion) */
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-}
-.fade-up {
-  animation: fade-up 0.28s ease-out both;
-}
-.fade-up-2 {
-  animation: fade-up 0.28s ease-out 0.08s both;
-}
-.fade-up-3 {
-  animation: fade-up 0.28s ease-out 0.16s both;
-}
-
 /* ---------------------------------------------------------------------------
-   Llegada de la página: el contenido se acomoda en vez de aparecer de golpe.
---------------------------------------------------------------------------- */
+   Paso de página (View Transitions): el giro de flipbook.
 
-.entra {
-  animation: entra-suave 400ms cubic-bezier(0.32, 0.72, 0.24, 1) both;
-}
-.entra-2 {
-  animation-delay: 70ms;
-}
-.entra-3 {
-  animation-delay: 140ms;
-}
+   La versión anterior abría la hoja vieja como una tapa y debajo había otra
+   quieta. Eso es una tapa, no una hoja: en un diario la página que gira
+   **tiene la siguiente de su otro lado**.
 
-@keyframes entra-suave {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-}
+   Acá el giro se reparte en dos mitades que son una sola rotación continua:
 
-/* La foto se asienta, como una cámara que termina de encuadrar */
-.foto-asienta {
-  animation: foto-asienta 1200ms cubic-bezier(0.22, 0.68, 0.28, 1) both;
-}
+     0 → 50 %   la hoja que se va rota de 0° a -90° sobre el lomo izquierdo.
+                A -90° está de canto y ocupa cero ancho: es invisible.
+     50 → 100 % la que llega sigue el mismo movimiento desde +90° hasta 0°,
+                o sea que aparece de canto y se abre hasta quedar plana.
 
-@keyframes foto-asienta {
-  from {
-    transform: scale(1.06);
-  }
-  to {
-    transform: scale(1);
-  }
-}
+   Las dos giran en el mismo sentido (el ángulo siempre baja), y el cambio
+   ocurre justo cuando ninguna de las dos tiene ancho. El ojo no ve dos
+   elementos: ve una hoja que se da vuelta y muestra su reverso.
 
-/* Líneas de texto simuladas para la miniatura del diario */
-.fake-lines {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--ink) 28%, transparent) 0 2px,
-    transparent 2px 7px
-  );
-}
+   Volver es el reverso exacto: la que se va sube de 0° a +90° y la que llega
+   entra desde -90°.
 
-/* ---------------------------------------------------------------------------
-   Paso de página (View Transitions): la hoja gira sobre su lomo izquierdo y
-   deja ver la siguiente. Solo transform/opacity.
+   La luz es lo que termina de venderlo, y va en su propia animación: el
+   brillo tiene que seguir el COSENO del ángulo, no el tiempo. Metido en los
+   mismos fotogramas que el giro, uno le impone su curva al otro.
 
-   Las micro-interacciones del sistema van por debajo de 300ms; esto es el
-   traslado de una hoja entera, así que necesita recorrido para leerse como
-   papel y no como un corte: 440ms con una curva que arranca decidida y
-   frena al apoyar.
+   Perilla de gusto: el 0.38 de ambiente de la luz. Si el canto queda pesado,
+   0.45 es el punto medio seguro. La duración es 1150ms, repartida mitad y
+   mitad, y la guardia de `mando-paginas.tsx` (1180ms) tiene que acompañarla.
+
+   Lo que NO se puede hacer acá: doblar el papel. La API anima una captura de
+   la página, o sea una imagen plana, y sólo acepta propiedades CSS sobre ella.
+   Un rectángulo bajo transformaciones afines y proyectivas sigue siendo
+   siempre un cuadrilátero de bordes rectos: no hay doblez posible. Deformar
+   los píxeles pediría un filtro SVG por referencia, y `url()` en la lista de
+   `filter` vuelve DISCRETA toda la interpolación —incluida la del brillo que
+   sostiene esta animación—, así que costaría más de lo que da. El techo real
+   de esto es una lámina rígida bien tirada, no papel que se pliega.
 --------------------------------------------------------------------------- */
 
 ::view-transition {
@@ -252,24 +679,85 @@ body {
   pointer-events: none;
 }
 
+/* La hoja gira sobre el lomo, así que las dos caras comparten el eje.
+   La perspectiva NO va en px fijos: va atada al ancho real de la hoja
+   (`w-full max-w-6xl` = min(100vw, 72rem)). 1152 x 1.48 = 1705, o sea que en
+   escritorio esto es exactamente la perspectiva de siempre; en un teléfono de
+   390px la razón d/W pasaba de 1.48 a 4.36 y el giro se volvía ortográfico:
+   la hoja sólo se encogía, nunca se acercaba. Eso era la placa rígida. */
+::view-transition-old(.pagina-adelante),
+::view-transition-new(.pagina-adelante),
+::view-transition-old(.pagina-atras),
+::view-transition-new(.pagina-atras) {
+  backface-visibility: hidden;
+  animation-duration: 1150ms;
+  animation-fill-mode: both;
+}
+
+/* El punto de fuga tiene que caer donde está el ojo —el centro de la
+   pantalla—, no en el centro del elemento capturado.
+
+   `perspective()` dentro de la lista de transform clava el punto de fuga en el
+   `transform-origin`. La captura es la `.hoja` ENTERA, que en una nota mide
+   3249px contra 900px de pantalla: con `center`, el punto de fuga caía 1207px
+   por debajo de lo que el lector está viendo, y todo el contenido visible se
+   estiraba hacia un punto lejanísimo. El ojo leía un plano que se corre, no una
+   bisagra — y encima cambiaba según dónde estuvieras scrolleado.
+
+   Las variables las escribe `MandoPaginas`. El 50% de respaldo es el valor de
+   siempre: si por algo no llegan, esto es exactamente lo de antes. */
+::view-transition-old(.pagina-adelante),
+::view-transition-old(.pagina-atras) {
+  transform-origin: left var(--eje-hoja-vieja, 50%);
+}
+::view-transition-new(.pagina-adelante),
+::view-transition-new(.pagina-atras) {
+  transform-origin: left var(--eje-hoja-nueva, 50%);
+}
+
+/* Dos animaciones por cara, sobre propiedades distintas: el giro (transform +
+   opacity) y la luz (filter). Separadas porque el brillo tiene que seguir el
+   COSENO del ángulo, no el tiempo: metidos en los mismos fotogramas, uno le
+   impone su curva al otro y hay que partir el arco para arreglarlo.
+
+   Las curvas son `linear()` de 41 puntos muestreados de un perfil físico
+   (despegue lento, envión, cuelgue en la vertical, caída acelerada, frenazo al
+   apoyar). Los puntos quedan a 14.4ms, menos de un frame: la interpolación a
+   tramos no se puede resolver en pantalla. Van como longhand y no en el
+   shorthand a propósito: si un motor no entendiera `linear()`, se cae sólo esa
+   declaración y la animación sigue corriendo con `ease`. */
 ::view-transition-old(.pagina-adelante) {
-  transform-origin: left center;
-  animation: 440ms cubic-bezier(0.32, 0.72, 0.24, 1) both hoja-se-pasa;
+  animation-name: hoja-gira-sale, hoja-luz-sale;
+  animation-timing-function:
+    linear(0, 0.0063 2.5%, 0.0141 5%, 0.0247 7.5%, 0.0389 10%, 0.0573 12.5%, 0.08 15%, 0.1069 17.5%, 0.1375 20%, 0.171 22.5%, 0.2061 25%, 0.2416 27.5%, 0.2767 30%, 0.3114 32.5%, 0.3456 35%, 0.3793 37.5%, 0.4125 40%, 0.4451 42.5%, 0.4771 45%, 0.5085 47.5%, 0.5391 50%, 0.569 52.5%, 0.5982 55%, 0.6265 57.5%, 0.6541 60%, 0.6809 62.5%, 0.7068 65%, 0.732 67.5%, 0.7563 70%, 0.7798 72.5%, 0.8026 75%, 0.8247 77.5%, 0.846 80%, 0.8668 82.5%, 0.8869 85%, 0.9066 87.5%, 0.9258 90%, 0.9447 92.5%, 0.9633 95%, 0.9817 97.5%, 1),
+    linear(0, 0 2.5%, 0.0002 5%, 0.0008 7.5%, 0.0019 10%, 0.0041 12.5%, 0.0079 15%, 0.0141 17.5%, 0.0232 20%, 0.0358 22.5%, 0.0519 25%, 0.0711 27.5%, 0.093 30%, 0.1172 32.5%, 0.1438 35%, 0.1723 37.5%, 0.2027 40%, 0.2347 42.5%, 0.268 45%, 0.3024 47.5%, 0.3376 50%, 0.3736 52.5%, 0.4099 55%, 0.4465 57.5%, 0.483 60%, 0.5195 62.5%, 0.5556 65%, 0.5913 67.5%, 0.6265 70%, 0.661 72.5%, 0.6949 75%, 0.728 77.5%, 0.7605 80%, 0.7922 82.5%, 0.8233 85%, 0.8538 87.5%, 0.8837 90%, 0.9132 92.5%, 0.9423 95%, 0.9712 97.5%, 1);
+  z-index: 3;
+}
+
+::view-transition-new(.pagina-adelante) {
+  animation-name: hoja-gira-entra, hoja-luz-entra;
+  animation-timing-function:
+    linear(0, 0.0184 2.5%, 0.0369 5%, 0.0556 7.5%, 0.0745 10%, 0.0938 12.5%, 0.1135 15%, 0.1338 17.5%, 0.1546 20%, 0.176 22.5%, 0.1982 25%, 0.221 27.5%, 0.2447 30%, 0.2691 32.5%, 0.2943 35%, 0.3204 37.5%, 0.3473 40%, 0.3749 42.5%, 0.4034 45%, 0.4327 47.5%, 0.4627 50%, 0.4935 52.5%, 0.5249 55%, 0.5571 57.5%, 0.5898 60%, 0.6231 62.5%, 0.657 65%, 0.6914 67.5%, 0.7262 70%, 0.7615 72.5%, 0.7967 75%, 0.8309 77.5%, 0.8629 80%, 0.892 82.5%, 0.9175 85%, 0.9394 87.5%, 0.9574 90%, 0.9718 92.5%, 0.9832 95%, 0.9922 97.5%, 1),
+    linear(0, 0.0289 2.5%, 0.0579 5%, 0.0872 7.5%, 0.1168 10%, 0.1468 12.5%, 0.1774 15%, 0.2086 17.5%, 0.2405 20%, 0.273 22.5%, 0.3063 25%, 0.3403 27.5%, 0.3749 30%, 0.4102 32.5%, 0.446 35%, 0.4823 37.5%, 0.5188 40%, 0.5555 42.5%, 0.5921 45%, 0.6285 47.5%, 0.6645 50%, 0.6998 52.5%, 0.7343 55%, 0.7676 57.5%, 0.7995 60%, 0.8298 62.5%, 0.8583 65%, 0.8848 67.5%, 0.9089 70%, 0.9306 72.5%, 0.9494 75%, 0.9649 77.5%, 0.9769 80%, 0.9856 82.5%, 0.9916 85%, 0.9955 87.5%, 0.9978 90%, 0.999 92.5%, 0.9997 95%, 0.9999 97.5%, 1);
   z-index: 2;
 }
-::view-transition-new(.pagina-adelante) {
-  animation: 440ms cubic-bezier(0.32, 0.72, 0.24, 1) both hoja-se-revela;
-  z-index: 1;
+
+/* Volver usa las mismas curvas: cambia el signo del ángulo, no el tiempo ni
+   la luz. */
+::view-transition-old(.pagina-atras) {
+  animation-name: hoja-vuelve-sale, hoja-luz-sale;
+  animation-timing-function:
+    linear(0, 0.0063 2.5%, 0.0141 5%, 0.0247 7.5%, 0.0389 10%, 0.0573 12.5%, 0.08 15%, 0.1069 17.5%, 0.1375 20%, 0.171 22.5%, 0.2061 25%, 0.2416 27.5%, 0.2767 30%, 0.3114 32.5%, 0.3456 35%, 0.3793 37.5%, 0.4125 40%, 0.4451 42.5%, 0.4771 45%, 0.5085 47.5%, 0.5391 50%, 0.569 52.5%, 0.5982 55%, 0.6265 57.5%, 0.6541 60%, 0.6809 62.5%, 0.7068 65%, 0.732 67.5%, 0.7563 70%, 0.7798 72.5%, 0.8026 75%, 0.8247 77.5%, 0.846 80%, 0.8668 82.5%, 0.8869 85%, 0.9066 87.5%, 0.9258 90%, 0.9447 92.5%, 0.9633 95%, 0.9817 97.5%, 1),
+    linear(0, 0 2.5%, 0.0002 5%, 0.0008 7.5%, 0.0019 10%, 0.0041 12.5%, 0.0079 15%, 0.0141 17.5%, 0.0232 20%, 0.0358 22.5%, 0.0519 25%, 0.0711 27.5%, 0.093 30%, 0.1172 32.5%, 0.1438 35%, 0.1723 37.5%, 0.2027 40%, 0.2347 42.5%, 0.268 45%, 0.3024 47.5%, 0.3376 50%, 0.3736 52.5%, 0.4099 55%, 0.4465 57.5%, 0.483 60%, 0.5195 62.5%, 0.5556 65%, 0.5913 67.5%, 0.6265 70%, 0.661 72.5%, 0.6949 75%, 0.728 77.5%, 0.7605 80%, 0.7922 82.5%, 0.8233 85%, 0.8538 87.5%, 0.8837 90%, 0.9132 92.5%, 0.9423 95%, 0.9712 97.5%, 1);
+  z-index: 3;
 }
 
 ::view-transition-new(.pagina-atras) {
-  transform-origin: left center;
-  animation: 440ms cubic-bezier(0.32, 0.72, 0.24, 1) both hoja-vuelve;
+  animation-name: hoja-vuelve-entra, hoja-luz-entra;
+  animation-timing-function:
+    linear(0, 0.0184 2.5%, 0.0369 5%, 0.0556 7.5%, 0.0745 10%, 0.0938 12.5%, 0.1135 15%, 0.1338 17.5%, 0.1546 20%, 0.176 22.5%, 0.1982 25%, 0.221 27.5%, 0.2447 30%, 0.2691 32.5%, 0.2943 35%, 0.3204 37.5%, 0.3473 40%, 0.3749 42.5%, 0.4034 45%, 0.4327 47.5%, 0.4627 50%, 0.4935 52.5%, 0.5249 55%, 0.5571 57.5%, 0.5898 60%, 0.6231 62.5%, 0.657 65%, 0.6914 67.5%, 0.7262 70%, 0.7615 72.5%, 0.7967 75%, 0.8309 77.5%, 0.8629 80%, 0.892 82.5%, 0.9175 85%, 0.9394 87.5%, 0.9574 90%, 0.9718 92.5%, 0.9832 95%, 0.9922 97.5%, 1),
+    linear(0, 0.0289 2.5%, 0.0579 5%, 0.0872 7.5%, 0.1168 10%, 0.1468 12.5%, 0.1774 15%, 0.2086 17.5%, 0.2405 20%, 0.273 22.5%, 0.3063 25%, 0.3403 27.5%, 0.3749 30%, 0.4102 32.5%, 0.446 35%, 0.4823 37.5%, 0.5188 40%, 0.5555 42.5%, 0.5921 45%, 0.6285 47.5%, 0.6645 50%, 0.6998 52.5%, 0.7343 55%, 0.7676 57.5%, 0.7995 60%, 0.8298 62.5%, 0.8583 65%, 0.8848 67.5%, 0.9089 70%, 0.9306 72.5%, 0.9494 75%, 0.9649 77.5%, 0.9769 80%, 0.9856 82.5%, 0.9916 85%, 0.9955 87.5%, 0.9978 90%, 0.999 92.5%, 0.9997 95%, 0.9999 97.5%, 1);
   z-index: 2;
-}
-::view-transition-old(.pagina-atras) {
-  animation: 440ms cubic-bezier(0.32, 0.72, 0.24, 1) both hoja-queda-atras;
-  z-index: 1;
 }
 
 /* Las flechas laterales quedan quietas mientras la hoja gira: son el mando,
@@ -285,52 +773,125 @@ body {
   animation: none;
 }
 
-/* La hoja se mantiene entera casi todo el giro y recién se desvanece al
-   final: si se apaga temprano, el ojo lee un fundido, no una hoja. */
-@keyframes hoja-se-pasa {
+/* --- El giro, mitad y mitad ------------------------------------------------
+   Cada cara hace medio recorrido, y cada mitad es UNA sola interpolación de
+   transform: los fotogramas de 49.9/50/100% sólo llevan opacidad, así que no
+   parten el arco. Toda la forma del movimiento está en el `linear()` de arriba.
+
+   (Antes había fotogramas de transform en 25% y 75%. Como el easing se
+   re-aplica en cada intervalo, la hoja llegaba a 45° a 3.7x la velocidad media
+   y el frame siguiente arrancaba en cero: un frenazo a media hoja abierta, dos
+   veces por giro. Eso era el "mecánico".)
+
+   No hay `skewY`: es una transformación afín, no puede doblar nada, y sostener
+   su ida y vuelta obligaba justamente al fotograma intermedio que causaba el
+   frenazo.
+--------------------------------------------------------------------------- */
+
+@keyframes hoja-gira-sale {
   0% {
-    transform: perspective(2600px) rotateY(0deg);
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(0deg);
     opacity: 1;
   }
-  70% {
-    opacity: 0.94;
+  49.9% {
+    opacity: 1;
+  }
+  /* De acá en más la hoja ya pasó: la sigue la otra cara. */
+  50% {
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(-90deg);
+    opacity: 0;
   }
   100% {
-    transform: perspective(2600px) rotateY(-86deg);
     opacity: 0;
   }
 }
-@keyframes hoja-se-revela {
+
+@keyframes hoja-gira-entra {
   0% {
-    transform: scale(0.985);
-    opacity: 0.5;
-  }
-  100% {
-    transform: none;
-    opacity: 1;
-  }
-}
-@keyframes hoja-vuelve {
-  0% {
-    transform: perspective(2600px) rotateY(-86deg);
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(90deg);
     opacity: 0;
   }
-  30% {
-    opacity: 0.94;
+  49.9% {
+    opacity: 0;
+  }
+  50% {
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(90deg);
+    opacity: 1;
   }
   100% {
-    transform: perspective(2600px) rotateY(0deg);
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(0deg);
     opacity: 1;
   }
 }
-@keyframes hoja-queda-atras {
+
+/* Volver es el mismo giro al revés: los ángulos cambian de signo. */
+@keyframes hoja-vuelve-sale {
   0% {
-    transform: none;
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(0deg);
+    opacity: 1;
+  }
+  49.9% {
+    opacity: 1;
+  }
+  50% {
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(90deg);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes hoja-vuelve-entra {
+  0% {
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(-90deg);
+    opacity: 0;
+  }
+  49.9% {
+    opacity: 0;
+  }
+  50% {
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(-90deg);
     opacity: 1;
   }
   100% {
-    transform: scale(0.985);
-    opacity: 0.5;
+    transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(0deg);
+    opacity: 1;
+  }
+}
+
+/* --- La luz ----------------------------------------------------------------
+   Lambert con 0.38 de ambiente: brillo = 0.38 + 0.62 x cos(ángulo).
+   1.00 de frente, 0.92 a 30°, 0.82 a 45°, 0.38 de canto. Antes el ambiente
+   implícito era 0.55, o sea una superficie que mira 90° afuera de la luz
+   quedaba casi tan clara como una de frente, y dos planos del mismo brillo se
+   leen como dos imágenes que se cambian.
+
+   La curva `linear()` de la luz ya lleva el coseno adentro; por eso alcanza con
+   dos fotogramas y sirve igual para ir y para volver.
+
+   Único número de gusto de todo el bloque: el 0.38. Si el canto queda pesado,
+   0.45 es el punto medio seguro.
+--------------------------------------------------------------------------- */
+
+@keyframes hoja-luz-sale {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(0.38);
+  }
+}
+
+@keyframes hoja-luz-entra {
+  0% {
+    filter: brightness(0.38);
+  }
+  50% {
+    filter: brightness(0.38);
+  }
+  100% {
+    filter: brightness(1);
   }
 }
 
@@ -341,9 +902,7 @@ body {
     animation-duration: 0.01ms !important;
     animation-delay: 0s !important;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {

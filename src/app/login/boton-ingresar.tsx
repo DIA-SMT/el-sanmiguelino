@@ -21,12 +21,12 @@ export function BotonIngresar({ destino }: { destino: string }) {
   }
 
   return (
-    <div className="mt-6">
+    <div className="mt-8">
       <button
         type="button"
         onClick={ingresar}
         disabled={estado === "cargando"}
-        className="pressable inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-3 font-sans text-sm font-semibold text-accent-contrast transition-colors hover:bg-accent-strong disabled:opacity-60"
+        className="pressable inline-flex w-full items-center justify-center gap-2.5 bg-accent px-5 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-accent-contrast shadow-control hover:bg-accent-strong disabled:opacity-60"
       >
         {estado === "cargando" && (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

@@ -134,24 +134,29 @@ export function ColumnaDelLector({
   }
 
   return (
-    <section aria-labelledby="columna-lector" className="mx-auto mt-14 max-w-3xl">
-      <h2
-        id="columna-lector"
-        className="rule-double mb-6 py-2 text-center font-sans text-sm font-bold uppercase tracking-[0.2em] text-ink"
-      >
-        Columna del lector
-      </h2>
+    <section aria-labelledby="columna-lector" className="mx-auto mt-16 max-w-3xl">
+      <div className="rule-double mb-7 py-2.5 text-center">
+        <h2
+          id="columna-lector"
+          className="volanta text-ink"
+        >
+          Columna del lector
+        </h2>
+      </div>
 
       {/* Sumá tu opinión */}
-      <form onSubmit={publicar} className="rounded-lg border border-line bg-chrome p-4">
+      <form
+        onSubmit={publicar}
+        className="border border-line bg-paper-2 p-5"
+      >
         <label
           htmlFor="nueva-opinion"
-          className="font-sans text-sm font-semibold text-ink"
+          className="volanta block text-ink"
         >
           Sumá tu opinión
         </label>
-        <p className="mt-0.5 font-sans text-xs text-ink-2">
-          Firmás como <strong className="text-ink">{usuario.nombre}</strong>
+        <p className="mt-1.5 font-serif text-[0.85rem] italic text-ink-3">
+          Firmás como <strong className="not-italic text-ink">{usuario.nombre}</strong>
         </p>
         <textarea
           id="nueva-opinion"
@@ -160,22 +165,22 @@ export function ColumnaDelLector({
           rows={3}
           maxLength={1000}
           placeholder="¿Qué te pareció esta nota?"
-          className="mt-3 w-full resize-y rounded-md border border-line bg-paper px-3 py-2 font-serif text-sm text-ink placeholder:text-ink-2/70"
+          className="mt-3.5 w-full resize-y border border-line bg-chrome px-3.5 py-2.5 font-serif text-[0.95rem] leading-relaxed text-ink transition-colors placeholder:italic placeholder:text-ink-3 focus:border-accent"
         />
-        <div className="mt-2 flex items-center justify-between gap-3">
+        <div className="mt-3 flex items-center justify-between gap-3">
           {errorPublicar ? (
             <p role="alert" className="font-sans text-xs text-red-700 dark:text-red-400">
               No se pudo publicar. Tu texto quedó guardado, probá de nuevo.
             </p>
           ) : (
-            <span className="font-sans text-xs tabular-nums text-ink-2">
+            <span className="font-sans text-[0.7rem] tabular-nums text-ink-3">
               {texto.length}/1000
             </span>
           )}
           <button
             type="submit"
             disabled={publicando || texto.trim() === ""}
-            className="pressable rounded-md bg-accent px-4 py-2 font-sans text-sm font-semibold text-accent-contrast transition-colors hover:bg-accent-strong disabled:opacity-50"
+            className="pressable bg-ink px-5 py-2.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-paper hover:bg-accent hover:text-accent-contrast disabled:opacity-40 disabled:hover:bg-ink disabled:hover:text-paper"
           >
             {publicando ? "Publicando…" : "Publicar"}
           </button>
@@ -183,14 +188,14 @@ export function ColumnaDelLector({
       </form>
 
       {/* Lista */}
-      <div className="mt-6">
+      <div className="mt-7">
         {estado.fase === "cargando" && (
-          <div className="space-y-4" aria-hidden="true">
+          <div className="divide-y divide-hairline" aria-hidden="true">
             {[0, 1].map((i) => (
-              <div key={i} className="animate-pulse rounded-lg border border-line bg-chrome p-4">
-                <div className="h-3 w-32 rounded bg-line" />
-                <div className="mt-3 h-3 w-full rounded bg-line" />
-                <div className="mt-2 h-3 w-2/3 rounded bg-line" />
+              <div key={i} className="animate-pulse py-5">
+                <div className="h-3 w-32 bg-line" />
+                <div className="mt-3.5 h-3 w-full bg-line" />
+                <div className="mt-2 h-3 w-2/3 bg-line" />
               </div>
             ))}
             <p className="sr-only" role="status">
@@ -200,14 +205,14 @@ export function ColumnaDelLector({
         )}
 
         {estado.fase === "error" && (
-          <div className="rounded-lg border border-line bg-chrome p-6 text-center">
-            <p className="font-sans text-sm text-ink-2">
+          <div className="border border-line bg-paper-2 p-7 text-center">
+            <p className="font-serif text-[0.95rem] italic text-ink-2">
               No pudimos cargar los comentarios.
             </p>
             <button
               type="button"
               onClick={reintentar}
-              className="pressable mt-3 inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 font-sans text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+              className="pressable mt-4 inline-flex items-center gap-2 border border-line bg-chrome px-4 py-2 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink hover:border-ink hover:bg-paper"
             >
               <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
               Reintentar
@@ -216,9 +221,9 @@ export function ColumnaDelLector({
         )}
 
         {estado.fase === "listo" && estado.comentarios.length === 0 && (
-          <div className="rounded-lg border border-dashed border-line p-8 text-center">
-            <MessageSquare className="mx-auto h-6 w-6 text-ink-2" aria-hidden="true" />
-            <p className="mt-2 font-sans text-sm text-ink-2">
+          <div className="border border-dashed border-line p-9 text-center">
+            <MessageSquare className="mx-auto h-6 w-6 text-ink-3" aria-hidden="true" />
+            <p className="mt-3 font-serif text-[0.95rem] italic leading-relaxed text-ink-2">
               Todavía no hay opiniones sobre esta nota. ¡Sé la primera persona en
               comentar!
             </p>
@@ -226,17 +231,19 @@ export function ColumnaDelLector({
         )}
 
         {estado.fase === "listo" && estado.comentarios.length > 0 && (
-          <ul className="space-y-4">
+          <ul className="divide-y divide-hairline border-t border-hairline">
             {estado.comentarios.map((c) => (
-              <li key={c.id} className="rounded-lg border border-line bg-chrome p-4">
-                <p className="font-sans text-sm">
-                  <span className="font-semibold text-ink">{c.usuarioNombre}</span>{" "}
-                  <span className="text-ink-2">· {tiempoRelativo(c.fecha)}</span>
+              <li key={c.id} className="py-5">
+                <p className="flex flex-wrap items-baseline gap-x-2 font-sans text-[0.72rem]">
+                  <span className="font-semibold uppercase tracking-[0.1em] text-ink">
+                    {c.usuarioNombre}
+                  </span>
+                  <span className="text-ink-3">· {tiempoRelativo(c.fecha)}</span>
                 </p>
-                <p className="mt-2 font-serif text-[0.95rem] leading-relaxed text-ink">
+                <p className="mt-2.5 font-serif text-[0.98rem] leading-[1.7] text-ink">
                   {c.texto}
                 </p>
-                <div className="mt-3 flex items-center gap-2">
+                <div className="mt-3.5 flex items-center gap-2">
                   <BotonVoto
                     tipo="like"
                     activo={c.miVoto === 1}
@@ -278,10 +285,10 @@ function BotonVoto({
       aria-pressed={activo}
       aria-label={tipo === "like" ? "Me gusta este comentario" : "No me gusta este comentario"}
       className={cn(
-        "pressable inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-sans text-xs font-medium transition-colors",
+        "pressable inline-flex items-center gap-1.5 border px-3 py-1.5 font-sans text-[0.7rem] font-medium",
         activo
           ? "border-accent bg-accent text-accent-contrast"
-          : "border-line bg-paper text-ink-2 hover:border-accent hover:text-accent",
+          : "border-line bg-chrome text-ink-3 hover:border-ink hover:text-ink",
       )}
     >
       <Icono className="h-3.5 w-3.5" aria-hidden="true" />

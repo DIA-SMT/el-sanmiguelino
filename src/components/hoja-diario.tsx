@@ -4,9 +4,9 @@ import { edicionActual } from "@/lib/data/edicion-actual";
 import { cn } from "@/lib/utils";
 
 /**
- * Hoja de diario: la página apoyada sobre el escritorio, con su pie y el
- * pasador de páginas. `numeroPagina` en null para pantallas que no forman
- * parte de la numeración (listado de sección).
+ * Hoja de diario: la página apoyada sobre el escritorio, con su trama de
+ * fibra, su pie y el pasador de páginas. `numeroPagina` en null para
+ * pantallas que no forman parte de la numeración (listado de sección).
  */
 export function HojaDiario({
   numeroPagina,
@@ -21,15 +21,10 @@ export function HojaDiario({
   const indice = numeroPagina === null ? -1 : numeroPagina - 1;
 
   return (
-    <div
-      className={cn(
-        "mx-auto w-full max-w-6xl border border-line bg-paper shadow-[0_1px_3px_rgba(0,0,0,0.10),0_10px_30px_-12px_rgba(0,0,0,0.25)]",
-        className,
-      )}
-    >
+    <div className={cn("hoja grano mx-auto w-full max-w-6xl", className)}>
       {children}
 
-      <div className="px-4 pb-6 sm:px-6">
+      <div className="px-4 pb-7 sm:px-6">
         {indice >= 0 && (
           <PasadorPaginas
             anterior={paginas[indice - 1] ?? null}

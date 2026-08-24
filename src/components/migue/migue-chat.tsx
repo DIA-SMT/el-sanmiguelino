@@ -79,9 +79,12 @@ export function MigueChat() {
         <button
           type="button"
           aria-label="Abrir chat con Migue, el asistente del diario"
-          className="pressable fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-lg transition-colors hover:bg-accent-strong"
+          className="pressable fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-flotante hover:bg-accent-strong sm:h-auto sm:w-auto sm:gap-2.5 sm:py-3.5 sm:pl-4 sm:pr-5"
         >
-          <MessageCircle className="h-6 w-6" aria-hidden="true" />
+          <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span className="hidden font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em] sm:inline">
+            Preguntale a Migue
+          </span>
         </button>
       </Dialog.Trigger>
 
@@ -106,16 +109,16 @@ export function MigueChat() {
                 }
                 transition={{ duration: 0.2, ease: "easeOut" }}
                 style={{ transformOrigin: "bottom right" }}
-                className="fixed bottom-5 right-5 z-50 flex h-[min(560px,calc(100dvh-2.5rem))] w-[min(380px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border border-line bg-chrome shadow-2xl"
+                className="fixed bottom-5 right-5 z-50 flex h-[min(580px,calc(100dvh-2.5rem))] w-[min(390px,calc(100vw-2.5rem))] flex-col overflow-hidden border border-ink bg-chrome shadow-flotante"
               >
                 {/* Header */}
-                <header className="flex items-center gap-3 border-b border-line bg-paper px-4 py-3">
-                  <LogoHoja className="h-8 w-8" title="Migue" />
+                <header className="flex items-center gap-3 border-b border-ink bg-paper-2 px-4 py-3">
+                  <LogoHoja className="h-8 w-8 shrink-0" title="Migue" />
                   <div className="min-w-0 flex-1">
-                    <Dialog.Title className="font-sans text-sm font-bold text-ink">
+                    <Dialog.Title className="font-sans text-[0.72rem] font-bold uppercase tracking-[0.18em] text-ink">
                       Migue
                     </Dialog.Title>
-                    <p className="truncate font-sans text-xs text-ink-2">
+                    <p className="truncate font-serif text-[0.78rem] italic text-ink-3">
                       Asistente de El Sanmiguelino
                     </p>
                   </div>
@@ -123,7 +126,7 @@ export function MigueChat() {
                     <button
                       type="button"
                       aria-label="Cerrar chat"
-                      className="pressable flex h-8 w-8 items-center justify-center rounded-full text-ink-2 transition-colors hover:bg-bg hover:text-ink"
+                      className="pressable flex h-8 w-8 items-center justify-center border border-transparent text-ink-3 hover:border-line hover:bg-chrome hover:text-ink"
                     >
                       <X className="h-4 w-4" aria-hidden="true" />
                     </button>
@@ -137,8 +140,8 @@ export function MigueChat() {
                   aria-live="polite"
                 >
                   {mensajes.length === 0 && (
-                    <div className="space-y-3">
-                      <p className="font-sans text-sm text-ink-2">
+                    <div className="space-y-3.5">
+                      <p className="font-serif text-[0.95rem] leading-relaxed text-ink-2">
                         ¡Hola! Soy Migue. Preguntame lo que quieras sobre las
                         notas de esta edición.
                       </p>
@@ -148,7 +151,7 @@ export function MigueChat() {
                             <button
                               type="button"
                               onClick={() => enviar(s)}
-                              className="pressable w-full rounded-lg border border-line bg-paper px-3 py-2 text-left font-sans text-sm text-ink transition-colors hover:border-accent hover:text-accent"
+                              className="pressable w-full border border-line bg-paper-2 px-3.5 py-2.5 text-left font-serif text-[0.9rem] italic text-ink hover:border-ink hover:bg-paper"
                             >
                               {s}
                             </button>
@@ -162,10 +165,10 @@ export function MigueChat() {
                     <div
                       key={i}
                       className={cn(
-                        "max-w-[85%] whitespace-pre-wrap rounded-xl px-3 py-2 font-sans text-sm leading-relaxed",
+                        "max-w-[86%] whitespace-pre-wrap px-3.5 py-2.5 font-sans text-[0.85rem] leading-relaxed",
                         m.rol === "usuario"
-                          ? "ml-auto rounded-br-sm bg-accent text-accent-contrast"
-                          : "mr-auto rounded-bl-sm bg-paper text-ink border border-line",
+                          ? "ml-auto bg-ink text-paper"
+                          : "mr-auto border border-line bg-paper-2 text-ink",
                       )}
                     >
                       {m.texto}
@@ -174,7 +177,7 @@ export function MigueChat() {
 
                   {cargando && (
                     <p
-                      className="mr-auto flex items-center gap-1.5 rounded-xl rounded-bl-sm border border-line bg-paper px-3 py-2 font-sans text-sm text-ink-2"
+                      className="mr-auto flex items-center gap-1.5 border border-line bg-paper-2 px-3.5 py-3 font-sans text-sm text-ink-2"
                       role="status"
                     >
                       <span className="sr-only">Migue está escribiendo</span>
@@ -189,7 +192,7 @@ export function MigueChat() {
                   {errorUltima !== null && (
                     <div
                       role="alert"
-                      className="mr-auto max-w-[85%] rounded-xl rounded-bl-sm border border-red-300 bg-red-50 px-3 py-2 font-sans text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                      className="mr-auto max-w-[86%] border border-red-300 bg-red-50 px-3.5 py-2.5 font-sans text-[0.85rem] text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
                     >
                       <p>No pude responder por un problema de conexión.</p>
                       <button
@@ -209,7 +212,7 @@ export function MigueChat() {
 
                 {/* Input */}
                 <form
-                  className="flex items-center gap-2 border-t border-line bg-paper px-3 py-3"
+                  className="flex items-center gap-2 border-t border-line bg-paper-2 px-3 py-3"
                   onSubmit={(e) => {
                     e.preventDefault();
                     enviar(texto);
@@ -225,13 +228,13 @@ export function MigueChat() {
                     onChange={(e) => setTexto(e.target.value)}
                     placeholder="Preguntale a Migue…"
                     autoComplete="off"
-                    className="h-10 flex-1 rounded-md border border-line bg-chrome px-3 font-sans text-sm text-ink placeholder:text-ink-2/70"
+                    className="h-10 flex-1 border border-line bg-chrome px-3 font-serif text-[0.9rem] text-ink transition-colors placeholder:italic placeholder:text-ink-3 focus:border-accent"
                   />
                   <button
                     type="submit"
                     disabled={cargando || texto.trim() === ""}
                     aria-label="Enviar pregunta"
-                    className="pressable flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent text-accent-contrast transition-colors hover:bg-accent-strong disabled:opacity-50"
+                    className="pressable flex h-10 w-10 shrink-0 items-center justify-center bg-accent text-accent-contrast hover:bg-accent-strong disabled:opacity-40"
                   >
                     <Send className="h-4 w-4" aria-hidden="true" />
                   </button>

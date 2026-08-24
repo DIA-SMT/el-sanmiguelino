@@ -29,14 +29,14 @@ export function UserChip({ usuario }: { usuario: Usuario }) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="inline-flex items-center gap-2 rounded-full border border-line bg-chrome py-1 pl-1 pr-3">
+      <span className="inline-flex items-center gap-2.5 border border-line bg-chrome py-1 pl-1 pr-3">
         <span
           aria-hidden="true"
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-accent font-sans text-[0.65rem] font-bold text-accent-contrast"
+          className="flex h-7 w-7 items-center justify-center bg-ink font-sans text-[0.6rem] font-bold tracking-wider text-paper"
         >
           {iniciales}
         </span>
-        <span className="font-sans text-xs font-medium text-ink">
+        <span className="max-w-[9rem] truncate font-sans text-[0.7rem] font-medium text-ink">
           {usuario.nombre}
         </span>
       </span>
@@ -45,7 +45,8 @@ export function UserChip({ usuario }: { usuario: Usuario }) {
         onClick={cerrarSesion}
         disabled={saliendo}
         aria-label="Cerrar sesión"
-        className="pressable inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-chrome text-ink-2 transition-colors hover:text-ink disabled:opacity-50"
+        title="Cerrar sesión"
+        className="pressable inline-flex h-9 w-9 items-center justify-center border border-line bg-chrome text-ink-2 hover:border-ink hover:text-ink disabled:opacity-50"
       >
         <LogOut className="h-4 w-4" aria-hidden="true" />
       </button>
