@@ -27,10 +27,13 @@ function cadena(): string {
 }
 
 function crear(): PrismaClient {
-  // `connection_limit=1` viaja en la URL y lo interpreta el pooler, no `pg`.
-  // Del lado del cliente hay que decirlo aparte: en serverless cada invocación
-  // es un proceso propio, y un pool de veinte por invocación agota Supabase
-  // con tráfico normal.
+  // `max: 1` es lo que de verdad limita el pool, y por eso está acá y no en
+  // la URL: `pg-pool` lee `max`, nunca el `connection_limit` que se le pone
+  // como query param. Ese parámetro era del motor viejo de Prisma; con el
+  // modelo de driver adapters de la 7 no lo lee nadie.
+  //
+  // El tope importa porque en serverless cada invocación es un proceso propio:
+  // un pool de veinte por invocación agota Supabase con tráfico normal.
   const adapter = new PrismaPg({ connectionString: cadena(), max: 1 });
   return new PrismaClient({ adapter });
 }

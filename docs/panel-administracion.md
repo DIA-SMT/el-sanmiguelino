@@ -1,8 +1,8 @@
 # Panel de administración — plan de ejecución
 
-Estado: **etapas 1, 2 y 3 terminadas**. De la etapa 4 está hecho todo lo que
-no necesita conectarse a la base: esquema, migración inicial y semilla. Falta
-enchufarla, y eso necesita las credenciales de Supabase.
+Estado: **etapas 1 a 4 terminadas**, salvo el motor Postgres del repo. La base
+de Supabase está creada, migrada y sembrada; la aplicación todavía lee del
+mock, y cambiar el motor es lo que sigue.
 
 ## Decisiones tomadas
 
@@ -20,7 +20,7 @@ enchufarla, y eso necesita las credenciales de Supabase.
 | 1 | **Cerrar la casa**: sesión, proxy, config de imágenes | no | **hecha** |
 | 2 | Frontera de repo: `EdicionRepo` async con motor mock | no | **hecha** |
 | 3 | Formas normalizadas + contrato de moderación | no | **hecha** |
-| 4 | Persistencia: Prisma + Supabase + seed | **sí** | **a medias** |
+| 4 | Persistencia: Prisma + Supabase + seed | **sí** | **hecha** (falta el motor del repo) |
 | 5 | Imágenes a Storage | sí | pendiente |
 | 6 | `/admin`: shell + editor de notas | sí | pendiente |
 | 7 | Moderación de comentarios | sí | pendiente |
@@ -238,14 +238,33 @@ día, y no debería cambiar retroactivamente en comentarios ya publicados.
 **El foliado necesita la columna `orden`.** El orden de un array no sobrevive a
 una base; sin ella el número de página cambiaría solo entre requests.
 
-### Para enchufarla
+### Enchufada el 2026-08-24
 
-1. Crear el proyecto en Supabase.
-2. Poner `DATABASE_URL` (pooler, 6543, `?pgbouncer=true&connection_limit=1`) y
-   `DIRECT_URL` (host del pooler, 5432) en `.env.local`. Ver `.env.example`.
-3. `npm run db:migrate` y después `npm run db:seed`.
+La base está creada en Supabase (`sa-east-1`), migrada y sembrada. Ambas
+cadenas van por el **pooler**: 6543 para runtime, 5432 para migraciones. La
+"Direct connection" que Supabase ofrece para `DIRECT_URL` es la que NO hay que
+usar: quedó sólo por IPv6.
 
-Recién ahí tiene sentido escribir el motor Postgres del repo. La prueba de que
+Para reproducirlo en otra máquina: completar `.env.local` desde
+`.env.example` y correr `npm run db:deploy` y después `npm run db:seed`.
+
+**Verificado contra la base real**: las ocho notas coinciden campo por campo
+con lo que proyecta el mock — títulos, secciones, cuerpo, `minutosLectura` y
+`textoPlano`. Sembrar dos veces deja lo mismo que sembrar una (1 edición, 8
+notas), que es lo que se afirmaba del `upsert`.
+
+Una trampa que apareció al verificar: comparar los cuerpos con
+`JSON.stringify` daba cinco diferencias falsas. Postgres guarda `cuerpo` como
+JSONB y **reordena las claves** de cada objeto; un bloque de cita vuelve como
+`tipo, autor, cargo, texto`. El orden del array y los valores están intactos,
+y el acceso por propiedad en JS no depende del orden, así que a la aplicación
+le da igual. Hay que compararlos normalizando las claves.
+
+Otra corrección: `connection_limit=1` en la URL **no hace nada** con el modelo
+de driver adapters de Prisma 7 — `pg-pool` lee `max`, y ese `max: 1` está en
+`src/lib/db.ts`. La guía anterior de este documento decía lo contrario.
+
+Lo que sigue es el motor Postgres del repo. La prueba de que
 quedó bien es que `npm run verificar:comentarios` pase contra él **sin tocarle
 una línea**: si hay que editarlo, la migración cambió el comportamiento y no
 sólo el almacenamiento.

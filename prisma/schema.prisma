@@ -58,6 +58,14 @@ model Nota {
   /// BloqueNota[] serializado. Es Json y no una tabla de bloques a propósito:
   /// el cuerpo se lee y se escribe siempre entero, nunca se consulta por
   /// bloque, y el historial de versiones está fuera de alcance.
+  ///
+  /// Ojo al comparar contra el mock: Postgres guarda esto como JSONB, que
+  /// **reordena las claves** de cada objeto (por longitud y después
+  /// alfabéticamente). Un bloque de cita sale como `tipo, autor, cargo,
+  /// texto` aunque se haya escrito `tipo, texto, autor, cargo`. El orden del
+  /// array y los valores no se tocan, así que a la aplicación le da igual;
+  /// pero un `JSON.stringify` de los dos lados reporta diferencias que no
+  /// existen.
   cuerpo Json
 
   /// Derivados del cuerpo, calculados AL ESCRIBIR. Por eso existen como
