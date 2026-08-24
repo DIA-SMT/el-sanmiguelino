@@ -1,6 +1,6 @@
 import { PasadorPaginas } from "@/components/pasador-paginas";
 import { paginasDeEdicion } from "@/lib/data/paginas";
-import { edicionActual } from "@/lib/data/edicion-actual";
+import { getEdicion } from "@/lib/repos/edicion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * fibra, su pie y el pasador de páginas. `numeroPagina` en null para
  * pantallas que no forman parte de la numeración (listado de sección).
  */
-export function HojaDiario({
+export async function HojaDiario({
   numeroPagina,
   children,
   className,
@@ -17,7 +17,7 @@ export function HojaDiario({
   children: React.ReactNode;
   className?: string;
 }) {
-  const paginas = paginasDeEdicion(edicionActual);
+  const paginas = paginasDeEdicion(await getEdicion());
   const indice = numeroPagina === null ? -1 : numeroPagina - 1;
 
   return (

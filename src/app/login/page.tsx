@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LogoDireccionIA, LogoHoja } from "@/components/brand/logos";
-import { edicionActual } from "@/lib/data/edicion-actual";
+import { getEdicion } from "@/lib/repos/edicion";
 import { BotonIngresar } from "./boton-ingresar";
 
 export const metadata: Metadata = { title: "Ingresar" };
@@ -12,6 +12,7 @@ export default async function LoginPage({
 }: PageProps<"/login">) {
   const { volverA } = await searchParams;
   const destino = typeof volverA === "string" ? volverA : "/diario";
+  const edicion = await getEdicion();
 
   return (
     <main className="escritorio grano relative flex flex-1 items-center justify-center overflow-hidden px-4 py-16 sm:py-24">
@@ -26,7 +27,7 @@ export default async function LoginPage({
           El Sanmiguelino
         </h1>
         <div className="rule-double mt-4 mb-[7px] py-1.5">
-          <p className="meta">Diario digital · {edicionActual.mes}</p>
+          <p className="meta">Diario digital · {edicion.mes}</p>
         </div>
 
         <p className="mt-7 text-pretty font-serif text-[0.98rem] leading-[1.7] text-ink-2">

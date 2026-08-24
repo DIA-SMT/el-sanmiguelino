@@ -1,15 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
-import { edicionActual } from "@/lib/data/edicion-actual";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { notasRelacionadas } from "@/lib/data/relacionadas";
+import { getEdicion } from "@/lib/repos/edicion";
 import { minutosDeLectura } from "@/lib/utils";
 
 /** Pie de nota: qué leer después. Mismo lenguaje que las fichas de la portada
  *  —filete arriba, foto, volanta, titular— para que se lea como parte del
  *  diario y no como un módulo de recomendados. */
-export function NotasRelacionadas({ notaSlug }: { notaSlug: string }) {
-  const notas = notasRelacionadas(edicionActual, notaSlug);
+export async function NotasRelacionadas({ notaSlug }: { notaSlug: string }) {
+  const notas = notasRelacionadas(await getEdicion(), notaSlug);
   if (notas.length === 0) return null;
 
   return (

@@ -11,7 +11,7 @@ import { ColumnaDelLector } from "@/components/comentarios/columna-del-lector";
 import { CompartirNota } from "@/components/compartir-nota";
 import { NotasRelacionadas } from "@/components/notas-relacionadas";
 import { transicionPagina } from "@/lib/transiciones";
-import { edicionActual, getNota } from "@/lib/data/edicion-actual";
+import { getEdicion, getNota } from "@/lib/repos/edicion";
 import { slugificarSeccion } from "@/lib/data/secciones";
 import { getUsuario } from "@/lib/auth/session";
 import { minutosDeLectura } from "@/lib/utils";
@@ -21,7 +21,7 @@ export async function generateMetadata({
   params,
 }: PageProps<"/nota/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const nota = getNota(slug);
+  const nota = await getNota(slug);
   return { title: nota?.titulo ?? "Nota" };
 }
 
@@ -68,13 +68,14 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
   if (!usuario) redirect("/login");
 
   const { slug } = await params;
-  const nota = getNota(slug);
+  const nota = await getNota(slug);
   if (!nota) notFound();
 
+  const edicion = await getEdicion();
   const primerParrafoIdx = nota.cuerpo.findIndex((b) => b.tipo === "parrafo");
 
   const numeroPagina =
-    edicionActual.notas.findIndex((n) => n.slug === nota.slug) + 2;
+    edicion.notas.findIndex((n) => n.slug === nota.slug) + 2;
 
   return (
     <>
@@ -85,7 +86,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
       <ViewTransition {...transicionPagina}>
         <HojaDiario numeroPagina={numeroPagina}>
           <Masthead
-            edicion={edicionActual}
+            edicion={edicion}
             usuario={usuario}
             seccionActiva={slugificarSeccion(nota.seccion)}
           />
@@ -101,7 +102,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                   className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-1"
                   aria-hidden="true"
                 />
-                Portada de {edicionActual.mes}
+                Portada de {edicion.mes}
               </Link>
             </nav>
 
@@ -119,7 +120,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                   <span aria-hidden="true" className="text-line">
                     ·
                   </span>
-                  <p className="meta">{edicionActual.mes}</p>
+                  <p className="meta">{edicion.mes}</p>
                   <span aria-hidden="true" className="text-line">
                     ·
                   </span>

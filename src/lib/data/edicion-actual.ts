@@ -320,7 +320,3 @@ export const edicionActual: Edicion = {
     },
   ],
 };
-
-export function getNota(slug: string) {
-  return edicionActual.notas.find((n) => n.slug === slug) ?? null;
-}

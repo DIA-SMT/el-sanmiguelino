@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { edicionActual } from "@/lib/data/edicion-actual";
+import { getEdicion } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { notasPorSeccion, seccionesDeEdicion } from "@/lib/data/secciones";
 
@@ -12,9 +12,10 @@ import { notasPorSeccion, seccionesDeEdicion } from "@/lib/data/secciones";
  * tipográfica con la trama de semitono, que se lee como una decisión y no como
  * una imagen que falta.
  */
-export function VitrinaSecciones() {
-  const secciones = seccionesDeEdicion(edicionActual).map((seccion) => {
-    const notas = notasPorSeccion(edicionActual, seccion.slug);
+export async function VitrinaSecciones() {
+  const edicion = await getEdicion();
+  const secciones = seccionesDeEdicion(edicion).map((seccion) => {
+    const notas = notasPorSeccion(edicion, seccion.slug);
     const conFoto = notas.find((n) => imagenDisponible(n.imagen?.src));
     return {
       ...seccion,
@@ -31,7 +32,7 @@ export function VitrinaSecciones() {
             Las secciones de la edición
           </h2>
           <p className="meta">
-            {edicionActual.mes} · N.º {edicionActual.numero}
+            {edicion.mes} · N.º {edicion.numero}
           </p>
         </div>
 

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { MandoPaginas } from "@/components/mando-paginas";
 import { MigueChat } from "@/components/migue/migue-chat";
 import { usuarioActual } from "@/lib/auth/dal";
-import { edicionActual } from "@/lib/data/edicion-actual";
+import { getEdicion } from "@/lib/repos/edicion";
 import { paginasDeEdicion } from "@/lib/data/paginas";
 
 /** Escritorio sobre el que se apoya la hoja del diario. Migue y el mando de
@@ -29,7 +29,7 @@ export default async function DiarioLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="escritorio flex flex-1 flex-col px-0 py-0 sm:px-6 sm:py-8 lg:py-10">
       {children}
-      <MandoPaginas paginas={paginasDeEdicion(edicionActual)} />
+      <MandoPaginas paginas={paginasDeEdicion(await getEdicion())} />
       <MigueChat />
     </div>
   );

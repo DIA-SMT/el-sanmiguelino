@@ -1,6 +1,6 @@
 # Panel de administración — plan de ejecución
 
-Estado: **etapa 1 terminada**. Las etapas 2 en adelante están pendientes.
+Estado: **etapas 1 y 2 terminadas**. Las etapas 3 en adelante están pendientes.
 
 ## Decisiones tomadas
 
@@ -16,7 +16,7 @@ Estado: **etapa 1 terminada**. Las etapas 2 en adelante están pendientes.
 | # | Etapa | ¿Supabase? | Estado |
 |---|---|---|---|
 | 1 | **Cerrar la casa**: sesión, proxy, config de imágenes | no | **hecha** |
-| 2 | Frontera de repo: `EdicionRepo` async con motor mock | no | pendiente |
+| 2 | Frontera de repo: `EdicionRepo` async con motor mock | no | **hecha** |
 | 3 | Formas normalizadas + contrato de moderación | no | pendiente |
 | 4 | Persistencia: Prisma + Supabase + seed | **sí** | pendiente |
 | 5 | Imágenes a Storage | sí | pendiente |
@@ -116,3 +116,32 @@ el `redirect()` de la página no lo cubría.
 **Regla que queda**: el componente que tiene los datos es el que tiene que pedir
 permiso. Un layout no es un límite de seguridad — no se re-ejecuta en las
 navegaciones del cliente y no corre para Server Actions ni route handlers.
+
+## Etapa 2 — lo que quedó hecho
+
+`src/lib/repos/edicion.ts` define `EdicionRepo` con firmas **async desde el
+primer día**, aunque el motor de hoy responda al instante. Ese es el punto: el
+costo caro de esta migración no es leer de Postgres, es volver asíncronos los
+componentes que eran síncronos y arrastrar el `await` por el árbol. Se paga
+contra datos que ya funcionan, no en el mismo commit en que se estrena la base.
+
+`getEdicion()` y `getNota()` van envueltas en `cache()` de React: una página del
+diario las pide desde el layout, el masthead, la página y dos o tres
+componentes, y sin eso serían cinco viajes a la base por request.
+
+`src/lib/repos/edicion-mock.ts` es el único archivo que puede importar
+`edicionActual`. **Ese es el portón**: mientras `git grep edicionActual` no
+devuelva nada fuera de ahí, cambiar de motor es cambiar una línea.
+
+Pasaron a async: `HojaDiario`, `NotasRelacionadas`, los tres componentes de
+`landing/` y la landing. `Masthead` no hizo falta: ya recibía la edición por
+prop.
+
+Verificado que el comportamiento no cambió: mismos conteos por sección, mismo
+foliado, mismos resultados de búsqueda, Migue responde igual.
+
+### Lo que la etapa 2 NO hizo
+
+Sigue existiendo una sola forma `Nota`, con el cuerpo entero, aunque las páginas
+de listado no lo necesiten. Separar `NotaResumen` de `NotaCompleta` es la etapa
+3, y recién ahí importa: con el mock, traer el cuerpo de más es gratis.

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { LogoHoja } from "@/components/brand/logos";
-import { edicionActual } from "@/lib/data/edicion-actual";
+import { getEdicion } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
 import { minutosDeLectura } from "@/lib/utils";
@@ -19,10 +19,11 @@ import { minutosDeLectura } from "@/lib/utils";
  * para lectores de pantalla —los mismos titulares están enlazados más abajo,
  * en la vista previa.
  */
-export function DiarioEnPerspectiva() {
-  const [principal, ...resto] = edicionActual.notas;
+export async function DiarioEnPerspectiva() {
+  const edicion = await getEdicion();
+  const [principal, ...resto] = edicion.notas;
   const secundarias = resto.slice(0, 3);
-  const secciones = seccionesDeEdicion(edicionActual)
+  const secciones = seccionesDeEdicion(edicion)
     .slice(0, 6)
     .map((s) => s.nombre);
 
@@ -52,7 +53,7 @@ export function DiarioEnPerspectiva() {
             {/* Bandera */}
             <div className="flex items-center justify-between gap-3 border-b border-hairline pb-2">
               <span className="font-sans text-[0.42rem] uppercase tracking-[0.16em] text-ink-3">
-                Edición N.º {edicionActual.numero}
+                Edición N.º {edicion.numero}
               </span>
               <span className="flex items-center gap-1.5">
                 <LogoHoja className="h-3 w-3" decorativo />
@@ -61,7 +62,7 @@ export function DiarioEnPerspectiva() {
                 </span>
               </span>
               <span className="font-sans text-[0.42rem] uppercase tracking-[0.16em] text-ink-3">
-                {edicionActual.mes}
+                {edicion.mes}
               </span>
             </div>
 

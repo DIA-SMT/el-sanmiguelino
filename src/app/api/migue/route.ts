@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUsuario } from "@/lib/auth/session";
-import { edicionActual, getNota } from "@/lib/data/edicion-actual";
+import { getEdicion, getNota } from "@/lib/repos/edicion";
 import type { Nota } from "@/lib/types";
 
 /**
@@ -69,30 +69,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Falta la pregunta" }, { status: 400 });
   }
 
+  const edicion = await getEdicion();
   const tokens = tokenizar(pregunta);
 
   // Saludo / smalltalk
   if (/\b(hola|buenas|buen dia|buen día|como estas|cómo estás)\b/i.test(pregunta)) {
     return NextResponse.json({
-      respuesta: `¡Hola, ${usuario.nombre.split(" ")[0]}! Soy Migue 👋. Puedo contarte qué trae la edición de ${edicionActual.mes} o responder preguntas sobre cualquiera de sus notas. ¿Qué te interesa?`,
+      respuesta: `¡Hola, ${usuario.nombre.split(" ")[0]}! Soy Migue 👋. Puedo contarte qué trae la edición de ${edicion.mes} o responder preguntas sobre cualquiera de sus notas. ¿Qué te interesa?`,
     });
   }
 
   // Índice de la edición
   if (/\b(edicion|ediciones|notas|temas|indice|índice|resumen|trae)\b/i.test(pregunta)) {
-    const lista = edicionActual.notas
+    const lista = edicion.notas
       .map((n) => `• ${n.titulo} (${n.seccion})`)
       .join("\n");
     return NextResponse.json({
-      respuesta: `La edición de ${edicionActual.mes} trae estas notas:\n${lista}\n\nPreguntame por cualquiera y te cuento más.`,
+      respuesta: `La edición de ${edicion.mes} trae estas notas:\n${lista}\n\nPreguntame por cualquiera y te cuento más.`,
     });
   }
 
   // Recuperación por puntaje sobre todas las notas (con leve sesgo a la nota abierta)
-  const notaAbierta = body.notaSlug ? getNota(body.notaSlug) : null;
+  const notaAbierta = body.notaSlug ? await getNota(body.notaSlug) : null;
   let mejorNota: Nota | null = null;
   let mejorPuntaje = 0;
-  for (const nota of edicionActual.notas) {
+  for (const nota of edicion.notas) {
     const propios = new Set(tokenizar(textoDeNota(nota)));
     let puntaje = tokens.filter((t) => propios.has(t)).length;
     if (notaAbierta && nota.slug === notaAbierta.slug) puntaje += 1;
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
 
   if (!mejorNota || mejorPuntaje < 2) {
     return NextResponse.json({
-      respuesta: `Sobre eso no encontré nada en la edición de ${edicionActual.mes}. Puedo ayudarte con lo que sí está publicado: preguntame, por ejemplo, "¿qué notas trae esta edición?".`,
+      respuesta: `Sobre eso no encontré nada en la edición de ${edicion.mes}. Puedo ayudarte con lo que sí está publicado: preguntame, por ejemplo, "¿qué notas trae esta edición?".`,
     });
   }
 

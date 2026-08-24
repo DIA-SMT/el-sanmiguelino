@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUsuario } from "@/lib/auth/session";
 import { comentariosRepo } from "@/lib/repos/comentarios";
-import { getNota } from "@/lib/data/edicion-actual";
+import { notaExiste } from "@/lib/repos/edicion";
 
 export async function GET(request: NextRequest) {
   const usuario = await getUsuario();
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   }
 
   const notaSlug = request.nextUrl.searchParams.get("nota");
-  if (!notaSlug || !getNota(notaSlug)) {
+  if (!notaSlug || !(await notaExiste(notaSlug))) {
     return NextResponse.json({ error: "Nota inexistente" }, { status: 404 });
   }
   const comentarios = await comentariosRepo.listar(notaSlug, usuario.id);
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   }
 
   const texto = (body.texto ?? "").trim();
-  if (!body.notaSlug || !getNota(body.notaSlug)) {
+  if (!body.notaSlug || !(await notaExiste(body.notaSlug))) {
     return NextResponse.json({ error: "Nota inexistente" }, { status: 404 });
   }
   if (!texto) {

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { edicionActual } from "@/lib/data/edicion-actual";
+import { getEdicion } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { minutosDeLectura } from "@/lib/utils";
 import type { Nota } from "@/lib/types";
@@ -20,8 +20,9 @@ function arranqueDe(nota: Nota): string | undefined {
  * Los titulares apuntan a la nota real y no al login: el gate se encarga de
  * mandar a ingresar y de volver después a la nota que se quiso leer.
  */
-export function VistaPrevia() {
-  const [principal, ...resto] = edicionActual.notas;
+export async function VistaPrevia() {
+  const edicion = await getEdicion();
+  const [principal, ...resto] = edicion.notas;
   const secundarias = resto.slice(0, 3);
   const arranque = arranqueDe(principal);
 
@@ -124,7 +125,7 @@ export function VistaPrevia() {
             ))}
 
             <p className="hidden pt-5 font-serif text-[0.9rem] italic leading-relaxed text-ink-3 sm:block">
-              La edición completa —{edicionActual.notas.length} notas, columnas
+              La edición completa —{edicion.notas.length} notas, columnas
               y la voz de los vecinos— está detrás del ingreso.
             </p>
             <Link

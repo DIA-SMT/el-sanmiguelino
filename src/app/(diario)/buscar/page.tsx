@@ -6,7 +6,7 @@ import { ArrowLeft, Search } from "lucide-react";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { HojaDiario } from "@/components/hoja-diario";
-import { edicionActual } from "@/lib/data/edicion-actual";
+import { getEdicion } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { buscarEnEdicion, MINIMO_CONSULTA } from "@/lib/data/buscar";
 import { getUsuario } from "@/lib/auth/session";
@@ -20,14 +20,15 @@ export default async function BuscarPage({
   const usuario = await getUsuario();
   if (!usuario) redirect("/login");
 
+  const edicion = await getEdicion();
   const { q } = await searchParams;
   const consulta = typeof q === "string" ? q : "";
   const corta = consulta.trim().length < MINIMO_CONSULTA;
-  const resultados = corta ? [] : buscarEnEdicion(edicionActual, consulta);
+  const resultados = corta ? [] : buscarEnEdicion(edicion, consulta);
 
   return (
     <HojaDiario numeroPagina={null}>
-      <Masthead edicion={edicionActual} usuario={usuario} />
+      <Masthead edicion={edicion} usuario={usuario} />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <nav aria-label="Volver" className="mb-7">
@@ -39,7 +40,7 @@ export default async function BuscarPage({
               className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-1"
               aria-hidden="true"
             />
-            Portada de {edicionActual.mes}
+            Portada de {edicion.mes}
           </Link>
         </nav>
 
@@ -51,7 +52,7 @@ export default async function BuscarPage({
               así se puede compartir o volver con el historial. */}
           <form action="/buscar" className="mt-5 flex max-w-xl gap-2">
             <label htmlFor="q" className="sr-only">
-              Buscar en la edición de {edicionActual.mes}
+              Buscar en la edición de {edicion.mes}
             </label>
             <div className="relative flex-1">
               <Search
@@ -79,8 +80,8 @@ export default async function BuscarPage({
         {corta ? (
           <p className="mt-10 max-w-xl font-serif text-[1.02rem] italic leading-relaxed text-ink-2">
             Escribí al menos {MINIMO_CONSULTA} letras para buscar en las{" "}
-            {edicionActual.notas.length} notas de la edición de{" "}
-            {edicionActual.mes}.
+            {edicion.notas.length} notas de la edición de{" "}
+            {edicion.mes}.
           </p>
         ) : (
           <>
@@ -97,7 +98,7 @@ export default async function BuscarPage({
               <div className="mt-8 border border-dashed border-line bg-paper-2 p-10 text-center">
                 <p className="font-serif text-lg italic text-ink-2">
                   No encontramos nada con esa palabra en la edición de{" "}
-                  {edicionActual.mes}.
+                  {edicion.mes}.
                 </p>
                 <Link
                   href="/diario"

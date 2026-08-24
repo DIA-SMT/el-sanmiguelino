@@ -6,7 +6,7 @@ import { VistaPrevia } from "@/components/landing/vista-previa";
 import { VitrinaSecciones } from "@/components/landing/vitrina-secciones";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SiteFooter } from "@/components/site-footer";
-import { edicionActual } from "@/lib/data/edicion-actual";
+import { getEdicion } from "@/lib/repos/edicion";
 
 const QUE_TRAE = [
   {
@@ -31,8 +31,9 @@ const QUE_TRAE = [
 
 /** Landing pública: presenta El Sanmiguelino e invita a ingresar con Cidituc.
  *  El diario completo vive detrás del gate, en /diario. */
-export default function Landing() {
-  const secciones = [...new Set(edicionActual.notas.map((n) => n.seccion))];
+export default async function Landing() {
+  const edicion = await getEdicion();
+  const secciones = [...new Set(edicion.notas.map((n) => n.seccion))];
 
   return (
     <>
@@ -110,7 +111,7 @@ export default function Landing() {
                   acá cuesta media pantalla. */}
               <div className="mt-11 hidden border-t border-line pt-5 lg:block">
                 <p className="meta text-ink">
-                  En la edición de {edicionActual.mes}
+                  En la edición de {edicion.mes}
                 </p>
                 <ul className="mt-3 flex flex-wrap gap-x-2.5 gap-y-2">
                   {secciones.map((s) => (
@@ -188,7 +189,7 @@ export default function Landing() {
         <section className="grano bg-paper">
           <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-6 px-4 py-16 text-center sm:px-6">
             <h2 className="titular text-pretty text-[clamp(1.6rem,4vw,2.4rem)] font-black leading-tight text-ink">
-              La edición de {edicionActual.mes} ya está en la calle
+              La edición de {edicion.mes} ya está en la calle
             </h2>
             <p className="max-w-xl font-serif text-[1.05rem] leading-relaxed text-ink-2">
               Ingresá con tu cuenta de Cidituc y leela como se lee un diario:

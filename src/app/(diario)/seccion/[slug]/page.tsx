@@ -7,7 +7,7 @@ import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
 import { HojaDiario } from "@/components/hoja-diario";
-import { edicionActual } from "@/lib/data/edicion-actual";
+import { getEdicion } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { getSeccion, notasPorSeccion, slugificarSeccion } from "@/lib/data/secciones";
 import { getUsuario } from "@/lib/auth/session";
@@ -16,8 +16,9 @@ import { minutosDeLectura } from "@/lib/utils";
 export async function generateMetadata({
   params,
 }: PageProps<"/seccion/[slug]">): Promise<Metadata> {
+  const edicion = await getEdicion();
   const { slug } = await params;
-  const seccion = getSeccion(edicionActual, slug);
+  const seccion = getSeccion(edicion, slug);
   return { title: seccion?.nombre ?? "Sección" };
 }
 
@@ -28,10 +29,11 @@ export default async function SeccionPage({
   if (!usuario) redirect("/login");
 
   const { slug } = await params;
-  const seccion = getSeccion(edicionActual, slug);
+  const edicion = await getEdicion();
+  const seccion = getSeccion(edicion, slug);
   if (!seccion) notFound();
 
-  const notas = notasPorSeccion(edicionActual, slug);
+  const notas = notasPorSeccion(edicion, slug);
   // Jerarquía de sección: una protagonista, después las que la acompañan y al
   // final el listado. Con las secciones flacas de esta edición muchas veces
   // sólo hay protagonista, y está bien: los bloques vacíos no se renderizan.
@@ -41,14 +43,14 @@ export default async function SeccionPage({
 
   // Una sección de una sola nota dejaría la hoja casi vacía: se cierra con el
   // resto de la edición para que siempre haya para dónde seguir.
-  const otrasDeLaEdicion = edicionActual.notas
+  const otrasDeLaEdicion = edicion.notas
     .filter((n) => slugificarSeccion(n.seccion) !== slug)
     .slice(0, 3);
 
   return (
     <HojaDiario numeroPagina={null}>
       <Masthead
-        edicion={edicionActual}
+        edicion={edicion}
         usuario={usuario}
         seccionActiva={seccion.slug}
       />
@@ -63,7 +65,7 @@ export default async function SeccionPage({
               className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-1"
               aria-hidden="true"
             />
-            Portada de {edicionActual.mes}
+            Portada de {edicion.mes}
           </Link>
         </nav>
 
@@ -73,14 +75,14 @@ export default async function SeccionPage({
           </h1>
           <p className="meta pb-1.5">
             {notas.length === 1 ? "1 nota" : `${notas.length} notas`} en{" "}
-            {edicionActual.mes}
+            {edicion.mes}
           </p>
         </header>
 
         {!principal ? (
           <div className="mt-10 border border-dashed border-line bg-paper-2 p-12 text-center">
             <p className="font-serif text-lg italic text-ink-2">
-              Esta sección no tiene notas en la edición de {edicionActual.mes}.
+              Esta sección no tiene notas en la edición de {edicion.mes}.
             </p>
             <Link
               href="/diario"
