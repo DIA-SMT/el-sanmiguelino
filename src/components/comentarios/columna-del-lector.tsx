@@ -68,6 +68,7 @@ export function ColumnaDelLector({
       likes: 0,
       dislikes: 0,
       miVoto: null,
+      estado: "publicado",
     };
     const previos = estado.comentarios;
     setEstado({ fase: "listo", comentarios: [optimista, ...previos] });

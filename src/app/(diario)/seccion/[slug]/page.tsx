@@ -7,18 +7,21 @@ import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
 import { HojaDiario } from "@/components/hoja-diario";
-import { getEdicion } from "@/lib/repos/edicion";
+import { getIndice, getResumenEdicion } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
-import { getSeccion, notasPorSeccion, slugificarSeccion } from "@/lib/data/secciones";
+import {
+  getSeccion,
+  notasPorSeccion,
+  seccionesDeEdicion,
+  slugificarSeccion,
+} from "@/lib/data/secciones";
 import { getUsuario } from "@/lib/auth/session";
-import { minutosDeLectura } from "@/lib/utils";
 
 export async function generateMetadata({
   params,
 }: PageProps<"/seccion/[slug]">): Promise<Metadata> {
-  const edicion = await getEdicion();
   const { slug } = await params;
-  const seccion = getSeccion(edicion, slug);
+  const seccion = getSeccion(await getIndice(), slug);
   return { title: seccion?.nombre ?? "Sección" };
 }
 
@@ -29,11 +32,14 @@ export default async function SeccionPage({
   if (!usuario) redirect("/login");
 
   const { slug } = await params;
-  const edicion = await getEdicion();
-  const seccion = getSeccion(edicion, slug);
+  const [edicion, indice] = await Promise.all([
+    getResumenEdicion(),
+    getIndice(),
+  ]);
+  const seccion = getSeccion(indice, slug);
   if (!seccion) notFound();
 
-  const notas = notasPorSeccion(edicion, slug);
+  const notas = notasPorSeccion(indice, slug);
   // Jerarquía de sección: una protagonista, después las que la acompañan y al
   // final el listado. Con las secciones flacas de esta edición muchas veces
   // sólo hay protagonista, y está bien: los bloques vacíos no se renderizan.
@@ -43,7 +49,7 @@ export default async function SeccionPage({
 
   // Una sección de una sola nota dejaría la hoja casi vacía: se cierra con el
   // resto de la edición para que siempre haya para dónde seguir.
-  const otrasDeLaEdicion = edicion.notas
+  const otrasDeLaEdicion = indice
     .filter((n) => slugificarSeccion(n.seccion) !== slug)
     .slice(0, 3);
 
@@ -51,6 +57,7 @@ export default async function SeccionPage({
     <HojaDiario numeroPagina={null}>
       <Masthead
         edicion={edicion}
+        secciones={seccionesDeEdicion(indice)}
         usuario={usuario}
         seccionActiva={seccion.slug}
       />
@@ -99,7 +106,10 @@ export default async function SeccionPage({
               <div className="min-w-0">
                 <p className="volanta text-accent">{seccion.nombre}</p>
                 <h2 className="titular mt-2.5 text-[clamp(1.7rem,4.4vw,2.9rem)] font-black leading-[1.05] text-ink">
-                  <Link href={`/nota/${principal.slug}`} className="titular-link">
+                  <Link
+                    href={`/nota/${principal.slug}`}
+                    className="titular-link"
+                  >
                     {principal.titulo}
                   </Link>
                 </h2>
@@ -107,7 +117,7 @@ export default async function SeccionPage({
                   {principal.bajada}
                 </p>
                 <p className="meta mt-4">
-                  {minutosDeLectura(principal.cuerpo)} min de lectura
+                  {principal.minutosLectura} min de lectura
                 </p>
                 <Link
                   href={`/nota/${principal.slug}`}
@@ -161,7 +171,10 @@ export default async function SeccionPage({
                         </Link>
                       )}
                       <h3 className="titular text-[1.25rem] font-bold leading-[1.16] text-ink">
-                        <Link href={`/nota/${nota.slug}`} className="titular-link">
+                        <Link
+                          href={`/nota/${nota.slug}`}
+                          className="titular-link"
+                        >
                           {nota.titulo}
                         </Link>
                       </h3>
@@ -169,7 +182,7 @@ export default async function SeccionPage({
                         {nota.bajada}
                       </p>
                       <p className="meta mt-2.5">
-                        {minutosDeLectura(nota.cuerpo)} min de lectura
+                        {nota.minutosLectura} min de lectura
                       </p>
                     </article>
                   ))}
@@ -191,12 +204,15 @@ export default async function SeccionPage({
                       className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-4"
                     >
                       <h3 className="titular min-w-0 flex-1 text-[1.05rem] font-bold leading-snug text-ink">
-                        <Link href={`/nota/${nota.slug}`} className="titular-link">
+                        <Link
+                          href={`/nota/${nota.slug}`}
+                          className="titular-link"
+                        >
                           {nota.titulo}
                         </Link>
                       </h3>
                       <span className="meta shrink-0">
-                        {minutosDeLectura(nota.cuerpo)} min
+                        {nota.minutosLectura} min
                       </span>
                     </li>
                   ))}

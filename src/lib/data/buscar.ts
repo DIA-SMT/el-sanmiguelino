@@ -1,4 +1,4 @@
-import type { Edicion, Nota } from "@/lib/types";
+import type { NotaBuscable } from "@/lib/types";
 
 /** Fragmento del texto donde apareció lo buscado, partido para poder resaltar
  *  la coincidencia sin volver a buscarla en el componente. */
@@ -9,7 +9,7 @@ export interface Fragmento {
 }
 
 export interface Resultado {
-  nota: Nota;
+  nota: NotaBuscable;
   /** dónde pegó: manda para ordenar los resultados */
   donde: "titulo" | "bajada" | "seccion" | "cuerpo";
   fragmento: Fragmento | null;
@@ -60,17 +60,13 @@ function fragmentoDe(texto: string, consulta: string): Fragmento | null {
   };
 }
 
-function cuerpoDe(nota: Nota): string {
-  return nota.cuerpo.map((b) => b.texto).join(" ");
-}
-
 /**
  * Busca en la edición: título, bajada, sección y cuerpo. Devuelve una entrada
  * por nota —la del campo más relevante donde pegó— ordenada por esa
  * relevancia y, a igualdad, por el orden de tapa.
  */
 export function buscarEnEdicion(
-  edicion: Edicion,
+  notas: NotaBuscable[],
   consulta: string,
 ): Resultado[] {
   const buscada = normalizar(consulta.trim());
@@ -78,12 +74,12 @@ export function buscarEnEdicion(
 
   const resultados: Resultado[] = [];
 
-  edicion.notas.forEach((nota) => {
+  notas.forEach((nota) => {
     const campos: [Resultado["donde"], string][] = [
       ["titulo", nota.titulo],
       ["bajada", nota.bajada],
       ["seccion", nota.seccion],
-      ["cuerpo", cuerpoDe(nota)],
+      ["cuerpo", nota.textoPlano],
     ];
 
     for (const [donde, texto] of campos) {

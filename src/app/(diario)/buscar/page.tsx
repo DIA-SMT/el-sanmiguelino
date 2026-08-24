@@ -6,11 +6,11 @@ import { ArrowLeft, Search } from "lucide-react";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { HojaDiario } from "@/components/hoja-diario";
-import { getEdicion } from "@/lib/repos/edicion";
+import { getBuscables, getResumenEdicion } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { buscarEnEdicion, MINIMO_CONSULTA } from "@/lib/data/buscar";
+import { seccionesDeEdicion } from "@/lib/data/secciones";
 import { getUsuario } from "@/lib/auth/session";
-import { minutosDeLectura } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Buscar" };
 
@@ -20,15 +20,22 @@ export default async function BuscarPage({
   const usuario = await getUsuario();
   if (!usuario) redirect("/login");
 
-  const edicion = await getEdicion();
+  const [edicion, buscables] = await Promise.all([
+    getResumenEdicion(),
+    getBuscables(),
+  ]);
   const { q } = await searchParams;
   const consulta = typeof q === "string" ? q : "";
   const corta = consulta.trim().length < MINIMO_CONSULTA;
-  const resultados = corta ? [] : buscarEnEdicion(edicion, consulta);
+  const resultados = corta ? [] : buscarEnEdicion(buscables, consulta);
 
   return (
     <HojaDiario numeroPagina={null}>
-      <Masthead edicion={edicion} usuario={usuario} />
+      <Masthead
+        edicion={edicion}
+        secciones={seccionesDeEdicion(buscables)}
+        usuario={usuario}
+      />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <nav aria-label="Volver" className="mb-7">
@@ -80,8 +87,7 @@ export default async function BuscarPage({
         {corta ? (
           <p className="mt-10 max-w-xl font-serif text-[1.02rem] italic leading-relaxed text-ink-2">
             Escribí al menos {MINIMO_CONSULTA} letras para buscar en las{" "}
-            {edicion.notas.length} notas de la edición de{" "}
-            {edicion.mes}.
+            {buscables.length} notas de la edición de {edicion.mes}.
           </p>
         ) : (
           <>
@@ -117,7 +123,10 @@ export default async function BuscarPage({
                     <div className="min-w-0">
                       <p className="volanta text-accent">{nota.seccion}</p>
                       <h2 className="titular mt-2 text-[clamp(1.2rem,2.6vw,1.7rem)] font-bold leading-[1.16] text-ink">
-                        <Link href={`/nota/${nota.slug}`} className="titular-link">
+                        <Link
+                          href={`/nota/${nota.slug}`}
+                          className="titular-link"
+                        >
                           {nota.titulo}
                         </Link>
                       </h2>
@@ -140,7 +149,7 @@ export default async function BuscarPage({
                         {donde === "titulo" ? "En el título" : null}
                         {donde === "seccion" ? "En la sección" : null}
                         {" · "}
-                        {minutosDeLectura(nota.cuerpo)} min de lectura
+                        {nota.minutosLectura} min de lectura
                       </p>
                     </div>
 

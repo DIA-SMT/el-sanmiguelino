@@ -1,4 +1,4 @@
-import type { Edicion, Nota } from "@/lib/types";
+import type { NotaResumen } from "@/lib/types";
 import { slugificarSeccion } from "@/lib/data/secciones";
 
 /**
@@ -7,15 +7,15 @@ import { slugificarSeccion } from "@/lib/data/secciones";
  * resto de la edición en orden de tapa, para no dejar nunca el pie vacío.
  */
 export function notasRelacionadas(
-  edicion: Edicion,
+  notas: NotaResumen[],
   slug: string,
   cantidad = 3,
-): Nota[] {
-  const actual = edicion.notas.find((n) => n.slug === slug);
+): NotaResumen[] {
+  const actual = notas.find((n) => n.slug === slug);
   if (!actual) return [];
 
   const seccion = slugificarSeccion(actual.seccion);
-  const otras = edicion.notas.filter((n) => n.slug !== slug);
+  const otras = notas.filter((n) => n.slug !== slug);
   const mismaSeccion = otras.filter(
     (n) => slugificarSeccion(n.seccion) === seccion,
   );

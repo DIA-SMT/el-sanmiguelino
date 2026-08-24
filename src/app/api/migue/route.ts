@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUsuario } from "@/lib/auth/session";
-import { getEdicion, getNota } from "@/lib/repos/edicion";
-import type { Nota } from "@/lib/types";
+import {
+  getCompletas,
+  getIndice,
+  getResumenEdicion,
+} from "@/lib/repos/edicion";
+import type { NotaCompleta } from "@/lib/types";
 
 /**
  * Backend mock de Migue: recuperación naive por palabras clave sobre las notas
@@ -28,7 +32,7 @@ function tokenizar(texto: string): string[] {
     .filter((t) => t.length > 2 && !STOPWORDS.has(t));
 }
 
-function textoDeNota(nota: Nota): string {
+function textoDeNota(nota: NotaCompleta): string {
   return [
     nota.titulo,
     nota.bajada,
@@ -37,7 +41,7 @@ function textoDeNota(nota: Nota): string {
   ].join(" ");
 }
 
-function mejorParrafo(nota: Nota, tokens: string[]): string {
+function mejorParrafo(nota: NotaCompleta, tokens: string[]): string {
   const parrafos = nota.cuerpo.filter((b) => b.tipo === "parrafo");
   let mejor = parrafos[0]?.texto ?? nota.bajada;
   let mejorPuntaje = 0;
@@ -69,31 +73,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Falta la pregunta" }, { status: 400 });
   }
 
-  const edicion = await getEdicion();
+  const [edicion, indice] = await Promise.all([
+    getResumenEdicion(),
+    getIndice(),
+  ]);
   const tokens = tokenizar(pregunta);
 
   // Saludo / smalltalk
-  if (/\b(hola|buenas|buen dia|buen día|como estas|cómo estás)\b/i.test(pregunta)) {
+  if (
+    /\b(hola|buenas|buen dia|buen día|como estas|cómo estás)\b/i.test(pregunta)
+  ) {
     return NextResponse.json({
       respuesta: `¡Hola, ${usuario.nombre.split(" ")[0]}! Soy Migue 👋. Puedo contarte qué trae la edición de ${edicion.mes} o responder preguntas sobre cualquiera de sus notas. ¿Qué te interesa?`,
     });
   }
 
   // Índice de la edición
-  if (/\b(edicion|ediciones|notas|temas|indice|índice|resumen|trae)\b/i.test(pregunta)) {
-    const lista = edicion.notas
-      .map((n) => `• ${n.titulo} (${n.seccion})`)
-      .join("\n");
+  if (
+    /\b(edicion|ediciones|notas|temas|indice|índice|resumen|trae)\b/i.test(
+      pregunta,
+    )
+  ) {
+    const lista = indice.map((n) => `• ${n.titulo} (${n.seccion})`).join("\n");
     return NextResponse.json({
       respuesta: `La edición de ${edicion.mes} trae estas notas:\n${lista}\n\nPreguntame por cualquiera y te cuento más.`,
     });
   }
 
   // Recuperación por puntaje sobre todas las notas (con leve sesgo a la nota abierta)
-  const notaAbierta = body.notaSlug ? await getNota(body.notaSlug) : null;
-  let mejorNota: Nota | null = null;
+  // Migue busca sobre el cuerpo de todas: acá sí hace falta la edición entera.
+  const completas = await getCompletas(indice.map((n) => n.slug));
+  const notaAbierta = body.notaSlug
+    ? (completas.find((n) => n.slug === body.notaSlug) ?? null)
+    : null;
+  let mejorNota: NotaCompleta | null = null;
   let mejorPuntaje = 0;
-  for (const nota of edicion.notas) {
+  for (const nota of completas) {
     const propios = new Set(tokenizar(textoDeNota(nota)));
     let puntaje = tokens.filter((t) => propios.has(t)).length;
     if (notaAbierta && nota.slug === notaAbierta.slug) puntaje += 1;

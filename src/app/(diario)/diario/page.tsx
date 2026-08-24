@@ -7,19 +7,24 @@ import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
 import { HojaDiario } from "@/components/hoja-diario";
-import { getEdicion } from "@/lib/repos/edicion";
+import {
+  getCompletas,
+  getIndice,
+  getResumenEdicion,
+} from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { comentariosRepo } from "@/lib/repos/comentarios";
 import { getUsuario } from "@/lib/auth/session";
 import { transicionPagina } from "@/lib/transiciones";
-import { minutosDeLectura, tiempoRelativo } from "@/lib/utils";
-import type { Nota } from "@/lib/types";
+import { tiempoRelativo } from "@/lib/utils";
+import { seccionesDeEdicion } from "@/lib/data/secciones";
+import type { NotaCompleta } from "@/lib/types";
 
-function parrafosDe(nota: Nota): string[] {
+function parrafosDe(nota: NotaCompleta): string[] {
   return nota.cuerpo.filter((b) => b.tipo === "parrafo").map((b) => b.texto);
 }
 
-function citaDe(nota: Nota) {
+function citaDe(nota: NotaCompleta) {
   const bloque = nota.cuerpo.find((b) => b.tipo === "cita");
   return bloque?.tipo === "cita" ? bloque : null;
 }
@@ -28,25 +33,37 @@ export default async function Portada() {
   const usuario = await getUsuario();
   if (!usuario) redirect("/login");
 
-  const edicion = await getEdicion();
-  const [principal, segunda, ...cajas] = edicion.notas;
+  const [edicion, indice] = await Promise.all([
+    getResumenEdicion(),
+    getIndice(),
+  ]);
+  // Sólo las dos primeras necesitan el cuerpo: la tapa muestra sus párrafos y
+  // su cita. Las demás entran como fichas, con titular y bajada.
+  const [principal, segunda] = await getCompletas(
+    indice.slice(0, 2).map((n) => n.slug),
+  );
+  const cajas = indice.slice(2);
   const parrafos = parrafosDe(principal);
   const cita = citaDe(principal);
   // Las notas empiezan en la página 2: la 1 es esta portada.
   const paginaPrincipal =
-    edicion.notas.findIndex((n) => n.slug === principal.slug) + 2;
+    indice.findIndex((n) => n.slug === principal.slug) + 2;
   const comentarioDestacado = await comentariosRepo.ultimoDeEdicion(
-    edicion.notas.map((n) => n.slug),
+    indice.map((n) => n.slug),
     usuario.id,
   );
   const notaComentada = comentarioDestacado
-    ? edicion.notas.find((n) => n.slug === comentarioDestacado.notaSlug)
+    ? indice.find((n) => n.slug === comentarioDestacado.notaSlug)
     : null;
 
   return (
     <ViewTransition {...transicionPagina}>
       <HojaDiario numeroPagina={1}>
-        <Masthead edicion={edicion} usuario={usuario} />
+        <Masthead
+          edicion={edicion}
+          secciones={seccionesDeEdicion(indice)}
+          usuario={usuario}
+        />
 
         <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
           {/* Apertura: la nota de tapa */}
@@ -71,7 +88,7 @@ export default async function Portada() {
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Clock className="h-3 w-3" aria-hidden="true" />
-                {minutosDeLectura(principal.cuerpo)} min de lectura
+                {principal.minutosLectura} min de lectura
               </span>
             </p>
           </div>

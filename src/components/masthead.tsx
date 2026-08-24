@@ -3,8 +3,8 @@ import { LogoHoja } from "@/components/brand/logos";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
 import { SeccionesNav } from "@/components/secciones-nav";
-import { seccionesDeEdicion } from "@/lib/data/secciones";
-import type { Edicion, Usuario } from "@/lib/types";
+import type { SeccionInfo } from "@/lib/data/secciones";
+import type { EdicionResumen, Usuario } from "@/lib/types";
 
 /** Cabecera estilo bandera clásica: franja institucional, bandera centrada
  *  con el logo en recuadro, línea de fecha entre filetes y barra de
@@ -16,10 +16,12 @@ import type { Edicion, Usuario } from "@/lib/types";
  *  header solo podría pegarse hasta donde termina el header, o sea nada. */
 export function Masthead({
   edicion,
+  secciones,
   usuario,
   seccionActiva,
 }: {
-  edicion: Edicion;
+  edicion: EdicionResumen;
+  secciones: SeccionInfo[];
   usuario: Usuario;
   seccionActiva?: string;
 }) {
@@ -85,10 +87,7 @@ export function Masthead({
       </header>
 
       {/* Barra de secciones */}
-      <SeccionesNav
-        secciones={seccionesDeEdicion(edicion)}
-        seccionActiva={seccionActiva}
-      />
+      <SeccionesNav secciones={secciones} seccionActiva={seccionActiva} />
     </>
   );
 }

@@ -1,12 +1,21 @@
-import type { Comentario } from "@/lib/types";
+import type {
+  Comentario,
+  ComentarioModerable,
+  EstadoComentario,
+} from "@/lib/types";
 
 /**
  * Repo de comentarios y votos, in-memory. Implementa el contrato que después
- * cumplirá la capa Postgres + Prisma. Singleton en globalThis para sobrevivir
- * al hot-reload de desarrollo.
+ * cumplirá la capa Postgres. Singleton en globalThis para sobrevivir al
+ * hot-reload de desarrollo.
  *
- * PENDIENTE DE CONFIRMAR con el municipio: política de moderación (publicación
- * directa vs. aprobación previa). Hoy publica directo.
+ * Política de moderación, ya definida con el municipio: **los comentarios se
+ * publican directo** y el administrador puede darlos de baja después.
+ *
+ * Un comentario dado de baja **no se borra**. Se le cambia el estado y queda
+ * el rastro de quién y cuándo. Son dos razones: los votos que recibió siguen
+ * colgando de él, y una publicación oficial que esconde la palabra de un
+ * vecino tiene que poder decir quién lo decidió.
  */
 
 interface ComentarioRow {
@@ -16,6 +25,10 @@ interface ComentarioRow {
   usuarioNombre: string;
   texto: string;
   fecha: string;
+  estado: EstadoComentario;
+  ocultadoPor?: string;
+  ocultadoEn?: string;
+  motivoBaja?: string;
 }
 
 interface Store {
@@ -38,6 +51,7 @@ function seed(): Store {
         texto:
           "Hermosa nota. De chico iba con mi abuelo a ver el Laocoonte y no sabía la historia que había detrás. Gran trabajo el de la restauración.",
         fecha: hace(26),
+        estado: "publicado",
       },
       {
         id: "c2",
@@ -47,6 +61,7 @@ function seed(): Store {
         texto:
           "Estaría bueno que armen visitas guiadas los fines de semana para recorrer todas las esculturas con este contexto histórico.",
         fecha: hace(5),
+        estado: "publicado",
       },
       {
         id: "c3",
@@ -56,6 +71,7 @@ function seed(): Store {
         texto:
           "Por fin saber cuándo llega el colectivo sin adivinar. Ojalá las pantallas lleguen pronto a las paradas de la zona sur.",
         fecha: hace(12),
+        estado: "publicado",
       },
     ],
     votos: new Map([
@@ -80,25 +96,59 @@ function proyectar(row: ComentarioRow, usuarioId: string): Comentario {
     else dislikes++;
     if (votante === usuarioId) miVoto = valor;
   }
-  return { ...row, likes, dislikes, miVoto };
+  return {
+    id: row.id,
+    notaSlug: row.notaSlug,
+    usuarioId: row.usuarioId,
+    usuarioNombre: row.usuarioNombre,
+    texto: row.texto,
+    fecha: row.fecha,
+    likes,
+    dislikes,
+    miVoto,
+    estado: row.estado,
+  };
 }
 
+function proyectarModerable(
+  row: ComentarioRow,
+  usuarioId: string,
+): ComentarioModerable {
+  return {
+    ...proyectar(row, usuarioId),
+    ocultadoPor: row.ocultadoPor,
+    ocultadoEn: row.ocultadoEn,
+    motivoBaja: row.motivoBaja,
+  };
+}
+
+const visible = (c: ComentarioRow) => c.estado === "publicado";
+const porFecha = (a: ComentarioRow, b: ComentarioRow) =>
+  b.fecha.localeCompare(a.fecha);
+
 export const comentariosRepo = {
+  /** Lo que ve un lector: sólo lo publicado. */
   async listar(notaSlug: string, usuarioId: string): Promise<Comentario[]> {
     return store.comentarios
-      .filter((c) => c.notaSlug === notaSlug)
-      .sort((a, b) => b.fecha.localeCompare(a.fecha))
+      .filter((c) => c.notaSlug === notaSlug && visible(c))
+      .sort(porFecha)
       .map((c) => proyectar(c, usuarioId));
   },
 
-  /** Comentario más reciente de toda la edición, para destacar en portada. */
+  /**
+   * Comentario más reciente de toda la edición, para destacar en portada.
+   *
+   * Filtra por estado igual que `listar()`. Sin ese filtro, dar de baja un
+   * comentario lo saca de su nota pero lo deja **destacado en la tapa**, que
+   * es justo el lugar donde más se ve.
+   */
   async ultimoDeEdicion(
     notaSlugs: string[],
     usuarioId: string,
   ): Promise<Comentario | null> {
     const row = store.comentarios
-      .filter((c) => notaSlugs.includes(c.notaSlug))
-      .sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+      .filter((c) => notaSlugs.includes(c.notaSlug) && visible(c))
+      .sort(porFecha)[0];
     return row ? proyectar(row, usuarioId) : null;
   },
 
@@ -111,6 +161,7 @@ export const comentariosRepo = {
     const row: ComentarioRow = {
       id: `c${store.seq++}`,
       fecha: new Date().toISOString(),
+      estado: "publicado",
       ...datos,
     };
     store.comentarios.push(row);
@@ -129,5 +180,55 @@ export const comentariosRepo = {
     if (valor === null) store.votos.delete(clave);
     else store.votos.set(clave, valor);
     return proyectar(row, usuarioId);
+  },
+
+  // --- Moderación --------------------------------------------------------
+
+  /**
+   * Lo que ve el administrador: **todo**, publicado y oculto, de toda la
+   * edición o de una nota. Los ocultos primero no: primero los recientes, que
+   * es el orden en que se modera.
+   */
+  async listarParaModeracion(opciones?: {
+    notaSlug?: string;
+    estado?: EstadoComentario;
+    moderadorId?: string;
+  }): Promise<ComentarioModerable[]> {
+    const { notaSlug, estado, moderadorId = "" } = opciones ?? {};
+    return store.comentarios
+      .filter((c) => (notaSlug ? c.notaSlug === notaSlug : true))
+      .filter((c) => (estado ? c.estado === estado : true))
+      .sort(porFecha)
+      .map((c) => proyectarModerable(c, moderadorId));
+  },
+
+  async darDeBaja(
+    comentarioId: string,
+    moderadorId: string,
+    motivo?: string,
+  ): Promise<ComentarioModerable | null> {
+    const row = store.comentarios.find((c) => c.id === comentarioId);
+    if (!row) return null;
+    row.estado = "oculto";
+    row.ocultadoPor = moderadorId;
+    row.ocultadoEn = new Date().toISOString();
+    row.motivoBaja = motivo;
+    return proyectarModerable(row, moderadorId);
+  },
+
+  async restituir(
+    comentarioId: string,
+    moderadorId: string,
+  ): Promise<ComentarioModerable | null> {
+    const row = store.comentarios.find((c) => c.id === comentarioId);
+    if (!row) return null;
+    row.estado = "publicado";
+    // El rastro de la baja anterior se limpia: si vuelve a bajarse, se escribe
+    // de nuevo. El historial completo de moderación es otra tabla, y todavía
+    // no hace falta.
+    delete row.ocultadoPor;
+    delete row.ocultadoEn;
+    delete row.motivoBaja;
+    return proyectarModerable(row, moderadorId);
   },
 };

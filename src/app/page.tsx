@@ -1,12 +1,18 @@
 import Link from "next/link";
-import { ArrowRight, LogIn, MessageCircle, Newspaper, ThumbsUp } from "lucide-react";
+import {
+  ArrowRight,
+  LogIn,
+  MessageCircle,
+  Newspaper,
+  ThumbsUp,
+} from "lucide-react";
 import { LogoHoja } from "@/components/brand/logos";
 import { DiarioEnPerspectiva } from "@/components/landing/diario-en-perspectiva";
 import { VistaPrevia } from "@/components/landing/vista-previa";
 import { VitrinaSecciones } from "@/components/landing/vitrina-secciones";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SiteFooter } from "@/components/site-footer";
-import { getEdicion } from "@/lib/repos/edicion";
+import { getIndice, getResumenEdicion } from "@/lib/repos/edicion";
 
 const QUE_TRAE = [
   {
@@ -32,8 +38,11 @@ const QUE_TRAE = [
 /** Landing pública: presenta El Sanmiguelino e invita a ingresar con Cidituc.
  *  El diario completo vive detrás del gate, en /diario. */
 export default async function Landing() {
-  const edicion = await getEdicion();
-  const secciones = [...new Set(edicion.notas.map((n) => n.seccion))];
+  const [edicion, indice] = await Promise.all([
+    getResumenEdicion(),
+    getIndice(),
+  ]);
+  const secciones = [...new Set(indice.map((n) => n.seccion))];
 
   return (
     <>
@@ -110,9 +119,7 @@ export default async function Landing() {
                   tira de secciones de más abajo dice exactamente lo mismo, y
                   acá cuesta media pantalla. */}
               <div className="mt-11 hidden border-t border-line pt-5 lg:block">
-                <p className="meta text-ink">
-                  En la edición de {edicion.mes}
-                </p>
+                <p className="meta text-ink">En la edición de {edicion.mes}</p>
                 <ul className="mt-3 flex flex-wrap gap-x-2.5 gap-y-2">
                   {secciones.map((s) => (
                     <li

@@ -2,14 +2,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { notasRelacionadas } from "@/lib/data/relacionadas";
-import { getEdicion } from "@/lib/repos/edicion";
-import { minutosDeLectura } from "@/lib/utils";
+import { getIndice } from "@/lib/repos/edicion";
 
 /** Pie de nota: qué leer después. Mismo lenguaje que las fichas de la portada
  *  —filete arriba, foto, volanta, titular— para que se lea como parte del
  *  diario y no como un módulo de recomendados. */
 export async function NotasRelacionadas({ notaSlug }: { notaSlug: string }) {
-  const notas = notasRelacionadas(await getEdicion(), notaSlug);
+  const notas = notasRelacionadas(await getIndice(), notaSlug);
   if (notas.length === 0) return null;
 
   return (
@@ -56,9 +55,7 @@ export async function NotasRelacionadas({ notaSlug }: { notaSlug: string }) {
                 {nota.titulo}
               </Link>
             </h3>
-            <p className="meta mt-2">
-              {minutosDeLectura(nota.cuerpo)} min de lectura
-            </p>
+            <p className="meta mt-2">{nota.minutosLectura} min de lectura</p>
           </article>
         ))}
       </div>

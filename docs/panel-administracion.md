@@ -1,6 +1,7 @@
 # Panel de administración — plan de ejecución
 
-Estado: **etapas 1 y 2 terminadas**. Las etapas 3 en adelante están pendientes.
+Estado: **etapas 1, 2 y 3 terminadas**. La etapa 4 es la primera que necesita
+credenciales de Supabase, así que está esperando al usuario.
 
 ## Decisiones tomadas
 
@@ -17,7 +18,7 @@ Estado: **etapas 1 y 2 terminadas**. Las etapas 3 en adelante están pendientes.
 |---|---|---|---|
 | 1 | **Cerrar la casa**: sesión, proxy, config de imágenes | no | **hecha** |
 | 2 | Frontera de repo: `EdicionRepo` async con motor mock | no | **hecha** |
-| 3 | Formas normalizadas + contrato de moderación | no | pendiente |
+| 3 | Formas normalizadas + contrato de moderación | no | **hecha** |
 | 4 | Persistencia: Prisma + Supabase + seed | **sí** | pendiente |
 | 5 | Imágenes a Storage | sí | pendiente |
 | 6 | `/admin`: shell + editor de notas | sí | pendiente |
@@ -145,3 +146,50 @@ foliado, mismos resultados de búsqueda, Migue responde igual.
 Sigue existiendo una sola forma `Nota`, con el cuerpo entero, aunque las páginas
 de listado no lo necesiten. Separar `NotaResumen` de `NotaCompleta` es la etapa
 3, y recién ahí importa: con el mock, traer el cuerpo de más es gratis.
+
+## Etapa 3 — lo que quedó hecho
+
+**Formas partidas.** `Nota` se abrió en tres, según lo que cada pantalla usa de
+verdad:
+
+- `NotaResumen` — slug, sección, título, bajada, imagen, minutos de lectura.
+  Lo que necesitan la portada, el índice, las secciones y el foliado.
+- `NotaCompleta` — el resumen más el cuerpo.
+- `NotaBuscable` — el resumen más el texto plano del cuerpo, para el buscador.
+
+Contra el mock esto no cambia nada. Contra Postgres, `indice()` deja de traer
+el cuerpo de ocho notas para dibujar una lista de títulos.
+
+`minutosLectura` y `textoPlano` se calculan **al proyectar**, en el repo, y no
+en cada componente que los muestre. Antes cada pantalla llamaba
+`minutosDeLectura(nota.cuerpo)`, lo que obligaba a tener el cuerpo a mano para
+mostrar un número: la razón real por la que todo cargaba la nota entera.
+
+**Contrato de moderación.** `Comentario` ahora lleva `estado`, y el repo suma
+`listarParaModeracion()`, `darDeBaja()` y `restituir()`, según lo acordado: se
+publica directo y el administrador baja después. Un comentario dado de baja no
+se borra; queda el rastro de quién y cuándo.
+
+El detalle que importa: **`ultimoDeEdicion()` filtra por estado igual que
+`listar()`**. Sin ese segundo filtro, un comentario dado de baja seguía siendo
+el que la portada destaca — o sea, el admin lo escondía de la nota y quedaba en
+la tapa.
+
+### Cómo se verificó
+
+Se capturó la huella de comportamiento con la etapa aplicada, se hizo `git
+stash` para volver a HEAD, se capturó la misma huella, y se comparó: **idéntica
+byte a byte** (códigos de las seis rutas, "2 notas" en Cultura, "Página 5 de 9"
+en la nota del bacheo, "4 resultados" para *tucuman*, y la respuesta completa
+de Migue al índice).
+
+Lo nuevo de la etapa no lo cubre esa huella, porque todavía no hay ruta que lo
+ejercite: para eso está `npm run verificar:comentarios`, dieciséis aserciones
+sobre el contrato de moderación. En la etapa 4 tiene que seguir pasando **sin
+tocarle una línea**; si hay que editarlo, la migración cambió el comportamiento
+y no sólo el almacenamiento.
+
+### Lo que la etapa 3 NO hizo
+
+No hay `autor` ni `publicadoEn` en las notas. Faltan los datos reales — firmas
+y fechas de una publicación oficial del municipio — y no se inventan.

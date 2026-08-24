@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getEdicion } from "@/lib/repos/edicion";
+import { getIndice, getResumenEdicion } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { notasPorSeccion, seccionesDeEdicion } from "@/lib/data/secciones";
 
@@ -13,9 +13,12 @@ import { notasPorSeccion, seccionesDeEdicion } from "@/lib/data/secciones";
  * una imagen que falta.
  */
 export async function VitrinaSecciones() {
-  const edicion = await getEdicion();
-  const secciones = seccionesDeEdicion(edicion).map((seccion) => {
-    const notas = notasPorSeccion(edicion, seccion.slug);
+  const [edicion, indice] = await Promise.all([
+    getResumenEdicion(),
+    getIndice(),
+  ]);
+  const secciones = seccionesDeEdicion(indice).map((seccion) => {
+    const notas = notasPorSeccion(indice, seccion.slug);
     const conFoto = notas.find((n) => imagenDisponible(n.imagen?.src));
     return {
       ...seccion,

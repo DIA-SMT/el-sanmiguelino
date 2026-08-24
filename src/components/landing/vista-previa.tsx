@@ -1,13 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { getEdicion } from "@/lib/repos/edicion";
+import { getCompletas, getIndice } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
-import { minutosDeLectura } from "@/lib/utils";
-import type { Nota } from "@/lib/types";
+import type { NotaCompleta } from "@/lib/types";
 
 /** Primer párrafo de la nota, para el arranque de la principal. */
-function arranqueDe(nota: Nota): string | undefined {
+function arranqueDe(nota: NotaCompleta): string | undefined {
   const bloque = nota.cuerpo.find((b) => b.tipo === "parrafo");
   return bloque?.tipo === "parrafo" ? bloque.texto : undefined;
 }
@@ -21,9 +20,10 @@ function arranqueDe(nota: Nota): string | undefined {
  * mandar a ingresar y de volver después a la nota que se quiso leer.
  */
 export async function VistaPrevia() {
-  const edicion = await getEdicion();
-  const [principal, ...resto] = edicion.notas;
-  const secundarias = resto.slice(0, 3);
+  const indice = await getIndice();
+  // Sólo la protagonista necesita el cuerpo, para su párrafo de arranque.
+  const [principal] = await getCompletas([indice[0].slug]);
+  const secundarias = indice.slice(1, 4);
   const arranque = arranqueDe(principal);
 
   return (
@@ -77,7 +77,7 @@ export async function VistaPrevia() {
               </p>
             )}
             <p className="meta mt-4">
-              {minutosDeLectura(principal.cuerpo)} min de lectura
+              {principal.minutosLectura} min de lectura
             </p>
           </article>
 
@@ -125,8 +125,8 @@ export async function VistaPrevia() {
             ))}
 
             <p className="hidden pt-5 font-serif text-[0.9rem] italic leading-relaxed text-ink-3 sm:block">
-              La edición completa —{edicion.notas.length} notas, columnas
-              y la voz de los vecinos— está detrás del ingreso.
+              La edición completa —{indice.length} notas, columnas y la voz de
+              los vecinos— está detrás del ingreso.
             </p>
             <Link
               href="/login"

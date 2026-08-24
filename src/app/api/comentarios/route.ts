@@ -35,7 +35,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Nota inexistente" }, { status: 404 });
   }
   if (!texto) {
-    return NextResponse.json({ error: "El comentario no puede estar vacío" }, { status: 400 });
+    return NextResponse.json(
+      { error: "El comentario no puede estar vacío" },
+      { status: 400 },
+    );
   }
   if (texto.length > 1000) {
     return NextResponse.json(

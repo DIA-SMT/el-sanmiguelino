@@ -1,4 +1,4 @@
-import type { Edicion, Nota } from "@/lib/types";
+import type { NotaResumen } from "@/lib/types";
 
 export function slugificarSeccion(nombre: string): string {
   return nombre
@@ -15,19 +15,25 @@ export interface SeccionInfo {
 }
 
 /** Secciones de la edición, en el orden en que aparecen las notas. */
-export function seccionesDeEdicion(edicion: Edicion): SeccionInfo[] {
+export function seccionesDeEdicion(notas: NotaResumen[]): SeccionInfo[] {
   const vistas = new Map<string, SeccionInfo>();
-  for (const nota of edicion.notas) {
+  for (const nota of notas) {
     const slug = slugificarSeccion(nota.seccion);
     if (!vistas.has(slug)) vistas.set(slug, { nombre: nota.seccion, slug });
   }
   return [...vistas.values()];
 }
 
-export function notasPorSeccion(edicion: Edicion, slug: string): Nota[] {
-  return edicion.notas.filter((n) => slugificarSeccion(n.seccion) === slug);
+export function notasPorSeccion(
+  notas: NotaResumen[],
+  slug: string,
+): NotaResumen[] {
+  return notas.filter((n) => slugificarSeccion(n.seccion) === slug);
 }
 
-export function getSeccion(edicion: Edicion, slug: string): SeccionInfo | null {
-  return seccionesDeEdicion(edicion).find((s) => s.slug === slug) ?? null;
+export function getSeccion(
+  notas: NotaResumen[],
+  slug: string,
+): SeccionInfo | null {
+  return seccionesDeEdicion(notas).find((s) => s.slug === slug) ?? null;
 }

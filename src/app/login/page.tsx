@@ -2,17 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LogoDireccionIA, LogoHoja } from "@/components/brand/logos";
-import { getEdicion } from "@/lib/repos/edicion";
+import { getResumenEdicion } from "@/lib/repos/edicion";
 import { BotonIngresar } from "./boton-ingresar";
 
 export const metadata: Metadata = { title: "Ingresar" };
 
-export default async function LoginPage({
-  searchParams,
-}: PageProps<"/login">) {
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { volverA } = await searchParams;
   const destino = typeof volverA === "string" ? volverA : "/diario";
-  const edicion = await getEdicion();
+  const edicion = await getResumenEdicion();
 
   return (
     <main className="escritorio grano relative flex flex-1 items-center justify-center overflow-hidden px-4 py-16 sm:py-24">

@@ -1,8 +1,8 @@
-import type { Edicion } from "@/lib/types";
+import type { EdicionSemilla } from "@/lib/types";
 
 /** Edición mock basada en el impreso aprobado. Cuando se conecte la
  *  persistencia real, esto pasa a un repo de ediciones. */
-export const edicionActual: Edicion = {
+export const edicionActual: EdicionSemilla = {
   slug: "agosto-2026",
   mes: "Agosto de 2026",
   numero: 8,
@@ -12,7 +12,8 @@ export const edicionActual: Edicion = {
     {
       slug: "septiembre-musical-plaza-independencia",
       seccion: "Cultura",
-      titulo: "El Septiembre Musical vuelve a la plaza Independencia con un show de apertura gratuito",
+      titulo:
+        "El Septiembre Musical vuelve a la plaza Independencia con un show de apertura gratuito",
       bajada:
         "El festival más tradicional de la provincia abre su edición 2026 en el corazón fundacional de la ciudad: un espectáculo al aire libre con la Orquesta Estable, artistas locales y un mapping sobre los edificios históricos.",
       imagen: {
@@ -119,7 +120,8 @@ export const edicionActual: Edicion = {
     {
       slug: "casa-historica-reconocimiento-nacional",
       seccion: "Historia",
-      titulo: "La Casa Histórica recibió a autoridades nacionales por un nuevo reconocimiento patrimonial",
+      titulo:
+        "La Casa Histórica recibió a autoridades nacionales por un nuevo reconocimiento patrimonial",
       bajada:
         "La presidenta de la Comisión Nacional de Monumentos encabezó el acto en el que el museo más visitado del norte argentino fue distinguido por su plan de conservación, un trabajo conjunto entre Nación, provincia y municipio.",
       imagen: {
@@ -162,7 +164,8 @@ export const edicionActual: Edicion = {
     {
       slug: "plan-bacheo-integral",
       seccion: "Obras",
-      titulo: "Bacheo en marcha: la Municipalidad repara más de 200 cuadras en toda la ciudad",
+      titulo:
+        "Bacheo en marcha: la Municipalidad repara más de 200 cuadras en toda la ciudad",
       bajada:
         "Cuadrillas trabajan de día y de noche con asfalto en caliente sobre los corredores del transporte público y las avenidas troncales; el plan sigue por los barrios con un cronograma semanal.",
       imagen: {
@@ -200,7 +203,8 @@ export const edicionActual: Edicion = {
     {
       slug: "nuevo-sistema-transporte-publico",
       seccion: "Transporte",
-      titulo: "El transporte público se renueva: pago con QR y colectivos en tiempo real",
+      titulo:
+        "El transporte público se renueva: pago con QR y colectivos en tiempo real",
       bajada:
         "La ciudad avanza hacia un sistema de transporte inteligente: a la tarjeta se suma el pago con código QR desde el celular, y una app mostrará en qué momento llega cada colectivo a la parada.",
       imagen: {
@@ -244,7 +248,8 @@ export const edicionActual: Edicion = {
     {
       slug: "peatonal-luminarias-led",
       seccion: "Obras",
-      titulo: "La peatonal se renueva: nuevas luminarias LED y más accesibilidad",
+      titulo:
+        "La peatonal se renueva: nuevas luminarias LED y más accesibilidad",
       bajada:
         "El plan de puesta en valor del microcentro suma iluminación de bajo consumo, rampas renovadas y señalética táctil en las esquinas de mayor circulación.",
       imagen: {
@@ -273,7 +278,8 @@ export const edicionActual: Edicion = {
     {
       slug: "agenda-cultural-agosto",
       seccion: "Cultura",
-      titulo: "Agenda de agosto: teatro, ferias y música en los espacios públicos",
+      titulo:
+        "Agenda de agosto: teatro, ferias y música en los espacios públicos",
       bajada:
         "El mes del aniversario de la ciudad llega con una programación gratuita que recorre plazas, museos y centros culturales de todos los barrios.",
       cuerpo: [

@@ -11,8 +11,8 @@ import { ColumnaDelLector } from "@/components/comentarios/columna-del-lector";
 import { CompartirNota } from "@/components/compartir-nota";
 import { NotasRelacionadas } from "@/components/notas-relacionadas";
 import { transicionPagina } from "@/lib/transiciones";
-import { getEdicion, getNota } from "@/lib/repos/edicion";
-import { slugificarSeccion } from "@/lib/data/secciones";
+import { getIndice, getNota, getResumenEdicion } from "@/lib/repos/edicion";
+import { seccionesDeEdicion, slugificarSeccion } from "@/lib/data/secciones";
 import { getUsuario } from "@/lib/auth/session";
 import { minutosDeLectura } from "@/lib/utils";
 import type { BloqueNota } from "@/lib/types";
@@ -25,7 +25,13 @@ export async function generateMetadata({
   return { title: nota?.titulo ?? "Nota" };
 }
 
-function Bloque({ bloque, esPrimero }: { bloque: BloqueNota; esPrimero: boolean }) {
+function Bloque({
+  bloque,
+  esPrimero,
+}: {
+  bloque: BloqueNota;
+  esPrimero: boolean;
+}) {
   switch (bloque.tipo) {
     case "subtitulo":
       return (
@@ -71,11 +77,13 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
   const nota = await getNota(slug);
   if (!nota) notFound();
 
-  const edicion = await getEdicion();
+  const [edicion, indice] = await Promise.all([
+    getResumenEdicion(),
+    getIndice(),
+  ]);
   const primerParrafoIdx = nota.cuerpo.findIndex((b) => b.tipo === "parrafo");
 
-  const numeroPagina =
-    edicion.notas.findIndex((n) => n.slug === nota.slug) + 2;
+  const numeroPagina = indice.findIndex((n) => n.slug === nota.slug) + 2;
 
   return (
     <>
@@ -87,6 +95,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
         <HojaDiario numeroPagina={numeroPagina}>
           <Masthead
             edicion={edicion}
+            secciones={seccionesDeEdicion(indice)}
             usuario={usuario}
             seccionActiva={slugificarSeccion(nota.seccion)}
           />

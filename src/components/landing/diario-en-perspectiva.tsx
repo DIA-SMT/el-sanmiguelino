@@ -1,9 +1,12 @@
 import Image from "next/image";
 import { LogoHoja } from "@/components/brand/logos";
-import { getEdicion } from "@/lib/repos/edicion";
+import {
+  getCompletas,
+  getIndice,
+  getResumenEdicion,
+} from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
-import { minutosDeLectura } from "@/lib/utils";
 
 /**
  * El diario impreso apoyado en el escritorio, visto en ángulo, con la pila de
@@ -20,10 +23,13 @@ import { minutosDeLectura } from "@/lib/utils";
  * en la vista previa.
  */
 export async function DiarioEnPerspectiva() {
-  const edicion = await getEdicion();
-  const [principal, ...resto] = edicion.notas;
-  const secundarias = resto.slice(0, 3);
-  const secciones = seccionesDeEdicion(edicion)
+  const [edicion, indice] = await Promise.all([
+    getResumenEdicion(),
+    getIndice(),
+  ]);
+  const [principal] = await getCompletas([indice[0].slug]);
+  const secundarias = indice.slice(1, 4);
+  const secciones = seccionesDeEdicion(indice)
     .slice(0, 6)
     .map((s) => s.nombre);
 
@@ -91,8 +97,7 @@ export async function DiarioEnPerspectiva() {
                   {principal.bajada.slice(0, 150)}…
                 </p>
                 <p className="mt-1.5 font-sans text-[0.4rem] uppercase tracking-[0.12em] text-ink-3">
-                  Redacción · {minutosDeLectura(principal.cuerpo)} min de
-                  lectura
+                  Redacción · {principal.minutosLectura} min de lectura
                 </p>
               </div>
               {principal.imagen && imagenDisponible(principal.imagen.src) && (

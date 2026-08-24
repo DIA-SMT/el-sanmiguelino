@@ -1,4 +1,4 @@
-import type { Edicion } from "@/lib/types";
+import type { NotaResumen } from "@/lib/types";
 
 /** Una página del diario: la portada y después una por nota, como en el
  *  impreso. El orden del array `notas` define la numeración. */
@@ -8,10 +8,10 @@ export interface PaginaEdicion {
   titulo: string;
 }
 
-export function paginasDeEdicion(edicion: Edicion): PaginaEdicion[] {
+export function paginasDeEdicion(notas: NotaResumen[]): PaginaEdicion[] {
   return [
     { numero: 1, href: "/diario", titulo: "Portada" },
-    ...edicion.notas.map((nota, i) => ({
+    ...notas.map((nota, i) => ({
       numero: i + 2,
       href: `/nota/${nota.slug}`,
       titulo: nota.titulo,
@@ -22,8 +22,8 @@ export function paginasDeEdicion(edicion: Edicion): PaginaEdicion[] {
 /** Página actual a partir del pathname; null si la ruta no es una página
  *  numerada (por ejemplo, el listado de una sección). */
 export function paginaActual(
-  edicion: Edicion,
+  notas: NotaResumen[],
   pathname: string,
 ): PaginaEdicion | null {
-  return paginasDeEdicion(edicion).find((p) => p.href === pathname) ?? null;
+  return paginasDeEdicion(notas).find((p) => p.href === pathname) ?? null;
 }

@@ -1,6 +1,6 @@
 import { PasadorPaginas } from "@/components/pasador-paginas";
 import { paginasDeEdicion } from "@/lib/data/paginas";
-import { getEdicion } from "@/lib/repos/edicion";
+import { getIndice } from "@/lib/repos/edicion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,7 +17,7 @@ export async function HojaDiario({
   children: React.ReactNode;
   className?: string;
 }) {
-  const paginas = paginasDeEdicion(await getEdicion());
+  const paginas = paginasDeEdicion(await getIndice());
   const indice = numeroPagina === null ? -1 : numeroPagina - 1;
 
   return (
