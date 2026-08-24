@@ -20,12 +20,3 @@ export function tiempoRelativo(fechaIso: string, ahora = new Date()): string {
   return meses === 1 ? "hace 1 mes" : `hace ${meses} meses`;
 }
 
-/** Minutos de lectura estimados de una nota (200 palabras por minuto, el
- *  promedio de lectura en español). Mínimo 1. */
-export function minutosDeLectura(bloques: { texto: string }[]): number {
-  const palabras = bloques.reduce(
-    (total, b) => total + b.texto.trim().split(/\s+/).length,
-    0,
-  );
-  return Math.max(1, Math.round(palabras / 200));
-}

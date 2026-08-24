@@ -14,7 +14,6 @@ import { transicionPagina } from "@/lib/transiciones";
 import { getIndice, getNota, getResumenEdicion } from "@/lib/repos/edicion";
 import { seccionesDeEdicion, slugificarSeccion } from "@/lib/data/secciones";
 import { getUsuario } from "@/lib/auth/session";
-import { minutosDeLectura } from "@/lib/utils";
 import type { BloqueNota } from "@/lib/types";
 
 export async function generateMetadata({
@@ -135,7 +134,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                   </span>
                   <p className="meta inline-flex items-center gap-1.5">
                     <Clock className="h-3 w-3" aria-hidden="true" />
-                    {minutosDeLectura(nota.cuerpo)} min
+                    {nota.minutosLectura} min
                   </p>
                 </div>
               </header>

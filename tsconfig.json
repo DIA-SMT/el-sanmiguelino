@@ -6,6 +6,10 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // prisma/seed.mts importa .ts con la extensión escrita, porque lo ejecuta
+    // Node suelto (fuera de Next) y ahí la extensión es obligatoria. Con
+    // noEmit no hay salida que arreglar: es sólo permitirle a tsc leerlo.
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",

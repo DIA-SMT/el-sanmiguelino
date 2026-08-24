@@ -1,7 +1,8 @@
 # Panel de administración — plan de ejecución
 
-Estado: **etapas 1, 2 y 3 terminadas**. La etapa 4 es la primera que necesita
-credenciales de Supabase, así que está esperando al usuario.
+Estado: **etapas 1, 2 y 3 terminadas**. De la etapa 4 está hecho todo lo que
+no necesita conectarse a la base: esquema, migración inicial y semilla. Falta
+enchufarla, y eso necesita las credenciales de Supabase.
 
 ## Decisiones tomadas
 
@@ -19,7 +20,7 @@ credenciales de Supabase, así que está esperando al usuario.
 | 1 | **Cerrar la casa**: sesión, proxy, config de imágenes | no | **hecha** |
 | 2 | Frontera de repo: `EdicionRepo` async con motor mock | no | **hecha** |
 | 3 | Formas normalizadas + contrato de moderación | no | **hecha** |
-| 4 | Persistencia: Prisma + Supabase + seed | **sí** | pendiente |
+| 4 | Persistencia: Prisma + Supabase + seed | **sí** | **a medias** |
 | 5 | Imágenes a Storage | sí | pendiente |
 | 6 | `/admin`: shell + editor de notas | sí | pendiente |
 | 7 | Moderación de comentarios | sí | pendiente |
@@ -193,3 +194,66 @@ y no sólo el almacenamiento.
 
 No hay `autor` ni `publicadoEn` en las notas. Faltan los datos reales — firmas
 y fechas de una publicación oficial del municipio — y no se inventan.
+
+## Etapa 4 — la mitad que no necesita credenciales
+
+Está escrito y verificado todo lo que se puede verificar sin una base:
+
+- `prisma/schema.prisma` — `Edicion`, `Nota`, `Comentario`, `Voto`.
+- `prisma/migrations/20260824000000_inicial/` — el SQL, generado con
+  `migrate diff` contra el esquema, no improvisado en la máquina de nadie.
+- `prisma/seed.mts` — idempotente y transaccional.
+- `src/lib/db.ts` — el cliente, perezoso y singleton.
+- `prisma.config.ts` — Prisma 7 sacó las URLs del esquema; van acá.
+
+**Lo que NO está**: el motor Postgres de `EdicionRepo`. Es a propósito. Sin una
+base contra la cual correrlo, sería código que no se puede ejecutar ni una vez
+antes de commitearlo, y ya hay bastante en este proyecto que no se pudo ver
+funcionar.
+
+### Decisiones que quedaron en el esquema
+
+**El cuerpo es `Json`, no una tabla de bloques.** Se lee y se escribe siempre
+entero, nunca se consulta por bloque, y el historial de versiones está fuera de
+alcance.
+
+**`minutosLectura` y `textoPlano` son columnas.** Es lo que hace que un listado
+no traiga ocho cuerpos para mostrar títulos — el punto entero de la etapa 3.
+Las calcula `src/lib/derivar.ts`, que es el **mismo** módulo que usa el repo
+mock. Si cada uno tuviera su copia, la migración cambiaría los datos sin que
+nadie lo note: mismos textos, distintos minutos.
+
+`textoPlano` tiene que seguir siendo exactamente `cuerpo.map(b => b.texto)
+.join(" ")`. El resaltado de resultados corta el fragmento con índices sobre
+esa cadena; cambiar el separador corre todos los índices.
+
+**Los comentarios cuelgan del slug, no del id.** Toda la API del repo pide por
+slug, así que el listado de una nota es una consulta sola. El admin va a poder
+editar el slug, y para eso está el `ON UPDATE CASCADE`.
+
+**No hay tabla de usuarios.** Cidituc es la fuente. El nombre del autor se
+guarda desnormalizado en el comentario: es con el que esa persona firmó ese
+día, y no debería cambiar retroactivamente en comentarios ya publicados.
+
+**El foliado necesita la columna `orden`.** El orden de un array no sobrevive a
+una base; sin ella el número de página cambiaría solo entre requests.
+
+### Para enchufarla
+
+1. Crear el proyecto en Supabase.
+2. Poner `DATABASE_URL` (pooler, 6543, `?pgbouncer=true&connection_limit=1`) y
+   `DIRECT_URL` (host del pooler, 5432) en `.env.local`. Ver `.env.example`.
+3. `npm run db:migrate` y después `npm run db:seed`.
+
+Recién ahí tiene sentido escribir el motor Postgres del repo. La prueba de que
+quedó bien es que `npm run verificar:comentarios` pase contra él **sin tocarle
+una línea**: si hay que editarlo, la migración cambió el comportamiento y no
+sólo el almacenamiento.
+
+### Un aviso de `npm audit`
+
+`npm audit` marca 3 vulnerabilidades altas en `deepmerge-ts`. Cuelgan de
+`prisma` → `@prisma/config`, y `prisma` es una devDependency: es la CLI, no
+llega a `@prisma/client` ni se despliega. El único "arreglo" que ofrece npm es
+bajar a Prisma 6, que revierte todo el modelo de configuración de la 7. Se deja
+como está, sabiendo por qué.

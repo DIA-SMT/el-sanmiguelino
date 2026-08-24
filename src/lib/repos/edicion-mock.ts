@@ -1,6 +1,6 @@
 import type { EdicionRepo } from "@/lib/repos/edicion";
 import { edicionActual } from "@/lib/data/edicion-actual";
-import { minutosDeLectura } from "@/lib/utils";
+import { minutosDeLectura, textoPlanoDe } from "@/lib/derivar";
 import type {
   NotaBuscable,
   NotaCompleta,
@@ -25,10 +25,6 @@ import type {
  * guardar; el contrato hacia afuera no cambia.
  */
 
-function textoPlanoDe(nota: NotaSemilla): string {
-  return nota.cuerpo.map((b) => b.texto).join(" ");
-}
-
 function aResumen(nota: NotaSemilla): NotaResumen {
   return {
     slug: nota.slug,
@@ -45,7 +41,7 @@ function aCompleta(nota: NotaSemilla): NotaCompleta {
 }
 
 function aBuscable(nota: NotaSemilla): NotaBuscable {
-  return { ...aResumen(nota), textoPlano: textoPlanoDe(nota) };
+  return { ...aResumen(nota), textoPlano: textoPlanoDe(nota.cuerpo) };
 }
 
 export const edicionMockRepo: EdicionRepo = {

@@ -1,0 +1,147 @@
+// Esquema de la edición y de los comentarios.
+//
+// Traduce las formas de `src/lib/types.ts` a Postgres, sin cambiarlas. La
+// prueba de que la traducción es fiel es que `npm run verificar:comentarios`
+// tiene que seguir pasando contra este motor sin tocarle una línea.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7 sacó las URLs del esquema. La de migraciones vive en
+  // `prisma.config.ts` (conexión directa, 5432: el pooler en modo transacción
+  // no soporta el DDL de `prisma migrate`), y la de runtime se le pasa al
+  // adapter en `src/lib/db.ts` (el pooler, 6543).
+}
+
+model Edicion {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  /// ej.: "Agosto de 2026"
+  mes      String
+  numero   Int
+  anio     Int
+  etiqueta String?
+
+  /// Cuál es la edición que se sirve en /diario.
+  ///
+  /// Sólo una debería estar en true, y **eso lo sostiene quien escribe**, no
+  /// la base: la restricción que haría falta es un índice único parcial
+  /// (`WHERE actual`), que Prisma no sabe declarar. Meterlo a mano en el SQL
+  /// de la migración lo dejaría fuera del esquema, y `migrate dev` lo leería
+  /// como deriva y querría borrarlo en la migración siguiente.
+  ///
+  /// Por eso el seed apaga las demás en la misma transacción en que prende
+  /// ésta, y el panel tendrá que hacer lo mismo. Si algún día hay ediciones
+  /// programadas de verdad, la forma correcta es un puntero en una tabla de
+  /// una sola fila, no un booleano por edición.
+  actual Boolean @default(false)
+
+  notas Nota[]
+
+  @@unique([anio, numero])
+  @@map("ediciones")
+}
+
+model Nota {
+  id     String @id @default(cuid())
+  slug   String @unique
+  /// Hoy es texto libre, igual que en el mock: las secciones se derivan
+  /// agrupando las notas. Convertirlo en tabla cambiaría el orden y los slugs
+  /// de /seccion/*, así que es una migración aparte y no ésta.
+  seccion String
+  titulo  String
+  bajada  String
+
+  /// BloqueNota[] serializado. Es Json y no una tabla de bloques a propósito:
+  /// el cuerpo se lee y se escribe siempre entero, nunca se consulta por
+  /// bloque, y el historial de versiones está fuera de alcance.
+  cuerpo Json
+
+  /// Derivados del cuerpo, calculados AL ESCRIBIR. Por eso existen como
+  /// columnas: son lo que permite que un listado no traiga ocho cuerpos para
+  /// mostrar títulos.
+  minutosLectura Int
+  /// Exactamente `cuerpo.map(b => b.texto).join(" ")`. El resaltado de
+  /// resultados corta el fragmento con índices sobre esta misma cadena, así
+  /// que no puede normalizarse ni recortarse: tiene que seguir siendo eso.
+  /// Quien escriba el cuerpo escribe esto en la misma transacción.
+  textoPlano String
+
+  /// Campos de ImagenNota, aplanados. Son tres columnas y no una tabla porque
+  /// es una imagen por nota; la galería no está en el alcance.
+  imagenSrc      String?
+  imagenAlt      String?
+  imagenEpigrafe String?
+
+  /// El foliado ("Página 5 de 9") sale de acá. El orden de un array no
+  /// sobrevive a una base: sin esta columna, el número de página cambiaría
+  /// solo entre requests.
+  orden Int
+
+  edicionId String
+  edicion   Edicion @relation(fields: [edicionId], references: [id], onDelete: Cascade)
+
+  comentarios Comentario[]
+
+  @@unique([edicionId, orden])
+  @@index([edicionId, seccion])
+  @@map("notas")
+}
+
+model Comentario {
+  id String @id @default(cuid())
+
+  /// La relación va por slug y no por id porque toda la API del repo pide por
+  /// slug, y así el listado de una nota es una consulta sola. El admin puede
+  /// editar el slug de una nota, y para eso está el ON UPDATE CASCADE: si
+  /// cambia, los comentarios lo siguen en vez de quedar huérfanos.
+  notaSlug String
+  nota     Nota   @relation(fields: [notaSlug], references: [slug], onDelete: Cascade, onUpdate: Cascade)
+
+  /// El autor viene de Cidituc y no hay tabla de usuarios: Cidituc es la
+  /// fuente. El nombre se guarda desnormalizado a propósito — es el nombre con
+  /// el que la persona firmó ese día, y no debería cambiar retroactivamente en
+  /// comentarios ya publicados si después se lo cambia en Cidituc.
+  usuarioId     String
+  usuarioNombre String
+
+  texto String
+  fecha DateTime @default(now())
+
+  /// "publicado" | "oculto". Es texto y no enum de Postgres para que agregar
+  /// un estado más adelante no sea una migración con lock de tabla.
+  estado String @default("publicado")
+
+  /// Rastro de la baja. Un comentario oculto no se borra: una publicación
+  /// oficial que esconde la palabra de un vecino tiene que poder decir quién
+  /// lo decidió.
+  ocultadoPor String?
+  ocultadoEn  DateTime?
+  motivoBaja  String?
+
+  votos Voto[]
+
+  /// El listado de una nota filtra por estado y ordena por fecha.
+  @@index([notaSlug, estado, fecha])
+  /// La portada busca el último comentario visible de toda la edición.
+  @@index([estado, fecha])
+  @@map("comentarios")
+}
+
+model Voto {
+  comentarioId String
+  comentario   Comentario @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+  usuarioId    String
+  /// 1 o -1. Quitar el voto borra la fila; no existe el 0.
+  valor        Int
+
+  /// Un voto por persona y por comentario. La restricción vive acá y no en la
+  /// aplicación: dos pedidos simultáneos del mismo usuario no pueden dejar dos
+  /// filas.
+  @@id([comentarioId, usuarioId])
+  @@index([comentarioId])
+  @@map("votos")
+}
