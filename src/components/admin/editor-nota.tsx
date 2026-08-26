@@ -9,8 +9,9 @@ import {
   Plus,
   Trash2,
   TriangleAlert,
+  Upload,
 } from "lucide-react";
-import { guardarNotaAction } from "@/app/admin/acciones";
+import { guardarNotaAction, subirImagenAction } from "@/app/admin/acciones";
 import type { BloqueNota, NotaCompleta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -154,6 +155,8 @@ export function EditorNota({
   const [imagenEpigrafe, setImagenEpigrafe] = useState(
     nota?.imagen?.epigrafe ?? "",
   );
+  const [subiendo, setSubiendo] = useState(false);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
   const [cuerpo, setCuerpo] = useState<BloqueNota[]>(
     nota?.cuerpo ?? [{ tipo: "parrafo", texto: "" }],
   );
@@ -211,6 +214,35 @@ export function EditorNota({
     window.addEventListener("beforeunload", avisar);
     return () => window.removeEventListener("beforeunload", avisar);
   }, [sucio]);
+
+  /**
+   * Sube la foto y pone su dirección en el campo. **No guarda la nota.**
+   *
+   * Separar las dos cosas es a propósito: subir una foto y arrepentirse no
+   * deja la nota a medio cambiar, y el redactor ve el resultado antes de
+   * publicar nada.
+   */
+  async function subirFoto(archivo: File) {
+    setErrorFoto(null);
+    setSubiendo(true);
+    try {
+      const datos = new FormData();
+      datos.set("archivo", archivo);
+      datos.set("slug", slug);
+      const res = await subirImagenAction(datos);
+      if (!res.ok || !res.url) {
+        setErrorFoto(res.error ?? "No se pudo subir la foto.");
+        return;
+      }
+      setImagenSrc(res.url);
+      setGuardado(false);
+      setSucio(true);
+    } catch {
+      setErrorFoto("No se pudo hablar con el servidor al subir la foto.");
+    } finally {
+      setSubiendo(false);
+    }
+  }
 
   function guardar() {
     setError(null);
@@ -337,10 +369,40 @@ export function EditorNota({
               className={cn(campo, "mt-1.5 font-mono text-[0.8rem]")}
               placeholder="/notas/plaza-independencia.webp"
             />
-            <span className="mt-1 block font-sans text-[0.7rem] text-ink-3">
-              Por ahora la ruta de un archivo ya subido. La carga desde el panel
-              llega con el Storage.
+            <span className="mt-2 flex flex-wrap items-center gap-2">
+              {/* El input de archivo va escondido detrás de su etiqueta: el
+                  control nativo no se puede estilar y queda como un cuerpo
+                  extraño en el panel. La etiqueta ES el disparador, así que
+                  sigue andando con teclado y con lector de pantalla. */}
+              <label className="pressable inline-flex cursor-pointer items-center gap-2 border border-ink px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink hover:bg-ink hover:text-paper">
+                <Upload className="h-3 w-3" aria-hidden="true" />
+                {subiendo ? "Subiendo…" : "Subir una foto"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={subiendo}
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    // Se limpia el value para que elegir el MISMO archivo dos
+                    // veces seguidas vuelva a disparar el onChange.
+                    e.target.value = "";
+                    if (f) void subirFoto(f);
+                  }}
+                />
+              </label>
+              <span className="font-sans text-[0.7rem] text-ink-3">
+                JPG, PNG o WebP, hasta 8 MB.
+              </span>
             </span>
+            {errorFoto && (
+              <span
+                role="alert"
+                className="mt-1.5 block font-sans text-[0.75rem] text-red-700 dark:text-red-400"
+              >
+                {errorFoto}
+              </span>
+            )}
           </label>
           <label>
             <span className={etiqueta}>Texto alternativo</span>

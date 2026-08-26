@@ -1,8 +1,8 @@
 # Panel de administración — plan de ejecución
 
-Estado: **todas las etapas terminadas menos la 5** (imágenes a Storage, que
-necesita credenciales del bucket). El diario lee de Supabase, y el panel escribe
-notas, modera comentarios y muestra qué no supo contestar Migue.
+Estado: **las ocho etapas terminadas.** El diario lee de Supabase, y el panel
+escribe notas con sus fotos, programa ediciones, modera comentarios y muestra
+qué no supo contestar Migue.
 
 ## Decisiones tomadas
 
@@ -10,7 +10,8 @@ notas, modera comentarios y muestra qué no supo contestar Migue.
 |---|---|
 | Base de datos | Supabase (Postgres) |
 | Rol de admin | Viene de Cidituc |
-| Deploy / imágenes | Vercel + blob storage |
+| Deploy | Vercel |
+| Imágenes | Supabase Storage (decidido el 2026-08-26) |
 | Moderación | Los comentarios publican directo; el admin los da de baja |
 
 ## Etapas
@@ -21,7 +22,7 @@ notas, modera comentarios y muestra qué no supo contestar Migue.
 | 2 | Frontera de repo: `EdicionRepo` async con motor mock | no | **hecha** |
 | 3 | Formas normalizadas + contrato de moderación | no | **hecha** |
 | 4 | Persistencia: Prisma + Supabase + seed | **sí** | **hecha** |
-| 5 | Imágenes a Storage | sí | pendiente |
+| 5 | Imágenes a Storage | sí | **hecha** |
 | 6 | `/admin`: shell + editor de notas | sí | **hecha** |
 | 7 | Moderación de comentarios | sí | **hecha** |
 | 8 | Migue: registro + pantalla "Lo que no supimos contestar" | sí | **hecha** |
@@ -69,8 +70,10 @@ servidor en cada request, memoizada con `cache()`.
 `DATABASE_URL` (pooler, 6543, con `?pgbouncer=true&connection_limit=1`) y
 `DIRECT_URL` (mismo host del pooler, 5432). Ver `.env.example`.
 
-**Antes de la etapa 5**: crear el bucket y poner `SUPABASE_URL` y
-`SUPABASE_SERVICE_ROLE_KEY`. Esta última **nunca** con prefijo `NEXT_PUBLIC_`.
+**Hecho**: el bucket `diario` existe, y `SUPABASE_URL`, `SUPABASE_BUCKET` y
+`SUPABASE_SERVICE_ROLE_KEY` están en `.env.local`. Falta cargarlas en Vercel
+antes del próximo deploy. La `service_role` **nunca** con prefijo
+`NEXT_PUBLIC_`.
 
 **Bloqueante externo**: la spec del SSO de Cidituc. Sin ella no se sabe si el rol
 viene como claim, como grupo, o si hay que consultarlo aparte — y de eso depende
@@ -571,3 +574,60 @@ nota sigue en su dirección y el pie del pliego sigue contando sobre su edición
 Lo único que se apaga son las flechas del mando, porque esa nota ya no está en
 el índice de la edición en curso —y apagarlas es correcto: llevarían a otro
 mes—.
+
+
+## Etapa 5 — las fotos
+
+Se sube desde el editor de la nota. La foto va a Supabase Storage y en el campo
+del archivo queda su dirección; la nota se guarda después, con el botón. Las dos
+cosas están separadas a propósito: subir una foto y arrepentirse no deja la nota
+a medio cambiar.
+
+### Por qué no el SDK de Supabase
+
+`src/lib/storage.ts` habla la API REST con `fetch`. Son treinta líneas contra
+un paquete entero, y sobre todo: el SDK está pensado para correr también en el
+navegador, así que alguna vez alguien lo importa desde un componente cliente y
+se lleva la `service_role` al bundle. **Lo que no está instalado no se importa
+por accidente.** El módulo además tiene `import "server-only"`, que convierte
+ese error en un error de compilación.
+
+Verificado después de compilar: la clave aparece en **0** archivos de
+`.next/static`.
+
+### La subida pasa por el servidor
+
+El navegador nunca ve la clave. Subir directo desde el cliente exigiría dársela,
+y la `service_role` no es una llave de subida: es una llave maestra del
+proyecto entero, base incluida.
+
+### El tipo se valida por los bytes, no por lo que diga el archivo
+
+El `type` que manda el navegador lo pone quien sube y puede decir cualquier
+cosa. Se miran las firmas reales de JPG, PNG y WebP. Verificado con un archivo
+de texto renombrado a `.jpg`: **rechazado**.
+
+El nombre del archivo también lo elegimos nosotros —slug de la nota más un
+sufijo al azar—: un nombre que el usuario controla dentro de una ruta es la
+forma clásica de escribir donde no corresponde. El sufijo además evita pisar la
+foto anterior al cambiarla.
+
+### El bucket
+
+`diario`, público de lectura, con tope de 8 MB y sólo JPG/PNG/WebP **en el
+propio bucket**, además de lo que valida el código. Público porque las fotos de
+un diario se ven sin iniciar sesión y porque el optimizador de imágenes de Next
+las busca sin credenciales.
+
+`next.config.ts` acota `remotePatterns` al **bucket**, no al host: sin el
+`pathname`, cualquier archivo de cualquier bucket del proyecto pasaría por el
+optimizador, que es un proxy público. Un comodín ahí convierte al sitio en un
+servidor de imágenes ajeno.
+
+### Verificado
+
+Subida real desde la interfaz: el archivo mentiroso se rechaza, la foto de
+verdad sube, la nota se guarda y la imagen se sirve **a través del optimizador
+de Next** (`/_next/image?url=…`) con las dimensiones correctas — que es la
+prueba de que el patrón remoto está bien puesto. Después se restauró la nota y
+se vació el bucket.

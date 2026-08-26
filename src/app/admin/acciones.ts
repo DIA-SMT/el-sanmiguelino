@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { COOKIE_EDICION } from "@/lib/auth/vista-previa";
 import { desdeHoraTucuman } from "@/lib/fecha-edicion";
+import { subirImagen } from "@/lib/storage";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
 import { comentariosRepo } from "@/lib/repos/comentarios";
@@ -322,4 +323,38 @@ export async function enfocarEdicionAction(
 
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/**
+ * Sube la foto de una nota y devuelve su dirección.
+ *
+ * Recibe el archivo por `FormData` y lo manda a Storage **desde el servidor**.
+ * El navegador nunca ve la clave: subir directo desde el cliente exigiría
+ * dársela, y la `service_role` no es una llave de subida sino una llave
+ * maestra de todo el proyecto.
+ *
+ * No guarda la nota. Devuelve la URL y el editor la pone en el campo del
+ * archivo, que se guarda con el resto cuando el redactor aprieta Guardar. Así
+ * subir una foto y arrepentirse no deja la nota a medio cambiar.
+ */
+export async function subirImagenAction(
+  datos: FormData,
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  await requerirAdmin();
+
+  try {
+    const archivo = datos.get("archivo");
+    const slug = datos.get("slug");
+    if (!(archivo instanceof File)) throw new Error("No llegó ningún archivo.");
+    const nombre =
+      textoNoVacio(slug) && SLUG_VALIDO.test(slug) ? slug : "nota";
+
+    const { url } = await subirImagen(archivo, nombre);
+    return { ok: true, url };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo subir la foto.",
+    };
+  }
 }
