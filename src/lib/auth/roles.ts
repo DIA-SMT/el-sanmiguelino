@@ -15,8 +15,13 @@ export type Rol = "lector" | "editor" | "admin";
  *
  * Hoy devuelve siempre "lector", y eso es lo correcto: mientras el login sea
  * un POST sin credenciales que devuelve la misma identidad para todo el mundo,
- * cualquier rama que otorgue permisos se los otorga a cualquiera. La primera
- * condición corta antes de mirar nada más.
+ * cualquier rama que otorgue permisos se los otorga a cualquiera.
+ *
+ * Que el panel de administración se pueda abrir igual en desarrollo no
+ * contradice esto: no se resuelve acá dándole un rol falso a alguien, sino en
+ * `requerirAdmin()`, que fuera de producción no mira el rol. La diferencia
+ * importa —el rol sigue siendo la verdad, y la excepción está en un solo lugar
+ * y se borra de un renglón—.
  */
 export const rolDe = cache(async (usuarioId: string): Promise<Rol> => {
   // Sin SSO real no hay identidad verificable, así que no hay privilegio
@@ -24,9 +29,9 @@ export const rolDe = cache(async (usuarioId: string): Promise<Rol> => {
   // lista de ids, ni una fila en la base— puede saltearse esta guarda.
   if (!ES_SSO_REAL) return "lector";
 
-  // Etapa 4: acá va la consulta a la tabla de usuarios en Supabase, que pasa a
-  // ser la fuente de verdad provisoria hasta que Cidituc entregue el rol en el
-  // perfil. Mientras tanto, el default sigue cerrado.
+  // Con SSO real: acá va la consulta a la tabla de usuarios en Supabase, que
+  // pasa a ser la fuente de verdad provisoria hasta que Cidituc entregue el rol
+  // en el perfil. Mientras tanto, el default sigue cerrado.
   void usuarioId;
   return "lector";
 });

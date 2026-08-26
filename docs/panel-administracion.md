@@ -1,6 +1,6 @@
 # Panel de administración — plan de ejecución
 
-Estado: **etapas 1 a 4 terminadas**, salvo el motor Postgres del repo. La base
+Estado: **etapas 1 a 4 terminadas y el shell de la 6**, salvo el motor Postgres del repo. La base
 de Supabase está creada, migrada y sembrada; la aplicación todavía lee del
 mock, y cambiar el motor es lo que sigue.
 
@@ -22,7 +22,7 @@ mock, y cambiar el motor es lo que sigue.
 | 3 | Formas normalizadas + contrato de moderación | no | **hecha** |
 | 4 | Persistencia: Prisma + Supabase + seed | **sí** | **hecha** (falta el motor del repo) |
 | 5 | Imágenes a Storage | sí | pendiente |
-| 6 | `/admin`: shell + editor de notas | sí | pendiente |
+| 6 | `/admin`: shell + editor de notas | sí | **shell hecho**, editor pendiente |
 | 7 | Moderación de comentarios | sí | pendiente |
 | 8 | Migue: registro + pantalla "Lo que no supimos contestar" | sí | pendiente |
 
@@ -277,3 +277,46 @@ sólo el almacenamiento.
 llega a `@prisma/client` ni se despliega. El único "arreglo" que ofrece npm es
 bajar a Prisma 6, que revierte todo el modelo de configuración de la 7. Se deja
 como está, sabiendo por qué.
+
+
+## Cómo se entra al panel (decidido el 2026-08-26)
+
+**En desarrollo el panel está abierto**: cualquier sesión válida entra a
+`/admin`, sin roles. **En producción el panel no existe**: responde 404 y
+ninguna variable lo abre mientras el login siga siendo el mock.
+
+Las dos mitades son la misma decisión, y reemplazan al plan anterior de exigir
+rol de administrador desde el principio. El motivo: el login de hoy es un POST
+sin credenciales que devuelve la misma identidad a todo el que aprieta el
+botón, así que pedir un rol sería teatro —la única forma de tener uno sería
+inventárselo, y un rol inventado no distingue a nadie de nadie—. Mientras la
+identidad no se pueda verificar, o el panel es local o no es.
+
+La excepción vive en **un solo lugar**, `requerirAdmin()` en
+`src/lib/auth/dal.ts`, y se borra de un renglón el día que haya SSO real.
+`rolDe()` no se tocó: sigue devolviendo siempre "lector", que es la verdad. No
+se le enseñó a mentir.
+
+### Dos cosas que aparecieron al verificar
+
+**El orden de las guardias cambia si la ruta es estática.** Con el interruptor
+antes de leer la cookie, `requerirAdmin()` cortaba sin tocar APIs dinámicas y
+Next horneaba `/admin` como un **404 estático** al compilar: prenderlo después
+en runtime no habría servido de nada sin volver a desplegar. Leer la sesión
+primero lo vuelve dinámico. En el build se ve como `ƒ /admin` en vez de
+`○ /admin`.
+
+**El bloqueo en producción está probado, no deducido.** Se compiló, se levantó
+`next start` y con una sesión válida `/admin` devolvió **404** mientras
+`/diario` devolvía **200** en la misma corrida. Ese control es lo que hace que
+la prueba no sea vacía: sin él, el 404 podría ser una sesión rota.
+
+### Lo que el shell hace y lo que no
+
+Muestra el listado real de la edición —folio, título, sección, minutos y
+slug—. Es de **sólo lectura**, y lo dice en pantalla: un botón de "nueva nota"
+que no hace nada es peor que no tenerlo. Tampoco tiene barra de secciones,
+porque sería un menú de un ítem o links a pantallas que no existen.
+
+El layout llama a `requerirAdmin()` **y la página también**. No es
+redundancia: un layout no es un límite de seguridad, y ya nos costó una fuga.

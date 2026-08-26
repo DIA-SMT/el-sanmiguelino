@@ -32,15 +32,38 @@ export const sesionActual = cache(async (): Promise<Sesion | null> => {
 });
 
 /**
- * Exige administrador o corta con 404.
+ * ¿El panel puede pedir rol de administrador de verdad?
  *
- * 404 y no 403 a propósito: un 403 confirma que la ruta existe. Mientras el
- * panel no esté listo para producción, lo que no existe no se anuncia.
+ * Sólo en producción. Fuera de ella no tiene sentido: el login es un mock que
+ * devuelve la misma identidad a cualquiera que apriete el botón, así que
+ * exigir un rol sería teatro —la única forma de tenerlo sería inventárselo, y
+ * un rol inventado no distingue a nadie de nadie—.
+ *
+ * La consecuencia deliberada es que **en desarrollo cualquier sesión válida
+ * entra al panel**, y en producción **el panel no existe** hasta que haya SSO
+ * real. Las dos mitades son la misma decisión: mientras la identidad no se
+ * pueda verificar, o el panel es local o no es.
+ */
+const EXIGE_ROL = process.env.NODE_ENV === "production";
+
+/**
+ * Exige permiso para el panel, o corta con 404.
+ *
+ * 404 y no 403 a propósito: un 403 confirma que la ruta existe. Lo que no está
+ * listo no se anuncia.
+ *
+ * La sesión se lee ANTES del interruptor, y eso no es cosmético: leer la
+ * cookie es una API dinámica de Next, y es lo que evita que `/admin` se
+ * prerenderice como un 404 estático al compilar. Con el orden al revés, la
+ * guardia cortaba antes de tocar cookies, Next horneaba la página y prender el
+ * interruptor después ya no servía de nada sin volver a desplegar.
  */
 export async function requerirAdmin(): Promise<Sesion> {
-  if (!ADMIN_HABILITADO) notFound();
   const sesion = await sesionActual();
-  if (!sesion || sesion.rol !== "admin") notFound();
+  if (!sesion) notFound();
+  if (!EXIGE_ROL) return sesion;
+  if (!ADMIN_HABILITADO) notFound();
+  if (sesion.rol !== "admin") notFound();
   return sesion;
 }
 
@@ -56,12 +79,11 @@ export function conAdmin<T extends unknown[]>(
   handler: (sesion: Sesion, ...args: T) => Promise<Response>,
 ): (...args: T) => Promise<Response> {
   return async (...args: T) => {
-    if (!ADMIN_HABILITADO) {
-      return new Response(null, { status: 404 });
-    }
     const sesion = await sesionActual();
-    if (!sesion || sesion.rol !== "admin") {
-      return new Response(null, { status: 404 });
+    if (!sesion) return new Response(null, { status: 404 });
+    if (EXIGE_ROL) {
+      if (!ADMIN_HABILITADO) return new Response(null, { status: 404 });
+      if (sesion.rol !== "admin") return new Response(null, { status: 404 });
     }
     return handler(sesion, ...args);
   };
