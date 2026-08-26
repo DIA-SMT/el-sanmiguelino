@@ -10,7 +10,17 @@ export interface Usuario {
 export type BloqueNota =
   | { tipo: "parrafo"; texto: string }
   | { tipo: "subtitulo"; texto: string }
-  | { tipo: "cita"; texto: string; autor: string; cargo?: string };
+  | {
+      tipo: "cita";
+      texto: string;
+      autor: string;
+      cargo?: string;
+      /** Retrato de quien habla, para el círculo del impreso. Ruta bajo
+       *  /public. Opcional y sin default: sin foto el bloque igual es
+       *  correcto, y poner la cara equivocada al lado de una declaración
+       *  oficial es peor que no poner ninguna. */
+      retrato?: string;
+    };
 
 export interface ImagenNota {
   /** epígrafe en itálica bajo la imagen */

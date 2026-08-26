@@ -156,7 +156,7 @@ export default async function Landing() {
               {QUE_TRAE.map(({ icono: Icono, titulo, texto }) => (
                 <div key={titulo} className="revela border-t border-ink pt-5">
                   <Icono className="h-5 w-5 text-accent" aria-hidden="true" />
-                  <h3 className="titular mt-4 text-[1.4rem] font-bold leading-tight text-ink">
+                  <h3 className="titular mt-4 text-[1.4rem] leading-tight text-ink">
                     {titulo}
                   </h3>
                   <p className="mt-2.5 text-pretty font-serif text-[0.95rem] leading-[1.7] text-ink-2">
@@ -182,7 +182,7 @@ export default async function Landing() {
               aria-hidden="true"
               className="mx-auto mb-7 block h-[2px] w-12 bg-accent"
             />
-            <blockquote className="titular text-pretty text-[clamp(1.4rem,3.4vw,2.1rem)] font-medium italic leading-[1.3] text-ink">
+            <blockquote className="titular text-pretty text-[clamp(1.4rem,3.4vw,2.1rem)] italic leading-[1.3] text-ink">
               “Estamos rescatando nuestra historia, nuestra cultura y el arte en
               este paseo, que es de todos los ciudadanos.”
             </blockquote>
@@ -195,7 +195,7 @@ export default async function Landing() {
         {/* Cierre */}
         <section className="grano bg-paper">
           <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-6 px-4 py-16 text-center sm:px-6">
-            <h2 className="titular text-pretty text-[clamp(1.6rem,4vw,2.4rem)] font-black leading-tight text-ink">
+            <h2 className="titular text-pretty text-[clamp(1.6rem,4vw,2.4rem)] leading-tight text-ink">
               La edición de {edicion.mes} ya está en la calle
             </h2>
             <p className="max-w-xl font-serif text-[1.05rem] leading-relaxed text-ink-2">

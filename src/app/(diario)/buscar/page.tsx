@@ -122,7 +122,7 @@ export default async function BuscarPage({
                   >
                     <div className="min-w-0">
                       <p className="volanta text-accent">{nota.seccion}</p>
-                      <h2 className="titular mt-2 text-[clamp(1.2rem,2.6vw,1.7rem)] font-bold leading-[1.16] text-ink">
+                      <h2 className="titular mt-2 text-[clamp(1.2rem,2.6vw,1.7rem)] leading-[1.16] text-ink">
                         <Link
                           href={`/nota/${nota.slug}`}
                           className="titular-link"

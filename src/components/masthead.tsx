@@ -28,61 +28,47 @@ export function Masthead({
   return (
     <>
       <header>
-        {/* Franja institucional */}
+        {/* Franja institucional. Se queda con los controles —tema y usuario—
+            para que la bandera quede limpia: en el papel ahí no hay nada más
+            que el nombre del diario. */}
         <div className="border-b border-hairline">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-2 sm:px-6">
-            <p className="font-serif text-[0.7rem] italic text-ink-3">
+            <p className="font-sans text-[0.7rem] text-ink-3">
               Municipalidad de San Miguel de Tucumán
             </p>
-            <p className="hidden font-serif text-[0.7rem] italic text-ink-3 sm:block">
-              Publicación gratuita, prohibida su venta
-            </p>
+            <div className="flex items-center gap-2.5">
+              <ThemeToggle />
+              <UserChip usuario={usuario} />
+            </div>
           </div>
         </div>
 
-        {/* Bandera */}
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-[auto_1fr] items-center gap-4 px-4 pb-3 pt-5 sm:grid-cols-[auto_1fr_auto] sm:gap-6 sm:px-6 sm:pt-7">
-          {/* El logo, encuadrado como el sello del impreso */}
-          <div className="flex h-14 w-14 items-center justify-center border border-ink p-[3px] sm:h-[4.5rem] sm:w-[4.5rem]">
-            <span className="flex h-full w-full items-center justify-center border border-ink/25">
-              <LogoHoja className="h-8 w-8 sm:h-11 sm:w-11" />
-            </span>
-          </div>
-
-          <div className="col-start-2 row-start-1 min-w-0 text-center">
-            {/* El nombre del diario es la bandera, no el encabezado del
-                contenido: el h1 de cada página es su propio titular. */}
+        {/* La bandera, con la forma del impreso: filete grueso, el logotipo en
+            versales con la hoja A LA DERECHA —no encuadrada a la izquierda,
+            que era invento nuestro—, otro filete, y debajo una sola línea
+            centrada con lugar, mes y número. */}
+        <div className="mx-auto w-full max-w-6xl px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
+          <div className="border-y-[3px] border-ink py-3 sm:py-4">
             <Link
               href="/diario"
-              className="group inline-block max-w-full"
+              className="group flex items-center justify-center gap-[0.35em]"
               aria-label="Ir a la portada"
             >
-              <p className="bandera text-[clamp(1.6rem,7.5vw,4.4rem)] text-ink transition-colors group-hover:text-accent-strong">
+              <span className="bandera text-[clamp(1.5rem,8.2vw,4.6rem)] text-ink transition-colors group-hover:text-accent-strong">
                 El Sanmiguelino
-              </p>
+              </span>
+              {/* La hoja acompaña al logotipo y escala con él: en el papel es
+                  parte del logotipo, no un sello aparte. */}
+              <LogoHoja className="h-[0.78em] w-[0.78em] shrink-0 text-[clamp(1.5rem,8.2vw,4.6rem)]" />
             </Link>
-            <p className="meta mt-2 hidden sm:block">
-              Diario digital · Una edición por mes
-            </p>
           </div>
-
-          <div className="col-span-2 row-start-2 flex items-center justify-between gap-2 font-sans sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:flex-col sm:items-end sm:gap-2.5">
-            <ThemeToggle />
-            <UserChip usuario={usuario} />
-          </div>
-        </div>
-
-        {/* Línea de fecha entre filetes, como el impreso */}
-        <div className="mx-auto w-full max-w-6xl px-4 pb-4 sm:px-6">
-          <div className="rule-double mb-[7px] flex flex-wrap items-center justify-center gap-x-4 gap-y-1 py-2 sm:justify-between">
-            <p className="meta">San Miguel de Tucumán</p>
-            <p className="meta text-ink">
-              {edicion.mes} · N.º {edicion.numero}
-            </p>
-            <p className="meta hidden sm:block">
-              {edicion.etiqueta ?? "Edición mensual"}
-            </p>
-          </div>
+          {/* Caja normal y diminuta, como en el papel. No usa .meta porque
+              .meta va en versales muy espaciadas —bien para un folio, mal para
+              una línea que incluye el nombre de la ciudad. */}
+          <p className="mt-1.5 text-center font-sans text-[0.7rem] text-ink-3">
+            San Miguel de Tucumán, {edicion.mes} · N.º {edicion.numero}
+            {edicion.etiqueta ? ` · ${edicion.etiqueta}` : ""}
+          </p>
         </div>
       </header>
 

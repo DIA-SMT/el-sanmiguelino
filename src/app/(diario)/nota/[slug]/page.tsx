@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Clock, Quote } from "lucide-react";
+import { ArrowLeft, Clock } from "lucide-react";
 import { ViewTransition } from "react";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
+import { CitaPersona } from "@/components/cita-persona";
 import { HojaDiario } from "@/components/hoja-diario";
 import { ColumnaDelLector } from "@/components/comentarios/columna-del-lector";
 import { CompartirNota } from "@/components/compartir-nota";
@@ -24,13 +25,7 @@ export async function generateMetadata({
   return { title: nota?.titulo ?? "Nota" };
 }
 
-function Bloque({
-  bloque,
-  esPrimero,
-}: {
-  bloque: BloqueNota;
-  esPrimero: boolean;
-}) {
+function Bloque({ bloque }: { bloque: BloqueNota }) {
   switch (bloque.tipo) {
     case "subtitulo":
       return (
@@ -44,24 +39,17 @@ function Bloque({
       );
     case "cita":
       return (
-        <figure className="my-7 border-y border-ink bg-paper-2 px-4 py-5 text-center">
-          <Quote className="mx-auto h-4 w-4 text-accent" aria-hidden="true" />
-          <blockquote className="titular mt-3 text-[1.15rem] font-medium italic leading-snug text-ink">
-            “{bloque.texto}”
-          </blockquote>
-          <figcaption className="meta mt-3.5">
-            {bloque.autor}
-            {bloque.cargo ? ` · ${bloque.cargo}` : ""}
-          </figcaption>
-        </figure>
+        <CitaPersona
+          texto={bloque.texto}
+          autor={bloque.autor}
+          cargo={bloque.cargo}
+          retrato={bloque.retrato}
+          className="my-7"
+        />
       );
     default:
       return (
-        <p
-          className={`texto-diario mb-4 font-serif text-[0.97rem] leading-[1.72] text-ink ${
-            esPrimero ? "drop-cap" : ""
-          }`}
-        >
+        <p className="texto-diario font-serif text-[0.97rem] leading-[1.72] text-ink">
           {bloque.texto}
         </p>
       );
@@ -80,7 +68,6 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
     getResumenEdicion(),
     getIndice(),
   ]);
-  const primerParrafoIdx = nota.cuerpo.findIndex((b) => b.tipo === "parrafo");
 
   const numeroPagina = indice.findIndex((n) => n.slug === nota.slug) + 2;
 
@@ -115,15 +102,15 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
             </nav>
 
             <article>
-              <header className="entra mx-auto max-w-3xl text-center">
+              <header className="entra">
                 <p className="volanta text-accent">{nota.seccion}</p>
-                <h1 className="titular mt-3 text-[clamp(2rem,5.2vw,3.4rem)] font-black leading-[1.04] text-ink">
+                <h1 className="titular mt-2.5 text-[clamp(1.9rem,5.4vw,3.5rem)] text-ink">
                   {nota.titulo}
                 </h1>
-                <p className="mx-auto mt-4 max-w-2xl text-pretty font-serif text-[1.05rem] italic leading-relaxed text-ink-2">
+                <p className="bajada mt-4 max-w-3xl text-[clamp(0.98rem,1.6vw,1.15rem)]">
                   {nota.bajada}
                 </p>
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-y border-hairline py-2.5">
+                <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-hairline py-2.5">
                   <p className="meta">San Miguel de Tucumán</p>
                   <span aria-hidden="true" className="text-line">
                     ·
@@ -152,11 +139,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
 
               <div className="entra entra-3 note-columns mx-auto mt-9 max-w-6xl">
                 {nota.cuerpo.map((bloque, i) => (
-                  <Bloque
-                    key={i}
-                    bloque={bloque}
-                    esPrimero={i === primerParrafoIdx}
-                  />
+                  <Bloque key={i} bloque={bloque} />
                 ))}
               </div>
 

@@ -8,7 +8,7 @@ export default function NotFound() {
       <div className="fade-up hoja grano max-w-md px-8 py-12 text-center sm:px-10">
         <LogoHoja className="mx-auto h-12 w-12 opacity-70" />
         <p className="volanta mt-6 text-accent">Error 404</p>
-        <h1 className="titular mt-3 text-[clamp(1.5rem,5vw,2.1rem)] font-black leading-tight text-ink">
+        <h1 className="titular mt-3 text-[clamp(1.5rem,5vw,2.1rem)] leading-tight text-ink">
           Esta página no está en la edición
         </h1>
         <p className="mt-4 text-pretty font-serif text-[0.98rem] leading-[1.7] text-ink-2">

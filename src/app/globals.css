@@ -190,9 +190,18 @@
   --color-amarillo: var(--amarillo);
   --color-sol: var(--sol);
 
-  --font-display: var(--font-playfair), "Playfair Display", georgia, serif;
+  /* Las tres voces, sacadas del impreso. El sistema es sans para todo lo que
+     titula y serif sólo para lo que se lee corrido; antes era al revés. */
+
+  /* La bandera y nada más: grotesca ultra-negra, un solo corte. */
+  --font-display: var(--font-bandera), "Archivo Black", system-ui, sans-serif;
+  /* El cuerpo: lo único serif del sistema. */
   --font-serif: var(--font-newsreader), "Newsreader", georgia, serif;
-  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+  /* Todo lo que titula, rotula o numera, interfaz incluida. Una sola sans para
+     eso: el papel no distingue entre editorial e interfaz porque no tiene
+     interfaz, y dos sans conviviendo no se leen como decisión sino como
+     descuido. */
+  --font-sans: var(--font-titular), "Poppins", system-ui, sans-serif;
 
   --shadow-hoja: var(--sombra-hoja);
   --shadow-flotante: var(--sombra-flotante);
@@ -318,20 +327,44 @@
      Tipografía editorial
   --------------------------------------------------------------------------- */
 
-  /* Bandera del diario: display al máximo peso, tracking cerrado. */
+  /* Bandera del diario. En el impreso es una grotesca ultra-negra en versales
+     con las letras casi tocándose.
+
+     El peso es 400 y no 900 a propósito: Archivo Black trae un solo corte, que
+     ya ES el negro. Pedirle 900 no lo engorda —no hay de dónde—, hace que el
+     navegador sintetice la negrita engrosando los trazos por software, y eso
+     sobre una ultra-negra tapa los contrapunzones y ensucia el logotipo. */
   .bandera {
-    font-family: var(--font-display), georgia, serif;
-    font-weight: 900;
+    font-family: var(--font-display), system-ui, sans-serif;
+    font-weight: 400;
     text-transform: uppercase;
-    letter-spacing: -0.022em;
+    letter-spacing: -0.03em;
     line-height: 0.9;
   }
 
-  /* Titulares: display con ajuste óptico y corte de línea equilibrado. */
+  /* Titulares: la geométrica del impreso, en negrita y con el tracking
+     cerrado. El peso vive acá y no en cada call site: antes cada uno elegía el
+     suyo (siete font-black, diez font-bold, cuatro font-medium) y el titular
+     pesaba distinto según la pantalla. El máximo queda reservado al logotipo. */
   .titular {
-    font-family: var(--font-display), georgia, serif;
-    letter-spacing: -0.016em;
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.022em;
+    line-height: 1.06;
     text-wrap: balance;
+  }
+
+  /* Bajada. En el impreso es la MISMA geométrica del titular en peso normal,
+     alineada a la izquierda con bandera derecha y sin itálica. No es serif ni
+     cursiva: eso era vocabulario nuestro, no del diario. */
+  .bajada {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 400;
+    font-style: normal;
+    line-height: 1.45;
+    text-align: left;
+    text-wrap: pretty;
+    color: var(--ink-2);
   }
 
   /* Volanta / antetítulo: sans en versalitas espaciadas. */
@@ -354,14 +387,52 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Atribución de una cita: quién lo dijo y desde qué cargo.
+
+     No usa .meta a propósito. .meta es para rótulos de máquina —foliado,
+     fecha, créditos— y por eso va en versales con el tracking muy abierto. Un
+     nombre propio en versales espaciadas deja de leerse como nombre y pasa a
+     leerse como etiqueta. En el impreso la atribución es caja normal, chica y
+     gris. */
+  .atribucion {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--ink-3);
+  }
+
   /* Cuerpo de nota justificado, con partición de palabras: sin guiones, el
      texto justificado abre ríos blancos. El idioma lo da <html lang="es-AR">. */
   .texto-diario {
-    text-align: justify;
+    /* Alineado a la izquierda por defecto y justificado sólo cuando el texto
+       ya está en columnas (768px, que es donde .note-columns parte en dos).
+
+       El justificado necesita una medida corta para no abrir ríos: en el papel
+       la columna es angosta Y el cuerpo es chico. En un celular la medida es
+       de unos 45 caracteres con el cuerpo a 15px, y justificar ahí estira los
+       espacios hasta que se ven los canales blancos bajando por el párrafo.
+       Es peor que no justificar. */
+    text-align: left;
     text-justify: inter-word;
     hyphens: auto;
     hyphenate-limit-chars: 7 3 3;
     text-wrap: pretty;
+    /* La sangría de primera línea es lo que separa los párrafos: en el impreso
+       no hay blanco entre uno y otro, van pegados y el escalón de la sangría es
+       la única marca. Es lo que permite columnas tan densas. El margen se anula
+       acá y no en cada call site: si algún <p> vuelve a traer su mb-4, se ven
+       las dos separaciones a la vez y parece un error de maquetación. */
+    text-indent: 1.15em;
+    margin-block: 0;
+  }
+  @media (min-width: 768px) {
+    .texto-diario {
+      text-align: justify;
+    }
+  }
+  /* El primero de una tirada arranca al filo, como en el papel. */
+  .texto-diario:first-of-type {
+    text-indent: 0;
   }
 
   /* Cuerpo a columnas, como el impreso. */
@@ -386,18 +457,6 @@
     break-inside: auto;
   }
 
-  /* Letra capitular: se apoya en la línea base de la tercera línea sin empujar
-     al párrafo. */
-  .drop-cap::first-letter {
-    font-family: var(--font-display), georgia, serif;
-    font-weight: 700;
-    font-size: 3.5em;
-    line-height: 0.8;
-    float: left;
-    margin-right: 0.07em;
-    padding-top: 0.06em;
-    color: var(--ink);
-  }
 
   /* Filete doble, como la fecha del impreso. */
   .rule-double {

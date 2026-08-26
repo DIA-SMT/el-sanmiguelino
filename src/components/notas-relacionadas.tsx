@@ -46,7 +46,7 @@ export async function NotasRelacionadas({ notaSlug }: { notaSlug: string }) {
               </Link>
             )}
             <p className="volanta text-accent">{nota.seccion}</p>
-            <h3 className="titular mt-2 text-[1.1rem] font-bold leading-[1.18] text-ink">
+            <h3 className="titular mt-2 text-[1.1rem] leading-[1.18] text-ink">
               <Link
                 href={`/nota/${nota.slug}`}
                 transitionTypes={["pagina-adelante"]}

@@ -90,7 +90,7 @@ export async function DiarioEnPerspectiva() {
                 <p className="font-sans text-[0.4rem] font-semibold uppercase tracking-[0.18em] text-accent">
                   {principal.seccion}
                 </p>
-                <p className="titular mt-1 text-[0.82rem] font-black leading-[1.1] text-ink sm:text-[0.95rem]">
+                <p className="titular mt-1 text-[0.82rem] leading-[1.1] text-ink sm:text-[0.95rem]">
                   {principal.titulo}
                 </p>
                 <p className="mt-1.5 font-serif text-[0.44rem] leading-[1.5] text-ink-2">
@@ -120,7 +120,7 @@ export async function DiarioEnPerspectiva() {
                   <p className="font-sans text-[0.38rem] font-semibold uppercase tracking-[0.16em] text-accent">
                     {nota.seccion}
                   </p>
-                  <p className="titular mt-0.5 text-[0.5rem] font-bold leading-[1.2] text-ink">
+                  <p className="titular mt-0.5 text-[0.5rem] leading-[1.2] text-ink">
                     {nota.titulo.slice(0, 62)}
                   </p>
                 </div>

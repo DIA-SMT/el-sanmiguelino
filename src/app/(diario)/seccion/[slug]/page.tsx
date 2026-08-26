@@ -105,7 +105,7 @@ export default async function SeccionPage({
             <article className="entra entra-2 mt-8 grid gap-7 lg:grid-cols-[1.35fr_1fr] lg:gap-10">
               <div className="min-w-0">
                 <p className="volanta text-accent">{seccion.nombre}</p>
-                <h2 className="titular mt-2.5 text-[clamp(1.7rem,4.4vw,2.9rem)] font-black leading-[1.05] text-ink">
+                <h2 className="titular mt-2.5 text-[clamp(1.7rem,4.4vw,2.9rem)] leading-[1.05] text-ink">
                   <Link
                     href={`/nota/${principal.slug}`}
                     className="titular-link"
@@ -170,7 +170,7 @@ export default async function SeccionPage({
                           />
                         </Link>
                       )}
-                      <h3 className="titular text-[1.25rem] font-bold leading-[1.16] text-ink">
+                      <h3 className="titular text-[1.25rem] leading-[1.16] text-ink">
                         <Link
                           href={`/nota/${nota.slug}`}
                           className="titular-link"
@@ -203,7 +203,7 @@ export default async function SeccionPage({
                       key={nota.slug}
                       className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-4"
                     >
-                      <h3 className="titular min-w-0 flex-1 text-[1.05rem] font-bold leading-snug text-ink">
+                      <h3 className="titular min-w-0 flex-1 text-[1.05rem] leading-snug text-ink">
                         <Link
                           href={`/nota/${nota.slug}`}
                           className="titular-link"
@@ -238,7 +238,7 @@ export default async function SeccionPage({
                   <span className="volanta shrink-0 text-accent">
                     {nota.seccion}
                   </span>
-                  <h3 className="titular min-w-0 flex-1 text-[1.05rem] font-bold leading-snug text-ink">
+                  <h3 className="titular min-w-0 flex-1 text-[1.05rem] leading-snug text-ink">
                     <Link href={`/nota/${nota.slug}`} className="titular-link">
                       {nota.titulo}
                     </Link>

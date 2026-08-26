@@ -76,12 +76,11 @@ export function FiguraNota({
           </svg>
         </div>
       )}
-      <figcaption className="mt-2.5 flex gap-2.5 border-b border-hairline pb-2.5 font-serif text-[0.8rem] italic leading-snug text-ink-3">
-        <span
-          aria-hidden="true"
-          className="mt-[0.45em] h-[1px] w-4 shrink-0 bg-accent"
-        />
-        <span className="text-pretty">{epigrafe}</span>
+      {/* En el impreso el epígrafe es una línea diminuta apoyada debajo de la
+          foto, a la izquierda: sin guión de color, sin itálica y sin filete
+          que lo separe. Todo eso lo habíamos puesto nosotros. */}
+      <figcaption className="mt-2 font-sans text-[0.68rem] leading-snug text-ink-3 text-pretty">
+        {epigrafe}
       </figcaption>
     </figure>
   );

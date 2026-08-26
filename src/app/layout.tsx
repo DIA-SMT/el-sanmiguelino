@@ -1,29 +1,54 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Newsreader, Playfair_Display } from "next/font/google";
+import { Archivo_Black, Newsreader, Poppins } from "next/font/google";
 import { FondoPanorama } from "@/components/fondo-panorama";
 import "./globals.css";
 
-/** Bandera y titulares: didona de alto contraste, la voz del diario. */
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
+/**
+ * Las tres voces del diario, sacadas del impreso real (edición de agosto de
+ * 2026, escaneada en `Miguelino.pdf`).
+ *
+ * El impreso es **sans para todo lo que titula y serif sólo para lo que se lee
+ * corrido**. Antes teníamos lo contrario: Playfair, una didona de alto
+ * contraste, en la bandera y en los titulares. Se ve linda y no es este diario.
+ */
+
+/** Bandera. En el papel es una grotesca ultra-negra en versales, con el
+ *  tracking tan cerrado que las letras casi se tocan: más cuadrada y más
+ *  compacta que una geométrica. Archivo Black es lo más cercano que hay libre.
+ *  Trae un solo peso, que es todo lo que hace falta para dos palabras. */
+const archivo = Archivo_Black({
+  variable: "--font-bandera",
+  weight: "400",
   subsets: ["latin"],
   display: "swap",
 });
 
-/** Cuerpo de nota: tipografía de diario, variable y con eje óptico, con
- *  itálica real para epígrafes y citas (nada de oblicua sintética). */
+/**
+ * Titulares, bajadas, volantas, epígrafes, foliado y también la interfaz.
+ *
+ * En el impreso el titular es una geométrica pura: la "a" es de un solo piso y
+ * sin cola, los bols son circulares y la "y" baja con una diagonal recta.
+ * Poppins es el match libre más cercano.
+ *
+ * Va también en la interfaz, reemplazando a Inter. Dos sans distintas
+ * conviviendo no se leen como una decisión, se leen como un descuido: el papel
+ * usa una sola para todo lo que no es cuerpo.
+ */
+const poppins = Poppins({
+  variable: "--font-titular",
+  weight: ["400", "500", "600", "700"],
+  subsets: ["latin"],
+  display: "swap",
+});
+
+/** Cuerpo de nota: en el papel es serif, justificada y con guionado. Newsreader
+ *  ya cumplía, así que se queda. Tiene itálica real para epígrafes y citas
+ *  (nada de oblicua sintética) y eje óptico. */
 const newsreader = Newsreader({
   variable: "--font-newsreader",
   subsets: ["latin"],
   style: ["normal", "italic"],
   axes: ["opsz"],
-  display: "swap",
-});
-
-/** Interfaz: volantas, foliado, botones. */
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
   display: "swap",
 });
 
@@ -54,7 +79,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="es-AR"
       suppressHydrationWarning
-      className={`${playfair.variable} ${newsreader.variable} ${inter.variable} h-full antialiased`}
+      className={`${archivo.variable} ${poppins.variable} ${newsreader.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />

@@ -61,7 +61,7 @@ export async function VistaPrevia() {
               </Link>
             )}
             <p className="volanta text-accent">{principal.seccion}</p>
-            <h3 className="titular mt-2.5 text-[clamp(1.6rem,3.6vw,2.5rem)] font-black leading-[1.06] text-ink">
+            <h3 className="titular mt-2.5 text-[clamp(1.6rem,3.6vw,2.5rem)] leading-[1.06] text-ink">
               <Link href={`/nota/${principal.slug}`} className="titular-link">
                 {principal.titulo}
               </Link>
@@ -96,7 +96,7 @@ export async function VistaPrevia() {
               >
                 <div className="min-w-0">
                   <p className="volanta text-accent">{nota.seccion}</p>
-                  <h3 className="titular mt-1.5 text-[1.05rem] font-bold leading-[1.2] text-ink sm:text-[1.1rem]">
+                  <h3 className="titular mt-1.5 text-[1.05rem] leading-[1.2] text-ink sm:text-[1.1rem]">
                     <Link href={`/nota/${nota.slug}`} className="titular-link">
                       {nota.titulo}
                     </Link>
