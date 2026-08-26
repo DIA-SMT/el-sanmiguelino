@@ -25,23 +25,28 @@ model Edicion {
   anio     Int
   etiqueta String?
 
-  /// Cuál es la edición que se sirve en /diario.
+  /// Cuándo sale esta edición. `null` = todavía no tiene fecha, así que no
+  /// se publica nunca sola.
   ///
-  /// Sólo una debería estar en true, y **eso lo sostiene quien escribe**, no
-  /// la base: la restricción que haría falta es un índice único parcial
-  /// (`WHERE actual`), que Prisma no sabe declarar. Meterlo a mano en el SQL
-  /// de la migración lo dejaría fuera del esquema, y `migrate dev` lo leería
-  /// como deriva y querría borrarlo en la migración siguiente.
+  /// **La edición que se sirve se calcula con esto, no se marca.** Es la más
+  /// reciente cuya fecha ya pasó. Antes había un booleano `actual` que alguien
+  /// tenía que dar vuelta el día 1, y esa es la diferencia que importa: una
+  /// bandera necesita que algo corra a las 00:00 —un cron, una persona— y si
+  /// ese algo falla el diario se queda en el mes pasado sin que nadie se
+  /// entere. Una fecha no necesita que corra nada: si el sitio está en pie,
+  /// sirve la edición correcta. Volver atrás es cambiar la fecha.
   ///
-  /// Por eso el seed apaga las demás en la misma transacción en que prende
-  /// ésta, y el panel tendrá que hacer lo mismo. Si algún día hay ediciones
-  /// programadas de verdad, la forma correcta es un puntero en una tabla de
-  /// una sola fila, no un booleano por edición.
-  actual Boolean @default(false)
+  /// Se guarda en UTC, como todo `DateTime` de Prisma. Quien la carga la
+  /// escribe en hora de Tucumán y la conversión es del panel: "el 1 de
+  /// septiembre" son las 03:00 UTC, no las 00:00, y con tres horas de por medio
+  /// una edición mal cargada sale el 31 de agosto a la noche.
+  publicaEn DateTime?
 
   notas Nota[]
 
   @@unique([anio, numero])
+  /// La consulta de cada request: la más reciente con fecha ya pasada.
+  @@index([publicaEn])
   @@map("ediciones")
 }
 

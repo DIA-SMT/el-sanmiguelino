@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText, MessageSquare, Sparkles } from "lucide-react";
+import { CalendarClock, FileText, MessageSquare, Sparkles } from "lucide-react";
 import { LogoHoja } from "@/components/brand/logos";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
@@ -7,6 +7,7 @@ import { requerirAdmin } from "@/lib/auth/dal";
 
 const SECCIONES = [
   { href: "/admin", icono: FileText, texto: "Notas" },
+  { href: "/admin/ediciones", icono: CalendarClock, texto: "Ediciones" },
   { href: "/admin/comentarios", icono: MessageSquare, texto: "Comentarios" },
   { href: "/admin/migue", icono: Sparkles, texto: "Migue" },
 ] as const;

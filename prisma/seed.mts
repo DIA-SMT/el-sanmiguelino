@@ -52,16 +52,11 @@ async function main() {
     async (tx) => {
       const edicion = await tx.edicion.upsert({
         where: { slug },
-        update: { mes, numero, anio, etiqueta, actual: true },
-        create: { slug, mes, numero, anio, etiqueta, actual: true },
+        // La semilla publica en el pasado: es la edicion que ya salio.
+        update: { mes, numero, anio, etiqueta },
+        create: { slug, mes, numero, anio, etiqueta, publicaEn: new Date(0) },
       });
 
-      // Cualquier otra edición deja de ser la actual. Sin esto, sembrar una
-      // edición nueva dejaría dos en true y /diario elegiría por azar.
-      await tx.edicion.updateMany({
-        where: { id: { not: edicion.id } },
-        data: { actual: false },
-      });
 
       for (const [i, nota] of notas.entries()) {
         const campos = {

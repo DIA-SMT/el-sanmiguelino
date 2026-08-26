@@ -1,5 +1,6 @@
 import type { EdicionRepo } from "@/lib/repos/edicion";
 import { db } from "@/lib/db";
+import { edicionEnFoco } from "@/lib/auth/vista-previa";
 import { minutosDeLectura, textoPlanoDe } from "@/lib/derivar";
 import type {
   BloqueNota,
@@ -93,18 +94,49 @@ function aCuerpo(valor: unknown): BloqueNota[] {
   return (valor ?? []) as BloqueNota[];
 }
 
-/** La edición que se sirve. Ver el comentario de `actual` en el esquema: la
- *  unicidad la sostiene quien escribe, así que acá se ordena y se toma la
- *  primera en vez de asumir que hay exactamente una. */
+/**
+ * La edición que hay que servir.
+ *
+ * **Se calcula, no se marca**: es la más reciente cuya fecha de publicación ya
+ * pasó. No hay nada que correr el día 1, ni bandera que dar vuelta, ni estado
+ * que pueda quedar trabado. Si el sitio está en pie, sirve la edición correcta.
+ *
+ * Las que tienen fecha futura no salen, y las que no tienen fecha no salen
+ * nunca: eso es lo que permite preparar septiembre con tres días de
+ * anticipación sin que se filtre.
+ *
+ * Un administrador puede poner otra "en foco" y ver el diario entero con ella
+ * —ver `vista-previa.ts`—. Para el lector no cambia nada.
+ */
 async function edicionActualFila() {
+  const enFoco = await edicionEnFoco();
+  if (enFoco) {
+    const elegida = await db().edicion.findUnique({ where: { slug: enFoco } });
+    // Si el slug de la cookie no existe (la edición se borró, o la cookie
+    // quedó vieja) se cae a la publicada en vez de romper: una cookie
+    // desactualizada no puede dejar al admin sin diario.
+    if (elegida) return elegida;
+  }
+
   const edicion = await db().edicion.findFirst({
-    where: { actual: true },
-    orderBy: [{ anio: "desc" }, { numero: "desc" }],
+    where: {
+      publicaEn: { not: null, lte: new Date() },
+      // Con al menos una nota. Si llega el día 1 y septiembre está vacío
+      // —se programó y no se alcanzó a cargar—, el diario sigue mostrando
+      // agosto en vez de una tapa en blanco. Ningún diario saca un número
+      // vacío porque se le venció la fecha.
+      //
+      // No esconde el error: el panel sigue marcando "En la calle" sobre
+      // agosto, que es donde el error tiene que verse.
+      notas: { some: {} },
+    },
+    orderBy: { publicaEn: "desc" },
   });
   if (!edicion) {
     throw new Error(
-      "No hay ninguna edición marcada como actual en la base. " +
-        "Correr `npm run db:seed`.",
+      "No hay ninguna edición publicada: ninguna tiene fecha de publicación " +
+        "en el pasado. Correr `npm run db:seed`, o darle fecha a una desde " +
+        "el panel.",
     );
   }
   return edicion;
@@ -126,9 +158,22 @@ export const edicionPostgresRepo: EdicionRepo = {
     return filas.map(aResumen);
   },
 
+  /**
+   * Una nota **de la edición que se está sirviendo**.
+   *
+   * El filtro por edición no es prolijidad: sin él, una nota de la edición de
+   * septiembre se podía leer entrando a su dirección antes del 1, y todo el
+   * sentido de preparar la edición con anticipación era que no se filtrara. El
+   * índice sí filtraba, así que la nota no aparecía en ningún lado —pero
+   * estaba, y una dirección adivinable o compartida por error alcanzaba.
+   *
+   * Para un administrador con una edición en foco, `edicionActualFila()`
+   * devuelve esa, así que ve sus notas. Es la misma consulta.
+   */
   async nota(slug: string): Promise<NotaCompleta | null> {
-    const fila = await db().nota.findUnique({
-      where: { slug },
+    const edicion = await edicionActualFila();
+    const fila = await db().nota.findFirst({
+      where: { slug, edicionId: edicion.id },
       select: { ...CAMPOS_RESUMEN, cuerpo: true },
     });
     if (!fila) return null;
@@ -137,8 +182,10 @@ export const edicionPostgresRepo: EdicionRepo = {
 
   async completas(slugs: string[]): Promise<NotaCompleta[]> {
     if (slugs.length === 0) return [];
+    const edicion = await edicionActualFila();
     const filas = await db().nota.findMany({
-      where: { slug: { in: slugs } },
+      // Acotado a la edición servida, por lo mismo que `nota()`.
+      where: { slug: { in: slugs }, edicionId: edicion.id },
       select: { ...CAMPOS_RESUMEN, cuerpo: true },
     });
     // Se respeta el orden PEDIDO, no el que devuelve la base: quien pide

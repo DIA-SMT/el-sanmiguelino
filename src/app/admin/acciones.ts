@@ -1,6 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { db } from "@/lib/db";
+import { COOKIE_EDICION } from "@/lib/auth/vista-previa";
+import { desdeHoraTucuman } from "@/lib/fecha-edicion";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
 import { comentariosRepo } from "@/lib/repos/comentarios";
@@ -215,4 +219,107 @@ export async function moderarComentarioAction(
       error: e instanceof Error ? e.message : "No se pudo moderar.",
     };
   }
+}
+
+/**
+ * Crea o actualiza una edición, con su fecha de publicación.
+ *
+ * La fecha llega como la escribió el panel —hora de Tucumán— y se convierte
+ * acá. Dejarla pasar tal cual guardaría el instante equivocado por tres horas,
+ * que es justo lo que hace salir una edición la noche anterior.
+ */
+export async function guardarEdicionAction(datos: unknown): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  await requerirAdmin();
+
+  try {
+    if (!esObjeto(datos)) throw new Error("Faltan los datos de la edición.");
+    const { slug, mes, numero, anio, etiqueta, publicaEn, esNueva } = datos;
+
+    if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
+      throw new Error(
+        "El slug de la edición sólo puede llevar minúsculas, números y " +
+          "guiones (ej.: septiembre-2026).",
+      );
+    }
+    if (!textoNoVacio(mes)) throw new Error("Falta el mes (ej.: Septiembre de 2026).");
+    const n = Number(numero);
+    const a = Number(anio);
+    if (!Number.isInteger(n) || n < 1) throw new Error("El número de edición tiene que ser un entero.");
+    if (!Number.isInteger(a) || a < 2000) throw new Error("El año no parece un año.");
+
+    // Sin fecha se puede guardar: es una edición en preparación, y no salir
+    // sola es exactamente lo que se quiere de ella.
+    let instante: Date | null = null;
+    if (textoNoVacio(publicaEn)) {
+      instante = desdeHoraTucuman(publicaEn);
+      if (!instante) throw new Error("La fecha de publicación no se entiende.");
+    }
+
+    const campos = {
+      mes,
+      numero: n,
+      anio: a,
+      etiqueta: textoNoVacio(etiqueta) ? etiqueta : null,
+      publicaEn: instante,
+    };
+
+    const existente = await db().edicion.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+
+    if (esNueva === true) {
+      if (existente) {
+        throw new Error(`Ya hay una edición con el slug "${slug}".`);
+      }
+      await db().edicion.create({ data: { slug, ...campos } });
+    } else {
+      if (!existente) throw new Error("Esa edición ya no existe.");
+      await db().edicion.update({ where: { slug }, data: campos });
+    }
+
+    revalidatePath("/admin/ediciones");
+    revalidatePath("/admin");
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo guardar la edición.",
+    };
+  }
+}
+
+/**
+ * Pone una edición "en foco", o vuelve a la publicada.
+ *
+ * La cookie sola no da acceso: `edicionEnFoco()` vuelve a verificar que quien
+ * pide sea administrador en cada request. Acá se exige de nuevo porque una
+ * Server Action es su propio endpoint.
+ */
+export async function enfocarEdicionAction(
+  slug: unknown,
+): Promise<{ ok: boolean }> {
+  await requerirAdmin();
+  const jar = await cookies();
+
+  if (typeof slug === "string" && slug.trim()) {
+    jar.set(COOKIE_EDICION, slug.trim(), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      // Corta al cerrar el navegador: mirar una edición futura es algo que se
+      // hace un rato, no un modo en el que uno se queda a vivir sin darse
+      // cuenta de que está viendo otra cosa.
+    });
+  } else {
+    jar.delete(COOKIE_EDICION);
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true };
 }

@@ -47,6 +47,21 @@ export const sesionActual = cache(async (): Promise<Sesion | null> => {
 const EXIGE_ROL = process.env.NODE_ENV === "production";
 
 /**
+ * ¿Quien está del otro lado puede entrar al panel? Sin cortar nada.
+ *
+ * Misma regla que `requerirAdmin()`, en versión pregunta. Existe para los
+ * casos donde no hay que negar el acceso sino decidir qué mostrar —la vista
+ * previa de una edición futura en el diario, por ejemplo—, y donde tirar un 404
+ * sería absurdo.
+ */
+export async function esAdmin(): Promise<boolean> {
+  const sesion = await sesionActual();
+  if (!sesion) return false;
+  if (!EXIGE_ROL) return true;
+  return ADMIN_HABILITADO && sesion.rol === "admin";
+}
+
+/**
  * Exige permiso para el panel, o corta con 404.
  *
  * 404 y no 403 a propósito: un 403 confirma que la ruta existe. Lo que no está

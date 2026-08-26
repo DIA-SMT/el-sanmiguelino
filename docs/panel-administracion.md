@@ -478,3 +478,78 @@ Antes había cuatro `return NextResponse.json(...)` sueltos en la ruta. Con el
 registro serían cuatro oportunidades de olvidarse de anotar una, y la que se
 olvidaría es justo la que importa: el caso "no supe contestar" es el último y el
 más fácil de pasar por alto.
+
+## El cambio de edición: una fecha, no un trabajo programado
+
+El diario sale una vez por mes. La edición que se sirve es **la más reciente
+cuya fecha de publicación ya pasó**, calculado en cada request.
+
+### Por qué no un cron
+
+Lo obvio sería un trabajo que el día 1 dé vuelta una bandera. Es la opción
+frágil: si ese día el trabajo no corre —falla el deploy, se cae el proveedor,
+alguien renombró algo— el diario se queda en el mes pasado y **nadie se entera
+hasta que un vecino lo dice**. Es un estado que se puede trabar, y que también
+puede dispararse dos veces.
+
+Una fecha no necesita que corra nada. Si el sitio está en pie, sirve la edición
+correcta. Volver atrás es cambiar la fecha. Y como todas las páginas del diario
+son dinámicas (`ƒ` en el build), el cambio se ve en el mismo minuto sin caché
+que romper.
+
+### La hora es de Tucumán
+
+"El 1 de septiembre" son las 00:00 **en Tucumán**, no en UTC. Con tres horas de
+por medio, una edición cargada sin cuidado sale el 31 de agosto a las 21.
+
+`src/lib/fecha-edicion.ts` le pregunta el desfase al sistema **para esa fecha**,
+en vez de restar tres horas a mano: Argentina hoy no cambia la hora pero ya lo
+hizo y podría volver a hacerlo por decreto, y una constante quedaría muda
+mientras las ediciones empiezan a salir corridas.
+
+### La vista previa es el diario, no una pantalla aparte
+
+"Verla en el diario" pone una edición en foco y el **diario entero** se la
+muestra: tapa, notas, buscador, Migue. Con el mismo código que ve el lector.
+
+Una vista previa dibujada con su propio código te muestra que todo está bien y
+el día que sale aparece el problema igual, porque lo que probaste no era lo que
+el lector iba a ver.
+
+La cookie sola no da acceso: `edicionEnFoco()` verifica que quien pide sea
+administrador **en cada request**. Y arriba va una barra de aviso con el color
+de acento, no discreta: el riesgo de una vista previa idéntica al diario real
+es creer que uno está mirando lo publicado cuando no.
+
+### Dos cosas que aparecieron al probar
+
+**Las notas de una edición futura se leían por su dirección.** `nota()` buscaba
+por slug global mientras que `indice()` filtraba por edición, así que la nota de
+septiembre no aparecía en ningún lado pero se abría entrando a su URL. Todo el
+sentido de preparar la edición con anticipación era que no se filtrara. Ahora
+las dos consultas se acotan a la edición servida.
+
+**Una edición vacía que llega a su fecha rompía la tapa.** Se programa
+septiembre, no se alcanzan a cargar las notas, llega el día 1 y `/diario`
+explota. Ahora la elección automática exige que la edición tenga al menos una
+nota: si septiembre está vacío, el diario sigue mostrando agosto. Ningún diario
+saca un número en blanco porque se le venció la fecha. No esconde el error —el
+panel sigue marcando "En la calle" sobre agosto, que es donde tiene que verse—.
+
+### Verificado
+
+Se creó septiembre con fecha 1/9, se comprobó que el lector seguía viendo
+agosto, se movió la fecha al pasado y el lector pasó a ver septiembre **sin que
+corriera ningún trabajo**, y se volvió atrás cambiando la fecha. La vista previa
+se probó manejando la interfaz: enfocar, ver la edición futura con su barra,
+abrir una de sus notas y salir.
+
+### Lo que falta decidir
+
+Qué pasa con las ediciones viejas. Hoy `/edicion/agosto-2026` redirige al diario
+y cualquier otro slug da 404, así que cuando salga septiembre, agosto deja de
+ser accesible. Un diario municipal normalmente conserva el archivo, pero es una
+decisión editorial.
+
+Y el lector que está leyendo justo cuando cambia: si alguien está en la página 5
+a las 23:59, a las 00:01 el foliado ya es del mes siguiente.

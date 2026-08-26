@@ -2,8 +2,12 @@ import { redirect } from "next/navigation";
 import { MandoPaginas } from "@/components/mando-paginas";
 import { MigueChat } from "@/components/migue/migue-chat";
 import { usuarioActual } from "@/lib/auth/dal";
-import { getIndice } from "@/lib/repos/edicion";
+import { edicionEnFoco } from "@/lib/auth/vista-previa";
+import { getIndice, getResumenEdicion } from "@/lib/repos/edicion";
 import { paginasDeEdicion } from "@/lib/data/paginas";
+import { BarraVistaPrevia } from "@/components/barra-vista-previa";
+import { textoHoraTucuman } from "@/lib/fecha-edicion";
+import { db } from "@/lib/db";
 
 /** Escritorio sobre el que se apoya la hoja del diario. Migue y el mando de
  *  paso de página viven acá para que sobrevivan al paso de hoja: el segmento de
@@ -26,11 +30,36 @@ export default async function DiarioLayout({ children }: LayoutProps<"/">) {
   const usuario = await usuarioActual();
   if (!usuario) redirect("/login");
 
+  // `edicionEnFoco()` ya verifica que sea administrador: para un lector esto
+  // es siempre null y no cuesta nada.
+  const enFoco = await edicionEnFoco();
+  const edicion = enFoco ? await getResumenEdicion() : null;
+  const fila = enFoco
+    ? await db().edicion.findUnique({
+        where: { slug: enFoco },
+        select: { publicaEn: true },
+      })
+    : null;
+
   return (
-    <div className="escritorio flex flex-1 flex-col px-0 py-0 sm:px-6 sm:py-8 lg:py-10">
-      {children}
-      <MandoPaginas paginas={paginasDeEdicion(await getIndice())} />
-      <MigueChat />
-    </div>
+    <>
+      {edicion && (
+        <BarraVistaPrevia
+          mes={edicion.mes}
+          sale={
+            !fila?.publicaEn
+              ? "todavía no tiene fecha de publicación"
+              : fila.publicaEn > new Date()
+                ? `sale el ${textoHoraTucuman(fila.publicaEn)}`
+                : `salió el ${textoHoraTucuman(fila.publicaEn)}`
+          }
+        />
+      )}
+      <div className="escritorio flex flex-1 flex-col px-0 py-0 sm:px-6 sm:py-8 lg:py-10">
+        {children}
+        <MandoPaginas paginas={paginasDeEdicion(await getIndice())} />
+        <MigueChat />
+      </div>
+    </>
   );
 }
