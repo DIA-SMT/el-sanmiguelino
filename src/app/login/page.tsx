@@ -15,11 +15,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <main className="escritorio grano relative flex flex-1 items-center justify-center overflow-hidden px-4 py-16 sm:py-24">
       <div className="fade-up hoja grano w-full max-w-md px-8 py-10 text-center sm:px-10">
-        <span className="mx-auto flex h-16 w-16 items-center justify-center border border-ink p-[3px]">
-          <span className="flex h-full w-full items-center justify-center border border-ink/25">
-            <LogoHoja className="h-10 w-10" />
-          </span>
-        </span>
+        {/* La hoja sola, sin el doble recuadro: en el impreso es parte del
+            logotipo, no un sello encuadrado. Era invento nuestro. */}
+        <LogoHoja className="mx-auto h-14 w-14" />
 
         <h1 className="bandera mt-6 text-[clamp(1.7rem,7vw,2.3rem)] text-ink">
           El Sanmiguelino
