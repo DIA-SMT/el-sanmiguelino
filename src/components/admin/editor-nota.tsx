@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
@@ -54,16 +54,57 @@ const TIPOS: { valor: BloqueNota["tipo"]; nombre: string; ayuda: string }[] = [
   },
 ];
 
-function bloqueVacio(tipo: BloqueNota["tipo"]): BloqueNota {
+/**
+ * Convierte un bloque a otro tipo **conservando lo que se pueda**.
+ *
+ * Antes lo reemplazaba por uno vacío, así que elegir "destacado" sobre un
+ * párrafo de ochocientas palabras las borraba de un gesto y sin preguntar.
+ * Ahora el texto viaja entre todos los tipos que tienen texto, y hacia una
+ * ficha entra como título. Lo único que se pierde es lo que el tipo destino no
+ * puede representar, y eso ya no es un accidente.
+ */
+function convertirBloque(
+  bloque: BloqueNota,
+  tipo: BloqueNota["tipo"],
+): BloqueNota {
+  if (bloque.tipo === tipo) return bloque;
+  const texto = bloque.tipo === "ficha" ? bloque.titulo : bloque.texto;
+
   switch (tipo) {
     case "cita":
-      return { tipo: "cita", texto: "", autor: "" };
+      return {
+        tipo: "cita",
+        texto,
+        autor: bloque.tipo === "cita" ? bloque.autor : "",
+      };
     case "ficha":
-      return { tipo: "ficha", titulo: "", entradas: [{ lead: "", texto: "" }] };
+      return {
+        tipo: "ficha",
+        titulo: texto,
+        entradas: [{ lead: "", texto: "" }],
+      };
     default:
-      return { tipo, texto: "" };
+      return { tipo, texto };
   }
 }
+
+/**
+ * Enter en un campo de una línea NO publica la nota.
+ *
+ * Con un botón de envío presente, el HTML manda el formulario al apretar Enter
+ * en cualquier `input`, y acá eso significa publicar de un tecleo mientras se
+ * está cargando una ficha campo por campo. Se guarda con el botón, a propósito.
+ *
+ * Va en los inputs y no en el `<form>`: un formulario no es un elemento
+ * interactivo, y colgarle escuchas de teclado esconde el comportamiento de
+ * quien navega por teclado (además de que la regla de accesibilidad lo marca,
+ * con razón). Los `textarea` quedan afuera: ahí Enter es un salto de línea.
+ */
+const sinEnviarConEnter = {
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.preventDefault();
+  },
+};
 
 const campo =
   "w-full border border-line bg-chrome px-3 py-2 font-sans text-[0.88rem] text-ink transition-colors placeholder:text-ink-3 focus:border-accent focus:outline-none";
@@ -83,7 +124,25 @@ export function EditorNota({
   const router = useRouter();
   const [guardando, iniciarGuardado] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  /**
+   * "Guardado" se apaga en cuanto se toca cualquier cosa.
+   *
+   * Antes se prendía al guardar y no lo apagaba nada: el editor corregía el
+   * título, agregaba párrafos, y la barra seguía diciendo "Ya está en el
+   * diario" sobre cambios que sólo existían en su pantalla. Un cartel de éxito
+   * que sobrevive al cambio siguiente es peor que no tener cartel.
+   */
   const [guardado, setGuardado] = useState(false);
+  const [sucio, setSucio] = useState(false);
+
+  /** Todo cambio del formulario pasa por acá: marca sucio y baja el cartel. */
+  function alEditar<T>(set: (v: T) => void) {
+    return (v: T) => {
+      setGuardado(false);
+      setSucio(true);
+      set(v);
+    };
+  }
 
   const slugOriginal = nota?.slug;
   const [slug, setSlug] = useState(nota?.slug ?? "");
@@ -100,47 +159,103 @@ export function EditorNota({
   );
 
   function editarBloque(i: number, cambios: Partial<BloqueNota>) {
+    setGuardado(false);
+    setSucio(true);
     setCuerpo((prev) =>
       prev.map((b, k) => (k === i ? ({ ...b, ...cambios } as BloqueNota) : b)),
     );
   }
 
+  /**
+   * Mueve un bloque y **lleva el foco con él**.
+   *
+   * Sin la segunda parte, mover con el teclado no funciona: la lista se dibuja
+   * con la posición como `key`, así que React reusa el mismo nodo y el foco se
+   * queda en la FILA, no en el bloque. El editor apretaba "Bajar" dos veces
+   * esperando mover el bloque dos lugares y la segunda pulsación se lo traía de
+   * vuelta —el botón ahora mandaba sobre el bloque de al lado—. Dos
+   * pulsaciones, cero movimiento y ninguna pista de por qué.
+   */
   function mover(i: number, delta: number) {
     const destino = i + delta;
     if (destino < 0 || destino >= cuerpo.length) return;
+    setGuardado(false);
+    setSucio(true);
     setCuerpo((prev) => {
       const copia = [...prev];
       [copia[i], copia[destino]] = [copia[destino], copia[i]];
       return copia;
     });
+    queueMicrotask(() => {
+      document
+        .querySelector<HTMLButtonElement>(
+          `[data-bloque="${destino}"] [data-mover="${delta < 0 ? "subir" : "bajar"}"]`,
+        )
+        ?.focus();
+    });
   }
+
+  /**
+   * Aviso antes de cerrar o recargar con cambios sin guardar.
+   *
+   * Cubre lo que el navegador deja cubrir: cerrar la pestaña, recargar, ir a
+   * otro sitio. **No** cubre las navegaciones internas del App Router —hacer
+   * clic en "Ver en el diario" con cambios pendientes sigue perdiéndolos—, y
+   * eso pide interceptar el router, que es harina de otro costal. Mientras
+   * tanto la barra de abajo avisa que hay cambios sin guardar, que es lo que
+   * hace mirable el problema.
+   */
+  useEffect(() => {
+    if (!sucio) return;
+    const avisar = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [sucio]);
 
   function guardar() {
     setError(null);
     setGuardado(false);
     iniciarGuardado(async () => {
-      const res = await guardarNotaAction({
-        slug,
-        slugOriginal,
-        seccion,
-        titulo,
-        bajada,
-        cuerpo,
-        imagen: imagenAlt.trim()
-          ? { src: imagenSrc, alt: imagenAlt, epigrafe: imagenEpigrafe }
-          : undefined,
-      });
-      if (!res.ok) {
-        setError(res.error ?? "No se pudo guardar.");
-        return;
+      // La accion puede RECHAZAR, no solo devolver ok:false: sesion vencida,
+      // red cortada, error del servidor. Sin este try la promesa quedaba sin
+      // atrapar, el estado de "guardando" no se limpiaba nunca y el boton
+      // giraba para siempre sin decir nada.
+      try {
+        const res = await guardarNotaAction({
+          slug,
+          slugOriginal,
+          seccion,
+          titulo,
+          bajada,
+          cuerpo,
+          // Se manda la imagen si hay CUALQUIERA de los tres campos, no sólo si
+          // hay alt. Antes, borrar el alt para reescribirlo tiraba también el
+          // archivo y el epígrafe, y bastaba con guardar en el medio para
+          // perderlos. Que falte el alt lo decide el servidor, con un mensaje.
+          imagen:
+            imagenSrc.trim() || imagenAlt.trim() || imagenEpigrafe.trim()
+              ? { src: imagenSrc, alt: imagenAlt, epigrafe: imagenEpigrafe }
+              : undefined,
+        });
+        if (!res.ok) {
+          setError(res.error ?? "No se pudo guardar.");
+          return;
+        }
+        setGuardado(true);
+        setSucio(false);
+        // Si el slug cambió, la URL del editor apunta a una nota que ya no
+        // existe con ese nombre; hay que llevar al usuario a la nueva.
+        if (res.slug && res.slug !== slugOriginal) {
+          router.replace(`/admin/nota/${res.slug}`);
+        }
+        router.refresh();
+      } catch {
+        setError(
+          "No se pudo hablar con el servidor. Puede haberse cortado la " +
+            "conexión o vencido la sesión. Los cambios siguen en pantalla: " +
+            "volvé a intentar sin recargar.",
+        );
       }
-      setGuardado(true);
-      // Si el slug cambió, la URL del editor apunta a una nota que ya no
-      // existe con ese nombre; hay que llevar al usuario a la nueva.
-      if (res.slug && res.slug !== slugOriginal) {
-        router.replace(`/admin/nota/${res.slug}`);
-      }
-      router.refresh();
     });
   }
 
@@ -157,7 +272,7 @@ export function EditorNota({
           <span className={etiqueta}>Título</span>
           <textarea
             value={titulo}
-            onChange={(e) => setTitulo(e.target.value)}
+            onChange={(e) => alEditar(setTitulo)(e.target.value)}
             rows={2}
             className={cn(campo, "mt-1.5 resize-y font-semibold")}
             placeholder="El titular tal como va en la tapa"
@@ -168,7 +283,7 @@ export function EditorNota({
           <span className={etiqueta}>Bajada</span>
           <textarea
             value={bajada}
-            onChange={(e) => setBajada(e.target.value)}
+            onChange={(e) => alEditar(setBajada)(e.target.value)}
             rows={3}
             className={cn(campo, "mt-1.5 resize-y")}
             placeholder="Las dos o tres líneas que resumen la nota"
@@ -180,7 +295,8 @@ export function EditorNota({
           <input
             list="secciones-existentes"
             value={seccion}
-            onChange={(e) => setSeccion(e.target.value)}
+            onChange={(e) => alEditar(setSeccion)(e.target.value)}
+            {...sinEnviarConEnter}
             className={cn(campo, "mt-1.5")}
             placeholder="Cultura"
           />
@@ -195,7 +311,8 @@ export function EditorNota({
           <span className={etiqueta}>Slug (la dirección de la nota)</span>
           <input
             value={slug}
-            onChange={(e) => setSlug(e.target.value)}
+            onChange={(e) => alEditar(setSlug)(e.target.value)}
+            {...sinEnviarConEnter}
             className={cn(campo, "mt-1.5 font-mono text-[0.8rem]")}
             placeholder="plan-bacheo-integral"
           />
@@ -215,7 +332,8 @@ export function EditorNota({
             <span className={etiqueta}>Archivo</span>
             <input
               value={imagenSrc}
-              onChange={(e) => setImagenSrc(e.target.value)}
+              onChange={(e) => alEditar(setImagenSrc)(e.target.value)}
+              {...sinEnviarConEnter}
               className={cn(campo, "mt-1.5 font-mono text-[0.8rem]")}
               placeholder="/notas/plaza-independencia.webp"
             />
@@ -228,7 +346,8 @@ export function EditorNota({
             <span className={etiqueta}>Texto alternativo</span>
             <input
               value={imagenAlt}
-              onChange={(e) => setImagenAlt(e.target.value)}
+              onChange={(e) => alEditar(setImagenAlt)(e.target.value)}
+              {...sinEnviarConEnter}
               className={cn(campo, "mt-1.5")}
               placeholder="Qué se ve en la foto, para quien no puede verla"
             />
@@ -240,7 +359,8 @@ export function EditorNota({
             <span className={etiqueta}>Epígrafe</span>
             <input
               value={imagenEpigrafe}
-              onChange={(e) => setImagenEpigrafe(e.target.value)}
+              onChange={(e) => alEditar(setImagenEpigrafe)(e.target.value)}
+              {...sinEnviarConEnter}
               className={cn(campo, "mt-1.5")}
               placeholder="La línea que va debajo de la foto, a la vista de todos"
             />
@@ -257,6 +377,7 @@ export function EditorNota({
           {cuerpo.map((bloque, i) => (
             <li
               key={i}
+              data-bloque={i}
               className="border border-line bg-paper-2 px-4 py-3.5"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -266,17 +387,20 @@ export function EditorNota({
                   </span>
                   <select
                     value={bloque.tipo}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setGuardado(false);
+                      setSucio(true);
                       setCuerpo((prev) =>
                         prev.map((b, k) =>
                           k === i
-                            ? bloqueVacio(
+                            ? convertirBloque(
+                                b,
                                 e.target.value as BloqueNota["tipo"],
                               )
                             : b,
                         ),
-                      )
-                    }
+                      );
+                    }}
                     className="border border-line bg-chrome px-2 py-1 font-sans text-[0.75rem] font-semibold text-ink"
                   >
                     {TIPOS.map((t) => (
@@ -289,6 +413,7 @@ export function EditorNota({
                 <div className="flex items-center gap-1">
                   <BotonIcono
                     titulo="Subir"
+                    dato="subir"
                     onClick={() => mover(i, -1)}
                     disabled={i === 0}
                   >
@@ -296,6 +421,7 @@ export function EditorNota({
                   </BotonIcono>
                   <BotonIcono
                     titulo="Bajar"
+                    dato="bajar"
                     onClick={() => mover(i, 1)}
                     disabled={i === cuerpo.length - 1}
                   >
@@ -303,9 +429,11 @@ export function EditorNota({
                   </BotonIcono>
                   <BotonIcono
                     titulo="Eliminar bloque"
-                    onClick={() =>
-                      setCuerpo((prev) => prev.filter((_, k) => k !== i))
-                    }
+                    onClick={() => {
+                      setGuardado(false);
+                      setSucio(true);
+                      setCuerpo((prev) => prev.filter((_, k) => k !== i));
+                    }}
                     disabled={cuerpo.length === 1}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -327,9 +455,11 @@ export function EditorNota({
 
         <button
           type="button"
-          onClick={() =>
-            setCuerpo((prev) => [...prev, { tipo: "parrafo", texto: "" }])
-          }
+          onClick={() => {
+            setGuardado(false);
+            setSucio(true);
+            setCuerpo((prev) => [...prev, { tipo: "parrafo", texto: "" }]);
+          }}
           className="pressable mt-4 inline-flex items-center gap-2 border border-ink px-4 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink hover:bg-ink hover:text-paper"
         >
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -359,6 +489,14 @@ export function EditorNota({
                 <Check className="h-4 w-4 text-accent" aria-hidden="true" />
                 Guardado. Ya está en el diario.
               </span>
+            ) : sucio ? (
+              <span className="inline-flex items-center gap-2 text-ink-2">
+                <TriangleAlert
+                  className="h-4 w-4 shrink-0 text-accent"
+                  aria-hidden="true"
+                />
+                Hay cambios sin guardar.
+              </span>
             ) : (
               <span className="text-ink-3">
                 Los cambios se publican al guardar: no hay borradores todavía.
@@ -380,11 +518,14 @@ export function EditorNota({
 
 function BotonIcono({
   titulo,
+  dato,
   onClick,
   disabled,
   children,
 }: {
   titulo: string;
+  /** Marca para poder devolverle el foco después de reordenar. */
+  dato?: string;
   onClick: () => void;
   disabled?: boolean;
   children: React.ReactNode;
@@ -394,6 +535,7 @@ function BotonIcono({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-mover={dato}
       aria-label={titulo}
       title={titulo}
       className="pressable flex h-7 w-7 items-center justify-center border border-line text-ink-2 hover:border-ink hover:text-ink disabled:opacity-30 disabled:hover:border-line"
@@ -418,6 +560,7 @@ function CamposBloque({
         <input
           value={bloque.titulo}
           onChange={(e) => onCambio({ titulo: e.target.value })}
+          {...sinEnviarConEnter}
           className={cn(campo, "font-semibold")}
           placeholder="Título del recuadro"
         />
@@ -433,6 +576,7 @@ function CamposBloque({
                     ),
                   })
                 }
+                {...sinEnviarConEnter}
                 className={cn(campo, "font-semibold")}
                 placeholder="Encabezado de la entrada"
               />
@@ -468,7 +612,9 @@ function CamposBloque({
         <button
           type="button"
           onClick={() =>
-            onCambio({ entradas: [...bloque.entradas, { lead: "", texto: "" }] })
+            onCambio({
+              entradas: [...bloque.entradas, { lead: "", texto: "" }],
+            })
           }
           className="pressable inline-flex items-center gap-1.5 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-accent hover:text-accent-strong"
         >
@@ -499,12 +645,14 @@ function CamposBloque({
           <input
             value={bloque.autor}
             onChange={(e) => onCambio({ autor: e.target.value })}
+            {...sinEnviarConEnter}
             className={campo}
             placeholder="Quién lo dijo"
           />
           <input
             value={bloque.cargo ?? ""}
             onChange={(e) => onCambio({ cargo: e.target.value })}
+            {...sinEnviarConEnter}
             className={campo}
             placeholder="Su cargo (opcional)"
           />

@@ -171,13 +171,48 @@ export const edicionPostgresRepo: EdicionRepo = {
       textoPlano: textoPlanoDe(cuerpo),
     };
 
+    // Una nota NUEVA no puede escribir sobre una que existe.
+    //
+    // Antes la clave de busqueda era `slugOriginal ?? slug`, asi que sin
+    // slugOriginal —o sea, creando— se buscaba por el slug tipeado; si ese
+    // slug ya estaba, la rama de update pisaba la nota publicada entera y sin
+    // avisar. Un descuido al elegir el slug borraba una nota de la edicion.
+    if (!slugOriginal) {
+      const chocado = await db().nota.findUnique({
+        where: { slug },
+        select: { titulo: true },
+      });
+      if (chocado) {
+        throw new Error(
+          `Ya hay una nota con el slug "${slug}": «${chocado.titulo}». ` +
+            "Elegí otro, o editá esa nota desde el listado.",
+        );
+      }
+    }
+
     const clave = slugOriginal ?? slug;
-    const existente = await db().nota.findUnique({
-      where: { slug: clave },
-      select: { id: true },
-    });
+    const existente = slugOriginal
+      ? await db().nota.findUnique({
+          where: { slug: clave },
+          select: { id: true },
+        })
+      : null;
 
     if (existente) {
+      // Renombrar hacia un slug ocupado por OTRA nota tampoco puede pisarla.
+      // La base lo rechazaria por el indice unico, pero con un error de Prisma
+      // que no le dice nada a quien esta editando.
+      if (slug !== clave) {
+        const ocupado = await db().nota.findUnique({
+          where: { slug },
+          select: { titulo: true },
+        });
+        if (ocupado) {
+          throw new Error(
+            `El slug "${slug}" ya lo usa la nota «${ocupado.titulo}».`,
+          );
+        }
+      }
       // El slug puede haber cambiado: el ON UPDATE CASCADE del esquema hace
       // que los comentarios lo sigan en vez de quedar huérfanos.
       const fila = await db().nota.update({
