@@ -1,0 +1,4 @@
+# Lo lee la CLI de Prisma para saber contra qué motor están escritas las
+# migraciones. No se edita a mano ni se borra: sin esto, `migrate diff
+# --from-migrations` no sabe qué dialecto de SQL leer.
+provider = "postgresql"

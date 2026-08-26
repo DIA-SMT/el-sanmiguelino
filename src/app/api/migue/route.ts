@@ -7,6 +7,7 @@ import {
 } from "@/lib/repos/edicion";
 import type { NotaCompleta } from "@/lib/types";
 import { textoDeBloque } from "@/lib/derivar";
+import { registrarConsulta, type ResultadoConsulta } from "@/lib/repos/migue";
 
 /**
  * Backend mock de Migue: recuperación naive por palabras clave sobre las notas
@@ -57,6 +58,23 @@ function mejorParrafo(nota: NotaCompleta, tokens: string[]): string {
   return mejor;
 }
 
+/**
+ * Responde y **anota**, en un solo lugar.
+ *
+ * Antes había cuatro `return NextResponse.json(...)` sueltos. Con el registro,
+ * cuatro salidas serían cuatro oportunidades de olvidarse de anotar una, y la
+ * que se olvidaría es justo la que importa: el caso "no supe contestar" es el
+ * último y el más fácil de pasar por alto.
+ */
+async function responder(
+  resultado: ResultadoConsulta,
+  respuesta: string,
+  datos: { pregunta: string; notaSlug?: string; contextoSlug?: string },
+) {
+  await registrarConsulta({ ...datos, resultado });
+  return NextResponse.json({ respuesta, notaSlug: datos.notaSlug });
+}
+
 export async function POST(request: NextRequest) {
   const usuario = await getUsuario();
   if (!usuario) {
@@ -84,9 +102,11 @@ export async function POST(request: NextRequest) {
   if (
     /\b(hola|buenas|buen dia|buen día|como estas|cómo estás)\b/i.test(pregunta)
   ) {
-    return NextResponse.json({
-      respuesta: `¡Hola, ${usuario.nombre.split(" ")[0]}! Soy Migue 👋. Puedo contarte qué trae la edición de ${edicion.mes} o responder preguntas sobre cualquiera de sus notas. ¿Qué te interesa?`,
-    });
+    return responder(
+      "saludo",
+      `¡Hola, ${usuario.nombre.split(" ")[0]}! Soy Migue 👋. Puedo contarte qué trae la edición de ${edicion.mes} o responder preguntas sobre cualquiera de sus notas. ¿Qué te interesa?`,
+      { pregunta, contextoSlug: body.notaSlug },
+    );
   }
 
   // Índice de la edición
@@ -96,9 +116,11 @@ export async function POST(request: NextRequest) {
     )
   ) {
     const lista = indice.map((n) => `• ${n.titulo} (${n.seccion})`).join("\n");
-    return NextResponse.json({
-      respuesta: `La edición de ${edicion.mes} trae estas notas:\n${lista}\n\nPreguntame por cualquiera y te cuento más.`,
-    });
+    return responder(
+      "indice",
+      `La edición de ${edicion.mes} trae estas notas:\n${lista}\n\nPreguntame por cualquiera y te cuento más.`,
+      { pregunta, contextoSlug: body.notaSlug },
+    );
   }
 
   // Recuperación por puntaje sobre todas las notas (con leve sesgo a la nota abierta)
@@ -120,14 +142,19 @@ export async function POST(request: NextRequest) {
   }
 
   if (!mejorNota || mejorPuntaje < 2) {
-    return NextResponse.json({
-      respuesta: `Sobre eso no encontré nada en la edición de ${edicion.mes}. Puedo ayudarte con lo que sí está publicado: preguntame, por ejemplo, "¿qué notas trae esta edición?".`,
-    });
+    // La salida que le da sentido al registro entero: cada una de estas es
+    // un tema que los vecinos buscan y el diario no cubre.
+    return responder(
+      "sin_respuesta",
+      `Sobre eso no encontré nada en la edición de ${edicion.mes}. Puedo ayudarte con lo que sí está publicado: preguntame, por ejemplo, "¿qué notas trae esta edición?".`,
+      { pregunta, contextoSlug: body.notaSlug },
+    );
   }
 
   const extracto = mejorParrafo(mejorNota, tokens);
-  return NextResponse.json({
-    respuesta: `Según la nota “${mejorNota.titulo}” (${mejorNota.seccion}):\n\n${extracto}`,
-    notaSlug: mejorNota.slug,
-  });
+  return responder(
+    "nota",
+    `Según la nota “${mejorNota.titulo}” (${mejorNota.seccion}):\n\n${extracto}`,
+    { pregunta, notaSlug: mejorNota.slug, contextoSlug: body.notaSlug },
+  );
 }

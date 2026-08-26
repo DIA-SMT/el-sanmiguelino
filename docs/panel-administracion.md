@@ -1,8 +1,8 @@
 # Panel de administración — plan de ejecución
 
-Estado: **etapas 1 a 4, 6 y 7 terminadas**. El diario lee de Supabase, el panel
-escribe notas y modera comentarios. Quedan la etapa 5 (imágenes a Storage) y la
-8 (tablero de Migue).
+Estado: **todas las etapas terminadas menos la 5** (imágenes a Storage, que
+necesita credenciales del bucket). El diario lee de Supabase, y el panel escribe
+notas, modera comentarios y muestra qué no supo contestar Migue.
 
 ## Decisiones tomadas
 
@@ -24,7 +24,7 @@ escribe notas y modera comentarios. Quedan la etapa 5 (imágenes a Storage) y la
 | 5 | Imágenes a Storage | sí | pendiente |
 | 6 | `/admin`: shell + editor de notas | sí | **hecha** |
 | 7 | Moderación de comentarios | sí | **hecha** |
-| 8 | Migue: registro + pantalla "Lo que no supimos contestar" | sí | pendiente |
+| 8 | Migue: registro + pantalla "Lo que no supimos contestar" | sí | **hecha** |
 
 Las etapas 2 y 3 son la mayor parte del trabajo mecánico y se hacen **sin
 credenciales**: convertir a async los consumidores de `edicionActual` contra
@@ -434,3 +434,47 @@ El rastro muestra el **id** del moderador (`cidituc-demo-001`) y no su nombre,
 porque es lo único que se guarda. Para una auditoría el id es lo correcto —los
 nombres cambian—, pero cuando exista el SSO conviene resolverlo a nombre al
 mostrarlo.
+
+
+## Etapa 8 — el tablero de Migue
+
+La pantalla que importa es **"Lo que no supimos contestar"**. Cada pregunta sin
+respuesta es un tema que los vecinos buscan y el diario no cubre —o que cubre
+con palabras que nadie usa—. Es la lista de temas del mes siguiente, escrita por
+los lectores. El resto de los números son contexto para leerla: sin saber
+cuántas preguntas hubo, quince sin respuesta puede ser un desastre o ser nada.
+
+### El registro no guarda quién preguntó
+
+Decisión deliberada, y está en el esquema. Atar cada consulta a un vecino
+identificado convertiría un registro de calidad en un **historial de consultas
+de una persona ante el municipio**, que es otra cosa y necesitaría otro
+permiso. Para saber qué falta cubrir alcanza con el texto y el resultado.
+
+### El agrupado es por texto, no por significado
+
+"Cuándo abre el registro civil" y "horario del registro civil" aparecen como dos
+filas, y la pantalla lo dice. La agrupación semántica está fuera de alcance a
+propósito: mal hecha esconde temas, que es exactamente lo contrario de para lo
+que existe el tablero.
+
+### Anotar nunca puede tumbar el chat
+
+`registrarConsulta()` se traga sus errores: que el vecino reciba su respuesta
+vale más que que nosotros tengamos la estadística.
+
+Pero en **desarrollo** avisa por consola, y eso salió de tropezar: la primera
+prueba no registró nada y el `catch` mudo lo escondió —el servidor tenía el
+cliente de Prisma de antes de la migración—. Un registro que puede estar roto
+semanas sin que nadie se entere no sirve.
+
+Se **espera** el insert en vez de dispararlo y seguir: en serverless la función
+puede terminar apenas manda la respuesta, y una promesa suelta se cancela a
+mitad de camino.
+
+### Las cuatro salidas pasan por un solo lugar
+
+Antes había cuatro `return NextResponse.json(...)` sueltos en la ruta. Con el
+registro serían cuatro oportunidades de olvidarse de anotar una, y la que se
+olvidaría es justo la que importa: el caso "no supe contestar" es el último y el
+más fácil de pasar por alto.

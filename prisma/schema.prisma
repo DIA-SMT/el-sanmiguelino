@@ -154,3 +154,34 @@ model Voto {
   @@index([comentarioId])
   @@map("votos")
 }
+
+/// Una pregunta que alguien le hizo a Migue.
+///
+/// **No guarda quién preguntó, y es deliberado.** El tablero existe para saber
+/// qué no supimos contestar y dónde falta cobertura, y para eso el texto y el
+/// resultado alcanzan. Atar cada pregunta a un vecino identificado convertiría
+/// un registro de calidad en un historial de consultas de una persona ante el
+/// municipio, que es otra cosa y necesitaría otro permiso. Guardar de menos es
+/// el default correcto en una publicación oficial.
+model ConsultaMigue {
+  id       String @id @default(cuid())
+  pregunta String
+
+  /// Cómo terminó: "saludo", "indice", "nota" o "sin_respuesta". Es texto y no
+  /// enum de Postgres para que sumar un caso no sea una migración con lock.
+  resultado String
+
+  /// La nota con la que respondió, si respondió con una. Sin relación a
+  /// `notas`: la consulta tiene que sobrevivir a que la nota se borre, porque
+  /// justamente sirve para revisar qué se preguntaba sobre ella.
+  notaSlug String?
+
+  /// La nota que el lector tenía abierta al preguntar, si tenía alguna.
+  contextoSlug String?
+
+  fecha DateTime @default(now())
+
+  /// El tablero lista lo no respondido, y lo más reciente primero.
+  @@index([resultado, fecha])
+  @@map("consultas_migue")
+}
