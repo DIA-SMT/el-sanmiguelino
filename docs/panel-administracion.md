@@ -1,8 +1,8 @@
 # Panel de administración — plan de ejecución
 
-Estado: **etapas 1 a 4 y 6 terminadas**. El diario lee de Supabase y el panel
-escribe. Quedan la etapa 5 (imágenes a Storage), la 7 (moderación de
-comentarios) y la 8 (tablero de Migue).
+Estado: **etapas 1 a 4, 6 y 7 terminadas**. El diario lee de Supabase, el panel
+escribe notas y modera comentarios. Quedan la etapa 5 (imágenes a Storage) y la
+8 (tablero de Migue).
 
 ## Decisiones tomadas
 
@@ -23,7 +23,7 @@ comentarios) y la 8 (tablero de Migue).
 | 4 | Persistencia: Prisma + Supabase + seed | **sí** | **hecha** |
 | 5 | Imágenes a Storage | sí | pendiente |
 | 6 | `/admin`: shell + editor de notas | sí | **hecha** |
-| 7 | Moderación de comentarios | sí | pendiente |
+| 7 | Moderación de comentarios | sí | **hecha** |
 | 8 | Migue: registro + pantalla "Lo que no supimos contestar" | sí | pendiente |
 
 Las etapas 2 y 3 son la mayor parte del trabajo mecánico y se hacen **sin
@@ -370,3 +370,67 @@ No hay **borradores**: lo que se guarda sale publicado. No hay **historial de
 versiones**. No se **reordena** el foliado ni se **borran** notas —una nota nueva
 va al final—. Y la foto se carga por ruta de archivo, no por subida: eso es la
 etapa 5.
+
+
+## Etapa 7 — moderación de comentarios
+
+### El contrato se cobró la deuda de la etapa 3
+
+Las dieciséis aserciones de `scripts/contrato-comentarios.mjs` se escribieron
+contra el motor en memoria y **pasan contra Postgres sin cambiar una sola**. Se
+corren con dos comandos:
+
+```
+npm run verificar:comentarios      # motor en memoria
+npm run verificar:comentarios:pg   # Postgres
+```
+
+Eso era el punto de haber puesto la frontera del repo en la etapa 2: si para
+hacerlo pasar hubiera que editar una aserción, la migración habría cambiado el
+comportamiento y no sólo el almacenamiento.
+
+El runner de Postgres **limpia lo que crea**, en un `finally`. No es prolijidad:
+la base de desarrollo y la de producción son la misma, así que un comentario de
+prueba olvidado aparece publicado en el diario firmado por "Vecino de prueba".
+
+### Por qué el motor recibe el cliente en vez de importarlo
+
+`crearComentariosPostgresRepo(db)` es una fábrica. Si importara `@/lib/db`, ese
+import **de valor** no se podría resolver desde Node suelto, y el contrato sólo
+se podría verificar contra el mock —justo el motor que no importa—. Los únicos
+imports del archivo son de tipo, y esos se borran al quitar los tipos.
+
+### La moderación
+
+Muestra todo, publicado y de baja, ordenado por fecha y no por estado: la
+política acordada es que los comentarios se publican directo, así que no hay
+cola de aprobación que revisar.
+
+Dar de baja **pide un motivo antes de ejecutar**. Se puede dejar vacío, pero hay
+que pasar por el paso: es lo que convierte la baja en una decisión y no en un
+reflejo, y el motivo queda guardado junto a quién lo bajó y cuándo. Es lo único
+que después permite explicarle a un vecino por qué su comentario no está.
+
+**No hay acción de borrar, y no es un olvido.** Un comentario de baja conserva
+su texto y sus votos. Una publicación oficial que esconde la palabra de un
+vecino tiene que poder decir quién lo decidió, y eso es imposible sobre una
+fila borrada.
+
+El moderador sale de la sesión, nunca del formulario: quién dio de baja algo es
+un dato de auditoría, y un campo que manda el cliente no lo es.
+
+### Verificado de punta a punta
+
+Manejando la interfaz: un lector comenta por la API, el comentario aparece en la
+nota, el admin lo da de baja desde el panel con un motivo, **desaparece de la
+nota**, queda el rastro con quién y por qué, se restituye y **vuelve**.
+
+### Dos cosas que quedaron
+
+La base **no tiene comentarios sembrados**, a propósito: son de personas reales.
+Los tres de muestra eran del motor en memoria y no están más.
+
+El rastro muestra el **id** del moderador (`cidituc-demo-001`) y no su nombre,
+porque es lo único que se guarda. Para una auditoría el id es lo correcto —los
+nombres cambian—, pero cuando exista el SSO conviene resolverlo a nombre al
+mostrarlo.

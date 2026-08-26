@@ -1,8 +1,14 @@
 import Link from "next/link";
+import { FileText, MessageSquare } from "lucide-react";
 import { LogoHoja } from "@/components/brand/logos";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
 import { requerirAdmin } from "@/lib/auth/dal";
+
+const SECCIONES = [
+  { href: "/admin", icono: FileText, texto: "Notas" },
+  { href: "/admin/comentarios", icono: MessageSquare, texto: "Comentarios" },
+] as const;
 
 /**
  * Chrome del panel de administración.
@@ -54,9 +60,24 @@ export default async function AdminLayout({
             <AdminUser />
           </div>
         </div>
-        {/* Todavía no hay barra de secciones: sería un menú de un solo ítem, o
-            peor, links a pantallas que no existen. Vuelve cuando estén la
-            moderación de comentarios y el tablero de Migue. */}
+        {/* La barra aparece recién ahora que hay dos secciones. Con una sola
+            era un menú de un ítem; con links a pantallas inexistentes habría
+            sido peor. El tablero de Migue se suma cuando exista. */}
+        <nav aria-label="Secciones del panel" className="border-t border-hairline">
+          <ul className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-2 sm:px-4">
+            {SECCIONES.map(({ href, icono: Icono, texto }) => (
+              <li key={href}>
+                <Link
+                  href={href}
+                  className="inline-flex items-center gap-2 whitespace-nowrap border-b-2 border-transparent px-3 py-2.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-ink-2 transition-colors hover:border-accent hover:text-ink"
+                >
+                  <Icono className="h-3.5 w-3.5" aria-hidden="true" />
+                  {texto}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">

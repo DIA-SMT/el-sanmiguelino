@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
+import { comentariosRepo } from "@/lib/repos/comentarios";
 import type { BloqueNota, NotaBorrador } from "@/lib/types";
 
 /**
@@ -161,6 +162,57 @@ export async function guardarNotaAction(
     return {
       ok: false,
       error: e instanceof Error ? e.message : "No se pudo guardar la nota.",
+    };
+  }
+}
+
+
+/**
+ * Moderación de un comentario.
+ *
+ * El moderador sale de la sesión, nunca del formulario: quien dio de baja algo
+ * es un dato de auditoría, y un campo que manda el cliente no lo es.
+ *
+ * No hay acción de borrar, y no es un olvido. Un comentario dado de baja se
+ * oculta y conserva su texto, sus votos y el rastro de quién lo bajó. Una
+ * publicación oficial que esconde la palabra de un vecino tiene que poder
+ * decir quién lo decidió, y eso es imposible sobre una fila borrada.
+ */
+export async function moderarComentarioAction(
+  comentarioId: unknown,
+  accion: unknown,
+  motivo?: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  const { usuario } = await requerirAdmin();
+
+  try {
+    if (!textoNoVacio(comentarioId)) throw new Error("Falta el comentario.");
+    if (accion !== "bajar" && accion !== "restituir") {
+      throw new Error("Acción desconocida.");
+    }
+
+    const resultado =
+      accion === "bajar"
+        ? await comentariosRepo.darDeBaja(
+            comentarioId,
+            usuario.id,
+            textoNoVacio(motivo) ? motivo : undefined,
+          )
+        : await comentariosRepo.restituir(comentarioId, usuario.id);
+
+    if (!resultado) throw new Error("Ese comentario ya no existe.");
+
+    // La tapa destaca el último comentario visible, así que bajar uno la
+    // cambia. Y la nota muestra su columna del lector.
+    revalidatePath("/admin/comentarios");
+    revalidatePath("/diario");
+    revalidatePath(`/nota/${resultado.notaSlug}`);
+
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo moderar.",
     };
   }
 }
