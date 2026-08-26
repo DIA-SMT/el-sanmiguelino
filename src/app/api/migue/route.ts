@@ -8,16 +8,38 @@ import {
 import type { NotaCompleta } from "@/lib/types";
 import { textoDeBloque } from "@/lib/derivar";
 import { registrarConsulta, type ResultadoConsulta } from "@/lib/repos/migue";
+import {
+  migueTieneModelo,
+  preguntarAlModelo,
+  type NotaParaElModelo,
+} from "@/lib/migue/openrouter";
 
 /**
- * Backend mock de Migue: recuperación naive por palabras clave sobre las notas
- * de la edición.
+ * Migue.
  *
- * PENDIENTE DE CONFIRMAR: endpoint/modelo del Migue existente para reusar el
- * mismo motor. Cuando esté, este handler pasa a proxyear esa API (o a una
- * instancia nueva con RAG sobre las notas) manteniendo el mismo contrato:
- * POST { pregunta, notaSlug? } → { respuesta }.
+ * Tres caminos, en este orden:
+ *
+ * 1. **Saludo e índice** se responden acá, sin modelo. Son deterministas —la
+ *    lista de notas es exacta— y así no se paga una llamada por cada "hola".
+ * 2. **Todo lo demás va al modelo** (OpenRouter), con las notas de la edición
+ *    en el prompt y la orden de no salir de ahí.
+ * 3. **Si el modelo no está** —sin clave, caído, lento— se cae al buscador por
+ *    palabras clave de siempre. Que Migue conteste peor es mejor que Migue no
+ *    conteste.
+ *
+ * El contrato hacia afuera no cambió nunca: POST { pregunta, notaSlug? } →
+ * { respuesta, notaSlug? }.
  */
+
+/**
+ * Cuánto texto de la edición se le manda al modelo.
+ *
+ * Con ocho notas entran todas y Migue puede contestar sobre cualquiera, que es
+ * lo que se quiere. El tope existe para el día que la edición crezca: se
+ * mandan primero las que más puntaje sacaron, así lo que se recorta es siempre
+ * lo menos relacionado con la pregunta.
+ */
+const TOPE_CONTEXTO = 24_000;
 
 const STOPWORDS = new Set(
   "el la los las un una unos unas de del al a en y o que se su sus por para con sobre es son fue como mas más hay este esta estos estas donde cuando quien cual cuales qué cómo dónde cuándo quién cuál me te le nos".split(
@@ -141,6 +163,59 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // --- El modelo -----------------------------------------------------------
+  if (migueTieneModelo()) {
+    // Se ordenan por puntaje y se manda todo lo que entre en el tope: el
+    // modelo elige mejor que nuestro puntaje, pero el puntaje sirve para
+    // decidir QUÉ recortar si no entra todo.
+    const puntuadas = completas
+      .map((n) => {
+        const propios = new Set(tokenizar(textoDeNota(n)));
+        return { nota: n, puntaje: tokens.filter((t) => propios.has(t)).length };
+      })
+      .sort((a, b) => b.puntaje - a.puntaje);
+
+    const paraElModelo: NotaParaElModelo[] = [];
+    let usado = 0;
+    for (const { nota } of puntuadas) {
+      const texto = textoDeNota(nota);
+      if (usado + texto.length > TOPE_CONTEXTO && paraElModelo.length >= 3) break;
+      usado += texto.length;
+      paraElModelo.push({
+        slug: nota.slug,
+        titulo: nota.titulo,
+        seccion: nota.seccion,
+        texto,
+      });
+    }
+
+    const delModelo = await preguntarAlModelo({
+      pregunta,
+      notas: paraElModelo,
+      mes: edicion.mes,
+      nombreUsuario: usuario.nombre.split(" ")[0],
+    });
+
+    if (delModelo) {
+      // El slug que dice el modelo se verifica contra la edición: si se lo
+      // inventó o citó uno viejo, se descarta. Un enlace a una nota que no
+      // existe es peor que no enlazar.
+      const slugValido =
+        delModelo.notaSlug &&
+        indice.some((n) => n.slug === delModelo.notaSlug)
+          ? delModelo.notaSlug
+          : undefined;
+
+      return responder(
+        delModelo.sinRespuesta ? "sin_respuesta" : "nota",
+        delModelo.texto,
+        { pregunta, notaSlug: slugValido, contextoSlug: body.notaSlug },
+      );
+    }
+    // Si devolvió null seguimos al buscador de abajo, a propósito.
+  }
+
+  // --- Sin modelo: el buscador por palabras clave ---------------------------
   if (!mejorNota || mejorPuntaje < 2) {
     // La salida que le da sentido al registro entero: cada una de estas es
     // un tema que los vecinos buscan y el diario no cubre.

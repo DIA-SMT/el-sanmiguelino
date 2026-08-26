@@ -2,6 +2,7 @@ import Link from "next/link";
 import { HelpCircle, MessageSquare, Sparkles } from "lucide-react";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { resumenMigue } from "@/lib/repos/migue";
+import { migueTieneModelo, modeloDeMigue } from "@/lib/migue/openrouter";
 import { getIndice } from "@/lib/repos/edicion";
 import { tiempoRelativo } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ const NOMBRES: Record<string, string> = {
 export default async function AdminMigue() {
   await requerirAdmin();
   const [resumen, indice] = await Promise.all([resumenMigue(30), getIndice()]);
+  const conModelo = migueTieneModelo();
   const tituloDe = new Map(indice.map((n) => [n.slug, n.titulo]));
 
   const respondidas =
@@ -49,6 +51,29 @@ export default async function AdminMigue() {
         <p className="mt-1 font-sans text-[0.8rem] text-ink-3">
           Últimos 30 días · {resumen.total}{" "}
           {resumen.total === 1 ? "consulta" : "consultas"}
+        </p>
+        {/* Con qué está contestando. Importa para leer los números: el
+            buscador por palabras clave falla mucho más que el modelo, así que
+            una tanda de "sin respuesta" significa cosas distintas según cuál
+            estuviera activo. */}
+        <p className="mt-2 inline-flex items-center gap-2 border border-hairline px-2.5 py-1 font-sans text-[0.7rem] text-ink-2">
+          {conModelo ? (
+            <>
+              Responde con{" "}
+              <code className="font-mono text-[0.68rem] text-ink">
+                {modeloDeMigue()}
+              </code>{" "}
+              sobre las notas de la edición
+            </>
+          ) : (
+            <>
+              Sin modelo: responde con el buscador por palabras clave. Falta{" "}
+              <code className="font-mono text-[0.68rem] text-ink">
+                OPENROUTER_API_KEY
+              </code>
+              .
+            </>
+          )}
         </p>
       </div>
 

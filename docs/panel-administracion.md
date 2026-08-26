@@ -631,3 +631,69 @@ verdad sube, la nota se guarda y la imagen se sirve **a través del optimizador
 de Next** (`/_next/image?url=…`) con las dimensiones correctas — que es la
 prueba de que el patrón remoto está bien puesto. Después se restauró la nota y
 se vació el bucket.
+
+
+## Migue con modelo (OpenRouter)
+
+Migue responde con `openai/gpt-4o-mini` vía OpenRouter, y **sólo sobre las
+notas de la edición**. Las notas van en el prompt y se le prohíbe salir de ahí.
+
+No es una preferencia de estilo. Es una publicación oficial de un municipio: un
+modelo que improvisa un horario de atención o un teléfono está poniendo
+información falsa en boca del Estado. Cuando algo no está en la edición, la
+respuesta correcta es decir que no está.
+
+### Tres caminos, en orden
+
+1. **Saludo e índice** se responden sin modelo. Son deterministas —la lista de
+   notas es exacta— y así no se paga una llamada por cada "hola".
+2. **Todo lo demás va al modelo**, con las notas en el contexto.
+3. **Si el modelo no está** —sin clave, caído, lento— se cae al buscador por
+   palabras clave de siempre. Que Migue conteste peor es mejor que no conteste.
+
+### Cómo sabe el tablero que no supo contestar
+
+Se le pide al modelo una **marca literal** (`[SIN_RESPUESTA]`) en vez de
+adivinar por frases. Interpretar "no encontré" o "no tengo información" es
+frágil, y de ese dato depende toda la pantalla de "Lo que no supimos contestar".
+La marca se saca antes de mostrar el texto.
+
+Lo mismo con la fuente: el modelo termina con `FUENTE: <slug>` y **ese slug se
+verifica contra la edición**. Si se lo inventó o citó uno viejo, se descarta —un
+enlace a una nota que no existe es peor que no enlazar—.
+
+### Contexto y costo
+
+Se mandan las notas ordenadas por puntaje hasta 24.000 caracteres. Con ocho
+notas entran todas (unos 15.000) y Migue puede contestar sobre cualquiera. El
+tope existe para cuando la edición crezca: lo que se recorta es siempre lo menos
+relacionado con la pregunta.
+
+`max_tokens` 400 y `temperature` 0.2: no se le pide creatividad, se le pide
+que no se aparte de las notas. Y hay un timeout de 12 segundos — un chat que
+tarda quince ya perdió a quien preguntó.
+
+### Verificado contra un OpenRouter de mentira
+
+La URL es configurable (`OPENROUTER_URL`), lo que sirve para poner un proxy
+del municipio delante y además permitió probar el camino entero sin gastar en
+llamadas. Los cuatro casos:
+
+| Caso | Resultado |
+|---|---|
+| El modelo contesta y cita una nota | Responde y enlaza, registrado como `nota` |
+| El modelo declara que no sabe | La marca se saca del texto, registrado como `sin_respuesta` |
+| El modelo cita un slug inventado | Se descarta el enlace |
+| OpenRouter devuelve 500 | Cae al buscador por palabras clave |
+
+Y sin clave, el comportamiento de Migue es **exactamente el de antes**.
+
+### Falta
+
+Cargar `OPENROUTER_API_KEY` en `.env.local` y en Vercel. Sin ella no se rompe
+nada: Migue sigue con el buscador, y el tablero lo dice en pantalla.
+
+**No hay límite de consultas por usuario.** Con el diario detrás de Cidituc y
+una edición por mes el riesgo es bajo, pero el día que el acceso se abra, cada
+pregunta cuesta plata del municipio y no hay nada que frene a alguien que
+insista.
