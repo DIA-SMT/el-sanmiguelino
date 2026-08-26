@@ -6,6 +6,7 @@ import type {
   NotaResumen,
 } from "@/lib/types";
 import { edicionMockRepo } from "@/lib/repos/edicion-mock";
+import { edicionPostgresRepo } from "@/lib/repos/edicion-postgres";
 
 /**
  * De dónde salen las notas del diario.
@@ -36,9 +37,29 @@ export interface EdicionRepo {
   buscables(): Promise<NotaBuscable[]>;
 }
 
-/** El motor activo. Cuando exista la capa Supabase se elige acá, y no se toca
- *  ningún consumidor. */
-const repo: EdicionRepo = edicionMockRepo;
+/**
+ * El motor activo, elegido acá y en ningún otro lado: ningún consumidor sabe
+ * de dónde salen las notas.
+ *
+ * El criterio es la presencia de `DATABASE_URL`, y no una variable propia de
+ * más. Si hay base configurada se usa; si no —alguien que clona el repo y
+ * quiere mirar el diario sin pedirle credenciales a nadie— se cae al mock, que
+ * tiene exactamente los mismos datos porque es la semilla.
+ *
+ * Que el fallback exista no lo vuelve inofensivo: en producción quedarse en el
+ * mock significaría servir la edición congelada del archivo mientras el panel
+ * escribe en una base que nadie lee. Por eso abajo tira en vez de caer.
+ */
+const HAY_BASE = Boolean(process.env.DATABASE_URL);
+
+if (!HAY_BASE && process.env.NODE_ENV === "production") {
+  throw new Error(
+    "Falta DATABASE_URL en producción. Sin base, el diario serviría la edición " +
+      "congelada del archivo semilla y todo lo que cargue el panel sería invisible.",
+  );
+}
+
+const repo: EdicionRepo = HAY_BASE ? edicionPostgresRepo : edicionMockRepo;
 
 /*
  * Todo va envuelto en `cache()` de React: dentro de un mismo render, quien
