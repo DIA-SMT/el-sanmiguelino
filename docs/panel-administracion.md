@@ -1,8 +1,8 @@
 # Panel de administración — plan de ejecución
 
-Estado: **etapas 1 a 4 terminadas y el shell de la 6**, salvo el motor Postgres del repo. La base
-de Supabase está creada, migrada y sembrada; la aplicación todavía lee del
-mock, y cambiar el motor es lo que sigue.
+Estado: **etapas 1 a 4 y 6 terminadas**. El diario lee de Supabase y el panel
+escribe. Quedan la etapa 5 (imágenes a Storage), la 7 (moderación de
+comentarios) y la 8 (tablero de Migue).
 
 ## Decisiones tomadas
 
@@ -20,9 +20,9 @@ mock, y cambiar el motor es lo que sigue.
 | 1 | **Cerrar la casa**: sesión, proxy, config de imágenes | no | **hecha** |
 | 2 | Frontera de repo: `EdicionRepo` async con motor mock | no | **hecha** |
 | 3 | Formas normalizadas + contrato de moderación | no | **hecha** |
-| 4 | Persistencia: Prisma + Supabase + seed | **sí** | **hecha** (falta el motor del repo) |
+| 4 | Persistencia: Prisma + Supabase + seed | **sí** | **hecha** |
 | 5 | Imágenes a Storage | sí | pendiente |
-| 6 | `/admin`: shell + editor de notas | sí | **shell hecho**, editor pendiente |
+| 6 | `/admin`: shell + editor de notas | sí | **hecha** |
 | 7 | Moderación de comentarios | sí | pendiente |
 | 8 | Migue: registro + pantalla "Lo que no supimos contestar" | sí | pendiente |
 
@@ -320,3 +320,53 @@ porque sería un menú de un ítem o links a pantallas que no existen.
 
 El layout llama a `requerirAdmin()` **y la página también**. No es
 redundancia: un layout no es un límite de seguridad, y ya nos costó una fuga.
+
+
+## Etapa 6 — el editor de notas
+
+### Por qué obligó a terminar la etapa 4
+
+El editor no podía existir sobre el motor mock: su almacén es un archivo del
+repositorio, así que todo lo que se guardara se perdía al recargar. Enchufar
+Postgres dejó de ser una tarea aparte y pasó a ser un requisito.
+
+El cambio de motor se verificó comparando la huella de comportamiento contra
+los dos: **idéntica**. Y para que esa prueba no fuera vacía —"idéntico" también
+es el resultado de no haber cambiado nada— se cambió un título **sólo en
+Postgres**, sin tocar el archivo semilla, y la nota lo mostró.
+
+### El cuerpo se edita como bloques, no como texto rico
+
+El diario tiene cinco formas —párrafo, subtítulo, cita, destacado y ficha— y
+cada una se maqueta distinto en la hoja. Un editor de texto libre obligaría a
+adivinar cuál es cuál al renderizar, y a la primera nota pegada desde Word el
+diario se llena de negritas y tamaños que no existen en el sistema.
+
+Los bloques se mueven con botones y no arrastrando: la WCAG 2.2 (SC 2.5.7)
+exige que todo lo que se hace arrastrando se pueda hacer con un solo puntero,
+así que el arrastre sería trabajo **encima** de esto, no en lugar de esto.
+
+### Dónde está el límite de confianza
+
+En la Server Action, no en el layout. Una Server Action es un endpoint POST con
+su propia URL y **el layout no corre para ella**: una acción sin guardia es una
+ruta de escritura abierta con apariencia de protegida. Por eso
+`guardarNotaAction` llama a `requerirAdmin()` por su cuenta.
+
+Y valida la forma de lo que recibe aunque el llamador sea nuestro propio
+formulario tipado: los tipos de TypeScript no existen en runtime, y el cuerpo
+se guarda como Json sin validarse al leer, así que lo que entra por acá es lo
+que después se sirve. Cada bloque se devuelve **proyectado** —sólo los campos
+que su tipo declara— para que un campo de más no llegue a la base.
+
+Verificado por la interfaz, con control: título vacío, slug con mayúsculas y
+cita sin autor se **rechazan** con un mensaje que dice qué arreglar; guardar sin
+tocar nada **guarda**. Sin ese último caso, un validador que rechaza todo daría
+el mismo resultado.
+
+### Lo que el editor todavía no hace
+
+No hay **borradores**: lo que se guarda sale publicado. No hay **historial de
+versiones**. No se **reordena** el foliado ni se **borran** notas —una nota nueva
+va al final—. Y la foto se carga por ruta de archivo, no por subida: eso es la
+etapa 5.

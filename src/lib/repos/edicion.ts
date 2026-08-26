@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type {
   EdicionResumen,
+  NotaBorrador,
   NotaBuscable,
   NotaCompleta,
   NotaResumen,
@@ -35,6 +36,16 @@ export interface EdicionRepo {
   completas(slugs: string[]): Promise<NotaCompleta[]>;
   /** El índice más el texto plano de cada cuerpo, para el buscador. */
   buscables(): Promise<NotaBuscable[]>;
+
+  /**
+   * Guarda una nota: la crea si el slug no existe, la actualiza si sí.
+   *
+   * Es opcional en la interfaz porque el motor mock **no puede** cumplirla: su
+   * almacén es un archivo del repositorio, y una escritura que se pierde al
+   * recargar es peor que un error claro. Los consumidores preguntan por
+   * `repoEscribe()`.
+   */
+  guardarNota?(borrador: NotaBorrador): Promise<NotaCompleta>;
 }
 
 /**
@@ -93,4 +104,29 @@ export const getBuscables = cache(async (): Promise<NotaBuscable[]> =>
 export async function notaExiste(slug: string): Promise<boolean> {
   const indice = await getIndice();
   return indice.some((n) => n.slug === slug);
+}
+
+/** ¿El motor activo sabe escribir? Sólo Postgres. El panel lo consulta para no
+ *  ofrecer un botón de guardar que no puede cumplir. */
+export function repoEscribe(): boolean {
+  return typeof repo.guardarNota === "function";
+}
+
+/**
+ * Guarda una nota y devuelve la versión persistida.
+ *
+ * No está envuelta en `cache()` —al revés que las lecturas—: memoizar una
+ * escritura haría que dos guardados iguales en el mismo render se conviertan en
+ * uno solo, que es exactamente lo que no se quiere.
+ */
+export async function guardarNota(
+  borrador: NotaBorrador,
+): Promise<NotaCompleta> {
+  if (!repo.guardarNota) {
+    throw new Error(
+      "El motor activo no sabe escribir. Falta DATABASE_URL: sin base, lo que " +
+        "se guarde se pierde al recargar.",
+    );
+  }
+  return repo.guardarNota(borrador);
 }

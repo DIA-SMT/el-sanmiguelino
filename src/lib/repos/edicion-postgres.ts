@@ -1,7 +1,9 @@
 import type { EdicionRepo } from "@/lib/repos/edicion";
 import { db } from "@/lib/db";
+import { minutosDeLectura, textoPlanoDe } from "@/lib/derivar";
 import type {
   BloqueNota,
+  NotaBorrador,
   EdicionResumen,
   ImagenNota,
   NotaBuscable,
@@ -147,6 +149,65 @@ export const edicionPostgresRepo: EdicionRepo = {
       .map((slug) => porSlug.get(slug))
       .filter((f): f is (typeof filas)[number] => Boolean(f))
       .map((f) => ({ ...aResumen(f), cuerpo: aCuerpo(f.cuerpo) }));
+  },
+
+  async guardarNota(borrador: NotaBorrador): Promise<NotaCompleta> {
+    const { slug, slugOriginal, seccion, titulo, bajada, cuerpo, imagen } =
+      borrador;
+
+    // Los derivados se calculan ACÁ, con las mismas funciones que usan el
+    // motor mock y la semilla. Es el único camino de escritura, así que no
+    // pueden quedar desfasados del cuerpo: no hay forma de guardar un texto
+    // sin recalcularlos.
+    const campos = {
+      seccion,
+      titulo,
+      bajada,
+      cuerpo,
+      imagenSrc: imagen?.src ?? null,
+      imagenAlt: imagen?.alt ?? null,
+      imagenEpigrafe: imagen?.epigrafe ?? null,
+      minutosLectura: minutosDeLectura(cuerpo),
+      textoPlano: textoPlanoDe(cuerpo),
+    };
+
+    const clave = slugOriginal ?? slug;
+    const existente = await db().nota.findUnique({
+      where: { slug: clave },
+      select: { id: true },
+    });
+
+    if (existente) {
+      // El slug puede haber cambiado: el ON UPDATE CASCADE del esquema hace
+      // que los comentarios lo sigan en vez de quedar huérfanos.
+      const fila = await db().nota.update({
+        where: { slug: clave },
+        data: { ...campos, slug },
+        select: { ...CAMPOS_RESUMEN, cuerpo: true },
+      });
+      return { ...aResumen(fila), cuerpo: aCuerpo(fila.cuerpo) };
+    }
+
+    // Nota nueva: va al final del foliado. `orden` es único por edición, así
+    // que se calcula desde el máximo actual y no desde el conteo de filas: si
+    // alguna vez queda un hueco en el medio, contar daría un número ya usado
+    // y el guardado fallaría por la restricción.
+    const edicion = await edicionActualFila();
+    const ultima = await db().nota.findFirst({
+      where: { edicionId: edicion.id },
+      orderBy: { orden: "desc" },
+      select: { orden: true },
+    });
+    const fila = await db().nota.create({
+      data: {
+        ...campos,
+        slug,
+        orden: (ultima?.orden ?? -1) + 1,
+        edicionId: edicion.id,
+      },
+      select: { ...CAMPOS_RESUMEN, cuerpo: true },
+    });
+    return { ...aResumen(fila), cuerpo: aCuerpo(fila.cuerpo) };
   },
 
   async buscables(): Promise<NotaBuscable[]> {

@@ -100,6 +100,21 @@ export interface NotaSemilla {
   imagen?: ImagenNota;
 }
 
+/**
+ * Lo que el panel manda al guardar una nota.
+ *
+ * Es `NotaSemilla` más el slug anterior, y no lleva `minutosLectura` ni
+ * `textoPlano` a propósito: esos se derivan al escribir, con las funciones de
+ * `src/lib/derivar`. Si el borrador los trajera, el panel podría mandar un
+ * número que no corresponde al texto y nadie se enteraría.
+ */
+export interface NotaBorrador extends NotaSemilla {
+  /** El slug con el que la nota estaba guardada. Ausente = nota nueva.
+   *  Existe porque el slug es la clave: cambiarlo es mover la nota, no crear
+   *  otra, y los comentarios tienen que seguirla. */
+  slugOriginal?: string;
+}
+
 export interface EdicionSemilla extends EdicionResumen {
   notas: NotaSemilla[];
 }
