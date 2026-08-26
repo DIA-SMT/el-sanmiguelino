@@ -32,9 +32,19 @@ export function textoDeBloque(bloque: BloqueNota): string {
   switch (bloque.tipo) {
     case "parrafo":
     case "subtitulo":
-    case "cita":
     case "destacado":
       return bloque.texto;
+    case "cita":
+      // El autor y el cargo van INCLUIDOS. Antes se devolvía sólo el texto, y
+      // eso dejaba a quien habla fuera del índice del buscador y fuera del
+      // contexto que ve Migue: buscar "intendenta" no daba nada, y a "qué dijo
+      // la intendenta sobre las plazas" Migue contestaba que no estaba en la
+      // edición —teniendo la cita delante, pero sin saber de quién era—.
+      //
+      // En un diario, quién dijo algo es tan buscable como lo que dijo.
+      return [bloque.texto, bloque.autor, bloque.cargo]
+        .filter(Boolean)
+        .join(" ");
     case "ficha":
       return [
         bloque.titulo,
