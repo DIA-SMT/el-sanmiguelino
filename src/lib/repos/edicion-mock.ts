@@ -37,7 +37,11 @@ function aResumen(nota: NotaSemilla): NotaResumen {
 }
 
 function aCompleta(nota: NotaSemilla): NotaCompleta {
-  return { ...aResumen(nota), cuerpo: nota.cuerpo };
+  return {
+    ...aResumen(nota),
+    cuerpo: nota.cuerpo,
+    edicionSlug: edicionActual.slug,
+  };
 }
 
 function aBuscable(nota: NotaSemilla): NotaBuscable {
@@ -70,5 +74,18 @@ export const edicionMockRepo: EdicionRepo = {
 
   async buscables() {
     return edicionActual.notas.map(aBuscable);
+  },
+
+  // El mock tiene una sola edición, así que el archivo es esa misma y el
+  // índice "de" una edición sólo puede ser el suyo.
+  async indiceDe(edicionSlug) {
+    return edicionSlug === edicionActual.slug
+      ? edicionActual.notas.map(aResumen)
+      : [];
+  },
+
+  async publicadas() {
+    const { slug, mes, numero, anio, etiqueta } = edicionActual;
+    return [{ slug, mes, numero, anio, etiqueta }];
   },
 };

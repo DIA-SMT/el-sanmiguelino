@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LogoDireccionIA, LogoHoja } from "@/components/brand/logos";
 
 export function SiteFooter() {
@@ -15,6 +16,17 @@ export function SiteFooter() {
             de Tucumán (4000), Tucumán.
           </p>
           <p className="meta mt-2">Publicación gratuita, prohibida su venta</p>
+          {/* El archivo se llega desde el pie, que está en todas las páginas.
+              En la bandera competiría con las secciones de la edición en curso,
+              que es lo que la mayoría viene a leer. */}
+          <p className="mt-2.5">
+            <Link
+              href="/archivo"
+              className="enlace font-sans text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink-2"
+            >
+              Números anteriores
+            </Link>
+          </p>
         </div>
 
         <div className="flex items-center gap-3 md:justify-end">

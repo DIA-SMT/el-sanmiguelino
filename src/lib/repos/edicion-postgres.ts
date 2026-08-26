@@ -25,6 +25,26 @@ import type {
 
 /** Las columnas de un resumen. Se nombran explícitas y no con un `select *`
  *  para que `cuerpo` no se cuele por descuido en un listado. */
+/**
+ * De qué ediciones se puede leer una nota.
+ *
+ * La regla es **"su edición está publicada"**, no "es la edición que se está
+ * sirviendo". La diferencia es el archivo entero: una nota de agosto sigue
+ * siendo leíble cuando el diario ya va por septiembre, y una de septiembre no
+ * se abre antes del 1 aunque alguien tenga la dirección.
+ *
+ * Un administrador con una edición en foco suma esa, publicada o no: es lo que
+ * le permite revisar la edición que está armando.
+ */
+function edicionesLegibles(enFoco: string | null) {
+  return {
+    OR: [
+      { publicaEn: { not: null, lte: new Date() } },
+      ...(enFoco ? [{ slug: enFoco }] : []),
+    ],
+  };
+}
+
 const CAMPOS_RESUMEN = {
   slug: true,
   seccion: true,
@@ -171,22 +191,34 @@ export const edicionPostgresRepo: EdicionRepo = {
    * devuelve esa, así que ve sus notas. Es la misma consulta.
    */
   async nota(slug: string): Promise<NotaCompleta | null> {
-    const edicion = await edicionActualFila();
     const fila = await db().nota.findFirst({
-      where: { slug, edicionId: edicion.id },
-      select: { ...CAMPOS_RESUMEN, cuerpo: true },
+      where: { slug, edicion: edicionesLegibles(await edicionEnFoco()) },
+      select: {
+        ...CAMPOS_RESUMEN,
+        cuerpo: true,
+        edicion: { select: { slug: true } },
+      },
     });
     if (!fila) return null;
-    return { ...aResumen(fila), cuerpo: aCuerpo(fila.cuerpo) };
+    return {
+      ...aResumen(fila),
+      cuerpo: aCuerpo(fila.cuerpo),
+      edicionSlug: fila.edicion.slug,
+    };
   },
 
   async completas(slugs: string[]): Promise<NotaCompleta[]> {
     if (slugs.length === 0) return [];
-    const edicion = await edicionActualFila();
     const filas = await db().nota.findMany({
-      // Acotado a la edición servida, por lo mismo que `nota()`.
-      where: { slug: { in: slugs }, edicionId: edicion.id },
-      select: { ...CAMPOS_RESUMEN, cuerpo: true },
+      where: {
+        slug: { in: slugs },
+        edicion: edicionesLegibles(await edicionEnFoco()),
+      },
+      select: {
+        ...CAMPOS_RESUMEN,
+        cuerpo: true,
+        edicion: { select: { slug: true } },
+      },
     });
     // Se respeta el orden PEDIDO, no el que devuelve la base: quien pide
     // ["b", "a"] espera recibirlas así, y la portada depende de eso para saber
@@ -195,7 +227,11 @@ export const edicionPostgresRepo: EdicionRepo = {
     return slugs
       .map((slug) => porSlug.get(slug))
       .filter((f): f is (typeof filas)[number] => Boolean(f))
-      .map((f) => ({ ...aResumen(f), cuerpo: aCuerpo(f.cuerpo) }));
+      .map((f) => ({
+        ...aResumen(f),
+        cuerpo: aCuerpo(f.cuerpo),
+        edicionSlug: f.edicion.slug,
+      }));
   },
 
   async guardarNota(borrador: NotaBorrador): Promise<NotaCompleta> {
@@ -265,9 +301,17 @@ export const edicionPostgresRepo: EdicionRepo = {
       const fila = await db().nota.update({
         where: { slug: clave },
         data: { ...campos, slug },
-        select: { ...CAMPOS_RESUMEN, cuerpo: true },
+        select: {
+          ...CAMPOS_RESUMEN,
+          cuerpo: true,
+          edicion: { select: { slug: true } },
+        },
       });
-      return { ...aResumen(fila), cuerpo: aCuerpo(fila.cuerpo) };
+      return {
+        ...aResumen(fila),
+        cuerpo: aCuerpo(fila.cuerpo),
+        edicionSlug: fila.edicion.slug,
+      };
     }
 
     // Nota nueva: va al final del foliado. `orden` es único por edición, así
@@ -287,9 +331,50 @@ export const edicionPostgresRepo: EdicionRepo = {
         orden: (ultima?.orden ?? -1) + 1,
         edicionId: edicion.id,
       },
-      select: { ...CAMPOS_RESUMEN, cuerpo: true },
+      select: {
+        ...CAMPOS_RESUMEN,
+        cuerpo: true,
+        edicion: { select: { slug: true } },
+      },
     });
-    return { ...aResumen(fila), cuerpo: aCuerpo(fila.cuerpo) };
+    return {
+      ...aResumen(fila),
+      cuerpo: aCuerpo(fila.cuerpo),
+      edicionSlug: fila.edicion.slug,
+    };
+  },
+
+  async indiceDe(edicionSlug: string): Promise<NotaResumen[]> {
+    const filas = await db().nota.findMany({
+      where: {
+        edicion: {
+          slug: edicionSlug,
+          ...edicionesLegibles(await edicionEnFoco()),
+        },
+      },
+      orderBy: { orden: "asc" },
+      select: CAMPOS_RESUMEN,
+    });
+    return filas.map(aResumen);
+  },
+
+  async publicadas(): Promise<EdicionResumen[]> {
+    const filas = await db().edicion.findMany({
+      where: {
+        publicaEn: { not: null, lte: new Date() },
+        // Con notas: una edición vacía no es un número del diario, y ya se la
+        // excluye de la elección automática por lo mismo.
+        notas: { some: {} },
+      },
+      orderBy: { publicaEn: "desc" },
+    });
+    return filas.map((e) => ({
+      slug: e.slug,
+      mes: e.mes,
+      numero: e.numero,
+      anio: e.anio,
+      etiqueta: e.etiqueta ?? undefined,
+    }));
   },
 
   async buscables(): Promise<NotaBuscable[]> {

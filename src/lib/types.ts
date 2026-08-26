@@ -65,6 +65,13 @@ export interface NotaResumen {
 /** La nota entera, para la pantalla que efectivamente la muestra. */
 export interface NotaCompleta extends NotaResumen {
   cuerpo: BloqueNota[];
+  /** De qué edición es.
+   *
+   *  Existe por el archivo: una nota de agosto sigue siendo leíble cuando el
+   *  diario ya va por septiembre, y su "Página 5 de 9" tiene que contarse
+   *  sobre agosto. Sin esto, el foliado de una nota vieja se calculaba sobre la
+   *  edición en la calle y decía cualquier cosa. */
+  edicionSlug: string;
 }
 
 /** La cabecera de la edición, sin sus notas: mes, número, etiqueta. Es lo

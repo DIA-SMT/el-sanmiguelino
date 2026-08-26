@@ -12,7 +12,12 @@ import { ColumnaDelLector } from "@/components/comentarios/columna-del-lector";
 import { CompartirNota } from "@/components/compartir-nota";
 import { NotasRelacionadas } from "@/components/notas-relacionadas";
 import { transicionPagina } from "@/lib/transiciones";
-import { getIndice, getNota, getResumenEdicion } from "@/lib/repos/edicion";
+import {
+  getIndice,
+  getIndiceDe,
+  getNota,
+  getResumenEdicion,
+} from "@/lib/repos/edicion";
 import { seccionesDeEdicion, slugificarSeccion } from "@/lib/data/secciones";
 import { getUsuario } from "@/lib/auth/session";
 import type { BloqueNota } from "@/lib/types";
@@ -106,7 +111,11 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
     getIndice(),
   ]);
 
-  const numeroPagina = indice.findIndex((n) => n.slug === nota.slug) + 2;
+  // El foliado se cuenta sobre la edición DE LA NOTA, no sobre la que está en
+  // la calle: en el archivo son distintas.
+  const indiceDeSuEdicion = await getIndiceDe(nota.edicionSlug);
+  const numeroPagina =
+    indiceDeSuEdicion.findIndex((n) => n.slug === nota.slug) + 2;
 
   return (
     <>
@@ -115,7 +124,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
       <div className="progreso-lectura" aria-hidden="true" />
 
       <ViewTransition {...transicionPagina}>
-        <HojaDiario numeroPagina={numeroPagina}>
+        <HojaDiario numeroPagina={numeroPagina} edicionSlug={nota.edicionSlug}>
           <Masthead
             edicion={edicion}
             secciones={seccionesDeEdicion(indice)}

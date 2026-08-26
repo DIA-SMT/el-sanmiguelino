@@ -37,6 +37,14 @@ export interface EdicionRepo {
   /** El índice más el texto plano de cada cuerpo, para el buscador. */
   buscables(): Promise<NotaBuscable[]>;
 
+  /** El índice de UNA edición, la que sea. Lo necesita el foliado de una nota
+   *  del archivo, que se cuenta sobre su propia edición y no sobre la que está
+   *  en la calle. */
+  indiceDe(edicionSlug: string): Promise<NotaResumen[]>;
+
+  /** Las ediciones ya publicadas, de la más nueva a la más vieja. El archivo. */
+  publicadas(): Promise<EdicionResumen[]>;
+
   /**
    * Guarda una nota: la crea si el slug no existe, la actualiza si sí.
    *
@@ -97,6 +105,18 @@ export const getCompletas = cache(
 
 export const getBuscables = cache(async (): Promise<NotaBuscable[]> =>
   repo.buscables(),
+);
+
+/** El índice de una edición cualquiera, para el foliado de una nota del
+ *  archivo y para su sumario. */
+export const getIndiceDe = cache(
+  async (edicionSlug: string): Promise<NotaResumen[]> =>
+    repo.indiceDe(edicionSlug),
+);
+
+/** Las ediciones ya publicadas, de la más nueva a la más vieja. */
+export const getPublicadas = cache(async (): Promise<EdicionResumen[]> =>
+  repo.publicadas(),
 );
 
 /** Para validar que un slug existe sin traerse la nota. Hoy cuesta lo mismo;

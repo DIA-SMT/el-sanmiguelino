@@ -544,12 +544,30 @@ corriera ningún trabajo**, y se volvió atrás cambiando la fecha. La vista pre
 se probó manejando la interfaz: enfocar, ver la edición futura con su barra,
 abrir una de sus notas y salir.
 
-### Lo que falta decidir
+### El archivo
 
-Qué pasa con las ediciones viejas. Hoy `/edicion/agosto-2026` redirige al diario
-y cualquier otro slug da 404, así que cuando salga septiembre, agosto deja de
-ser accesible. Un diario municipal normalmente conserva el archivo, pero es una
-decisión editorial.
+Los números anteriores quedan accesibles. `/archivo` los lista y
+`/edicion/<slug>` muestra el sumario de cada uno; la edición en la calle
+redirige a `/diario`, que es el diario de verdad con su paso de página.
 
-Y el lector que está leyendo justo cuando cambia: si alguien está en la página 5
-a las 23:59, a las 00:01 el foliado ya es del mes siguiente.
+Los sumarios no replican la tapa a propósito. Un archivo es una tabla de
+contenidos: quien entra viene a buscar una nota que recuerda, no a leer la tapa
+de nuevo — y replicarla sería una segunda tapa que mantener al día.
+
+**La regla de visibilidad cambió, y es la que hace posible el archivo.** Una
+nota es leíble si **su edición está publicada**, no si pertenece a la que se
+está sirviendo. Con la regla anterior —acotar a la edición servida, que fue el
+primer arreglo de la fuga— agosto se volvía ilegible en cuanto salía
+septiembre. Con la nueva, agosto sigue vivo y septiembre sigue oculto hasta el
+día 1.
+
+**El foliado se cuenta sobre la edición de la nota.** Verificado con las dos
+conviviendo: la nota de agosto dice "Página 5 de 9" —sobre las 8 notas de
+agosto— mientras la de septiembre dice "Página 2 de 2", con septiembre en la
+calle.
+
+El lector que está leyendo justo cuando cambia el mes ya no pierde nada: su
+nota sigue en su dirección y el pie del pliego sigue contando sobre su edición.
+Lo único que se apaga son las flechas del mando, porque esa nota ya no está en
+el índice de la edición en curso —y apagarlas es correcto: llevarían a otro
+mes—.

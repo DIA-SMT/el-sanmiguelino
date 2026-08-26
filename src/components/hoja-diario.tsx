@@ -1,6 +1,6 @@
 import { PasadorPaginas } from "@/components/pasador-paginas";
 import { paginasDeEdicion } from "@/lib/data/paginas";
-import { getIndice } from "@/lib/repos/edicion";
+import { getIndice, getIndiceDe } from "@/lib/repos/edicion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,14 +10,24 @@ import { cn } from "@/lib/utils";
  */
 export async function HojaDiario({
   numeroPagina,
+  edicionSlug,
   children,
   className,
 }: {
   numeroPagina: number | null;
+  /** De qué edición es lo que se está mostrando.
+   *
+   *  Importa para el archivo: una nota de agosto leída cuando el diario ya va
+   *  por septiembre tiene que decir "Página 5 de 9" contando sobre agosto. Sin
+   *  esto el pie contaba sobre la edición en la calle y el número no
+   *  correspondía a nada. */
+  edicionSlug?: string;
   children: React.ReactNode;
   className?: string;
 }) {
-  const paginas = paginasDeEdicion(await getIndice());
+  const paginas = paginasDeEdicion(
+    edicionSlug ? await getIndiceDe(edicionSlug) : await getIndice(),
+  );
   const indice = numeroPagina === null ? -1 : numeroPagina - 1;
 
   return (
