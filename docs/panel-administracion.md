@@ -693,7 +693,30 @@ Y sin clave, el comportamiento de Migue es **exactamente el de antes**.
 Cargar `OPENROUTER_API_KEY` en `.env.local` y en Vercel. Sin ella no se rompe
 nada: Migue sigue con el buscador, y el tablero lo dice en pantalla.
 
-**No hay límite de consultas por usuario.** Con el diario detrás de Cidituc y
-una edición por mes el riesgo es bajo, pero el día que el acceso se abra, cada
-pregunta cuesta plata del municipio y no hay nada que frene a alguien que
-insista.
+### El tope de consultas
+
+Hay dos topes por hora: **20 por persona** y **300 entre todos**. El global es
+el techo de gasto de verdad: si mil vecinos preguntan veinte veces cada uno, el
+tope individual no protege nada.
+
+**Pasarse no rompe a Migue.** Quien llega al tope sigue recibiendo respuesta,
+con el buscador por palabras clave, que no cuesta nada. Un asistente que se
+planta y dice "no puedo atenderte" es peor experiencia que uno que contesta un
+poco peor, y además el vecino no tiene por qué enterarse de nuestros costos.
+
+**El contador incrementa primero y pregunta después**, en una sola sentencia
+atómica. Al revés —leer, decidir, escribir— dos pedidos simultáneos leen el
+mismo número y los dos pasan: con veinte pestañas abiertas el tope no existiría.
+
+**La tabla no guarda quién preguntó**: guarda un hash del id salado con
+`SESSION_SECRET`. El registro de preguntas es anónimo a propósito, y meter acá
+el id lo volvería identificable por cruce de horarios. La sal importa porque los
+ids de Cidituc son un espacio chico: un hash pelado se revierte probando. Las
+filas se limpian solas.
+
+Si la base no responde, deja pasar: el tope protege el presupuesto, no la
+seguridad, y no vale que una caída de Postgres apague a Migue.
+
+Verificado con el tope en 3: las tres primeras fueron al modelo y de ahí en más
+al buscador, sin cortar. Y se comprobó que en la tabla figura el hash y no el
+id.

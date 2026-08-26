@@ -3,6 +3,7 @@ import { HelpCircle, MessageSquare, Sparkles } from "lucide-react";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { resumenMigue } from "@/lib/repos/migue";
 import { migueTieneModelo, modeloDeMigue } from "@/lib/migue/openrouter";
+import { consumoDeLaHora } from "@/lib/migue/tope";
 import { getIndice } from "@/lib/repos/edicion";
 import { tiempoRelativo } from "@/lib/utils";
 
@@ -28,7 +29,11 @@ const NOMBRES: Record<string, string> = {
  */
 export default async function AdminMigue() {
   await requerirAdmin();
-  const [resumen, indice] = await Promise.all([resumenMigue(30), getIndice()]);
+  const [resumen, indice, consumo] = await Promise.all([
+    resumenMigue(30),
+    getIndice(),
+    consumoDeLaHora(),
+  ]);
   const conModelo = migueTieneModelo();
   const tituloDe = new Map(indice.map((n) => [n.slug, n.titulo]));
 
@@ -76,6 +81,25 @@ export default async function AdminMigue() {
           )}
         </p>
       </div>
+
+      {conModelo && (
+        <p className="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-1 border border-hairline bg-paper-2 px-4 py-3 font-sans text-[0.8rem] text-ink-2">
+          <span>
+            Esta hora:{" "}
+            <strong className="tabular-nums text-ink">
+              {consumo.consultas}
+            </strong>{" "}
+            {consumo.consultas === 1 ? "consulta" : "consultas"} al modelo de{" "}
+            <span className="tabular-nums">{consumo.topeGlobal}</span>, de{" "}
+            <span className="tabular-nums">{consumo.personas}</span>{" "}
+            {consumo.personas === 1 ? "persona" : "personas"}.
+          </span>
+          <span className="text-ink-3">
+            Tope por persona: {consumo.topePersona} por hora. Pasarse no corta
+            a Migue: sigue con el buscador.
+          </span>
+        </p>
+      )}
 
       {resumen.total === 0 ? (
         <p className="mt-8 flex items-center gap-2.5 font-sans text-[0.85rem] text-ink-3">

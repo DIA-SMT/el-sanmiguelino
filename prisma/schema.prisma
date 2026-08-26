@@ -190,3 +190,30 @@ model ConsultaMigue {
   @@index([resultado, fecha])
   @@map("consultas_migue")
 }
+
+/// Cuántas consultas al MODELO lleva alguien en la hora en curso.
+///
+/// Existe para que una edición del diario no se coma el presupuesto del
+/// municipio: cada pregunta que llega al modelo cuesta plata, y no hay nada que
+/// frene a alguien que insista.
+///
+/// **No guarda el id del usuario, guarda un hash salado con `SESSION_SECRET`.**
+/// Con eso alcanza para contar por persona sin poder decir quién es: el
+/// registro de preguntas (`ConsultaMigue`) es anónimo a propósito, y meter acá
+/// el id volvería a hacer identificable todo por cruce de horarios. El salteado
+/// importa porque los ids de Cidituc son un espacio chico: un hash pelado se
+/// revierte probando.
+///
+/// Las filas son efímeras: se limpian las ventanas viejas.
+model ConsumoMigue {
+  /// Hash del id de usuario. Nunca el id.
+  clave String
+  /// El comienzo de la hora, truncado. Dos consultas de la misma hora caen en
+  /// la misma fila y el contador es un incremento atómico.
+  ventana   DateTime
+  consultas Int      @default(0)
+
+  @@id([clave, ventana])
+  @@index([ventana])
+  @@map("consumo_migue")
+}

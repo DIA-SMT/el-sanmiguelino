@@ -13,6 +13,10 @@ import {
   preguntarAlModelo,
   type NotaParaElModelo,
 } from "@/lib/migue/openrouter";
+import {
+  contarConsultaAlModelo,
+  limpiarVentanasViejas,
+} from "@/lib/migue/tope";
 
 /**
  * Migue.
@@ -164,7 +168,14 @@ export async function POST(request: NextRequest) {
   }
 
   // --- El modelo -----------------------------------------------------------
-  if (migueTieneModelo()) {
+  //
+  // El tope se cuenta ANTES de armar el contexto: si ya se pasó, no tiene
+  // sentido recorrer la edición entera para un prompt que no se va a mandar.
+  const tope = migueTieneModelo()
+    ? await contarConsultaAlModelo(usuario.id)
+    : { permitido: false };
+
+  if (migueTieneModelo() && tope.permitido) {
     // Se ordenan por puntaje y se manda todo lo que entre en el tope: el
     // modelo elige mejor que nuestro puntaje, pero el puntaje sirve para
     // decidir QUÉ recortar si no entra todo.
@@ -214,6 +225,13 @@ export async function POST(request: NextRequest) {
     }
     // Si devolvió null seguimos al buscador de abajo, a propósito.
   }
+
+  // Llegar acá con el modelo configurado significa una de dos: OpenRouter no
+  // respondió, o se alcanzó el tope de la hora. En los dos casos Migue sigue
+  // contestando con el buscador: un asistente que se planta y dice "no puedo
+  // atenderte" es peor que uno que contesta un poco peor, y el vecino no tiene
+  // por qué enterarse de nuestros costos.
+  void limpiarVentanasViejas();
 
   // --- Sin modelo: el buscador por palabras clave ---------------------------
   if (!mejorNota || mejorPuntaje < 2) {
