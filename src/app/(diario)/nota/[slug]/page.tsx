@@ -47,6 +47,43 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
           className="my-7"
         />
       );
+    case "destacado":
+      /* Una frase del propio texto, subrayada. En el impreso es un filete
+         grueso arriba y la frase en la sans del diario, más grande que el
+         cuerpo pero sin llegar al titular. Sin comillas ni autor: no es una
+         cita, es el redactor levantando la voz sobre su propia idea. */
+      return (
+        <p className="my-7 border-t-2 border-ink pt-4 font-sans text-[1.12rem] font-medium leading-[1.35] text-ink">
+          {bloque.texto}
+        </p>
+      );
+    case "ficha":
+      /* Recuadro de datos. El marco de esquinas redondeadas es del impreso y
+         es el único lugar del diario donde hay una curva: todo lo demás son
+         filetes rectos. Va entero en la sans, incluido el cuerpo, porque no es
+         texto para leer de corrido sino para consultar.
+
+         Cruza todas las columnas porque es un PANEL, no un ítem de la
+         columna: encerrado en una sola, su grilla interna de dos columnas se
+         parte en tiras de cuatro palabras y se vuelve ilegible. En el papel
+         ocupa el ancho de la página. */
+      return (
+        <section className="my-8 rounded-2xl border border-ink px-5 py-5 [column-span:all] sm:px-7 sm:py-6">
+          <h2 className="titular text-[1.3rem] text-ink">{bloque.titulo}</h2>
+          <dl className="mt-4 grid gap-x-9 gap-y-4 sm:grid-cols-2">
+            {bloque.entradas.map((e) => (
+              <div key={e.lead}>
+                <dt className="font-sans text-[0.85rem] font-semibold leading-snug text-ink">
+                  {e.lead}
+                </dt>
+                <dd className="mt-1 font-sans text-[0.82rem] leading-[1.55] text-ink-2">
+                  {e.texto}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      );
     default:
       return (
         <p className="texto-diario font-serif text-[0.97rem] leading-[1.72] text-ink">
@@ -84,6 +121,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
             secciones={seccionesDeEdicion(indice)}
             usuario={usuario}
             seccionActiva={slugificarSeccion(nota.seccion)}
+            pagina={numeroPagina}
           />
 
           <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">

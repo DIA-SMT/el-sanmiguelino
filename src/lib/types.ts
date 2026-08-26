@@ -20,6 +20,17 @@ export type BloqueNota =
        *  correcto, y poner la cara equivocada al lado de una declaración
        *  oficial es peor que no poner ninguna. */
       retrato?: string;
+    }
+  /** Frase del propio texto, promovida a destacado. No lleva comillas ni
+   *  autor: no es una cita, es el redactor subrayando su propia idea. */
+  | { tipo: "destacado"; texto: string }
+  /** Recuadro de datos: un título y una lista de entradas, cada una con su
+   *  encabezado en negrita. En el impreso va en un marco de esquinas
+   *  redondeadas y en dos columnas. */
+  | {
+      tipo: "ficha";
+      titulo: string;
+      entradas: { lead: string; texto: string }[];
     };
 
 export interface ImagenNota {
@@ -68,7 +79,7 @@ export interface EdicionResumen {
 }
 
 /** Nota como la necesita el buscador: el resumen más el texto plano del
- *  cuerpo. `textoPlano` es exactamente `cuerpo.map(b => b.texto).join(" ")`,
+ *  cuerpo. `textoPlano` es exactamente `cuerpo.map(textoDeBloque).join(" ")`,
  *  y tiene que seguir siéndolo: el resaltado de resultados corta el fragmento
  *  con índices sobre esa misma cadena. */
 export interface NotaBuscable extends NotaResumen {

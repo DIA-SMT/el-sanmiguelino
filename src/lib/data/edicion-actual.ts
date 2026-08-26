@@ -224,11 +224,44 @@ export const edicionActual: EdicionSemilla = {
           texto:
             "Para el pasajero, la diferencia se notará en la espera: una aplicación gratuita —y las pantallas que se instalarán en las paradas de mayor demanda— mostrarán cuántos minutos falta para que llegue cada línea. Se acabó el asomarse a la esquina a adivinar: la información estará en el bolsillo.",
         },
+        {
+          // Un destacado repite una frase del propio cuerpo: eso es lo que
+          // hace en el papel, levantar una idea que ya está escrita.
+          tipo: "destacado",
+          texto:
+            "Se acabó el asomarse a la esquina a adivinar: la información estará en el bolsillo.",
+        },
         { tipo: "subtitulo", texto: "Cómo funciona" },
         {
           tipo: "parrafo",
           texto:
             "El validador de cada unidad aceptará tres formas de pago: la tarjeta de siempre, el código QR generado desde la app o la billetera virtual, y en una etapa posterior las tarjetas bancarias sin contacto. El boleto estudiantil y los pases especiales migran automáticamente al nuevo sistema, sin trámites adicionales.",
+        },
+        {
+          tipo: "ficha",
+          titulo: "Las formas de pagar el boleto",
+          entradas: [
+            {
+              lead: "La tarjeta de siempre",
+              texto:
+                "Sigue funcionando igual. El boleto estudiantil y los pases especiales migran solos al nuevo sistema, sin trámites.",
+            },
+            {
+              lead: "Código QR",
+              texto:
+                "Se genera desde la aplicación o desde cualquier billetera virtual y se valida en el lector de la unidad.",
+            },
+            {
+              lead: "Tarjetas sin contacto",
+              texto:
+                "Las tarjetas bancarias se incorporan en una etapa posterior del despliegue.",
+            },
+            {
+              lead: "Dónde arranca",
+              texto:
+                "Las líneas 101, 102 y 8 concentran un tercio de los viajes diarios y son las primeras; el resto de la flota se suma antes de fin de año.",
+            },
+          ],
         },
         {
           tipo: "cita",

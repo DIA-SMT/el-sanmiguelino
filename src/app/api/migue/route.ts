@@ -6,6 +6,7 @@ import {
   getResumenEdicion,
 } from "@/lib/repos/edicion";
 import type { NotaCompleta } from "@/lib/types";
+import { textoDeBloque } from "@/lib/derivar";
 
 /**
  * Backend mock de Migue: recuperación naive por palabras clave sobre las notas
@@ -36,7 +37,7 @@ function textoDeNota(nota: NotaCompleta): string {
   return [
     nota.titulo,
     nota.bajada,
-    ...nota.cuerpo.map((b) => b.texto),
+    ...nota.cuerpo.map(textoDeBloque),
     nota.imagen?.epigrafe ?? "",
   ].join(" ");
 }

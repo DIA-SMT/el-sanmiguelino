@@ -3,21 +3,53 @@
  *
  * Viven acá, y no en `utils.ts` ni adentro del repo, porque tienen **dos**
  * usuarios que obligatoriamente tienen que coincidir: el repo mock, que los
- * calcula al proyectar, y `prisma/seed.ts`, que los escribe en columnas de
+ * calcula al proyectar, y `prisma/seed.mts`, que los escribe en columnas de
  * Postgres. Si cada uno tuviera su copia, la migración de la etapa 4 cambiaría
  * los datos sin que nadie lo note: mismos textos, distintos minutos.
  *
- * No importa nada con el alias `@/` a propósito: la semilla la ejecuta Node
- * suelto, fuera de Next, y ahí el alias no existe.
+ * El único import es de TIPO, y eso es lo que lo mantiene ejecutable por Node
+ * suelto: `import type` se borra al quitar los tipos, así que el alias `@/`
+ * nunca se resuelve en tiempo de ejecución. Un import de valor con alias sí
+ * rompería la semilla, que corre fuera de Next.
  */
+import type { BloqueNota } from "@/lib/types";
 
-/** Un bloque cualquiera del cuerpo; a estas dos funciones sólo les importa el
- *  texto. */
-type ConTexto = { texto: string };
+/**
+ * El texto plano de un bloque, sea del tipo que sea.
+ *
+ * Existe porque no todos los bloques tienen un campo `texto`: una ficha tiene
+ * un título y una lista de entradas. Antes las dos funciones de abajo hacían
+ * `b.texto` sobre cualquier bloque, así que la primera ficha habría metido la
+ * cadena "undefined" en el índice del buscador y hecho explotar el conteo de
+ * palabras.
+ *
+ * El `switch` es exhaustivo a propósito, con el `never` del final: agregar un
+ * tipo de bloque nuevo sin pasar por acá deja de compilar, que es exactamente
+ * lo que hay que forzar. Fallar en el build es barato; un índice de búsqueda
+ * sucio en silencio, no.
+ */
+export function textoDeBloque(bloque: BloqueNota): string {
+  switch (bloque.tipo) {
+    case "parrafo":
+    case "subtitulo":
+    case "cita":
+    case "destacado":
+      return bloque.texto;
+    case "ficha":
+      return [
+        bloque.titulo,
+        ...bloque.entradas.flatMap((e) => [e.lead, e.texto]),
+      ].join(" ");
+    default: {
+      const _exhaustivo: never = bloque;
+      return _exhaustivo;
+    }
+  }
+}
 
-export function minutosDeLectura(bloques: ConTexto[]): number {
+export function minutosDeLectura(bloques: BloqueNota[]): number {
   const palabras = bloques.reduce(
-    (total, b) => total + b.texto.trim().split(/\s+/).length,
+    (total, b) => total + textoDeBloque(b).trim().split(/\s+/).length,
     0,
   );
   return Math.max(1, Math.round(palabras / 200));
@@ -31,6 +63,6 @@ export function minutosDeLectura(bloques: ConTexto[]): number {
  * `"\n"` o por `""` corre todos los índices y el resaltado empieza a subrayar
  * la palabra equivocada.
  */
-export function textoPlanoDe(bloques: ConTexto[]): string {
-  return bloques.map((b) => b.texto).join(" ");
+export function textoPlanoDe(bloques: BloqueNota[]): string {
+  return bloques.map(textoDeBloque).join(" ");
 }

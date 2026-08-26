@@ -72,7 +72,8 @@ model Nota {
   /// columnas: son lo que permite que un listado no traiga ocho cuerpos para
   /// mostrar títulos.
   minutosLectura Int
-  /// Exactamente `cuerpo.map(b => b.texto).join(" ")`. El resaltado de
+  /// Exactamente `cuerpo.map(textoDeBloque).join(" ")` (ver src/lib/derivar).
+  /// No es `b.texto`: una ficha no tiene ese campo. El resaltado de
   /// resultados corta el fragmento con índices sobre esta misma cadena, así
   /// que no puede normalizarse ni recortarse: tiene que seguir siendo eso.
   /// Quien escriba el cuerpo escribe esto en la misma transacción.

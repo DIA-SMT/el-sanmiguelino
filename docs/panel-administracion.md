@@ -223,8 +223,9 @@ Las calcula `src/lib/derivar.ts`, que es el **mismo** módulo que usa el repo
 mock. Si cada uno tuviera su copia, la migración cambiaría los datos sin que
 nadie lo note: mismos textos, distintos minutos.
 
-`textoPlano` tiene que seguir siendo exactamente `cuerpo.map(b => b.texto)
-.join(" ")`. El resaltado de resultados corta el fragmento con índices sobre
+`textoPlano` tiene que seguir siendo exactamente
+`cuerpo.map(textoDeBloque).join(" ")` — con la función de `src/lib/derivar`,
+no con `b.texto`, porque una ficha no tiene ese campo. El resaltado de resultados corta el fragmento con índices sobre
 esa cadena; cambiar el separador corre todos los índices.
 
 **Los comentarios cuelgan del slug, no del id.** Toda la API del repo pide por
