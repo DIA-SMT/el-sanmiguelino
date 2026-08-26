@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { MessageCircle, RefreshCw, Send, X } from "lucide-react";
-import { LogoHoja } from "@/components/brand/logos";
+import { RefreshCw, Send, X } from "lucide-react";
+import { CuerpoMigue, RetratoMigue } from "@/components/migue/retrato-migue";
 import { cn } from "@/lib/utils";
 
 interface Mensaje {
@@ -79,9 +79,16 @@ export function MigueChat() {
         <button
           type="button"
           aria-label="Abrir chat con Migue, el asistente del diario"
-          className="pressable fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-flotante hover:bg-accent-strong sm:h-auto sm:w-auto sm:gap-2.5 sm:py-3.5 sm:pl-4 sm:pr-5"
+          className="pressable fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-flotante hover:bg-accent-strong sm:h-auto sm:w-auto sm:gap-2.5 sm:py-2 sm:pl-2 sm:pr-5"
         >
-          <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+          {/* La cara va sobre un círculo claro y no directamente sobre el
+              acento: el retrato tiene alfa, y el azul del botón se le metía
+              entre el pelo y los anteojos. */}
+          <RetratoMigue
+            prioridad
+            sizes="44px"
+            className="h-11 w-11 bg-paper ring-1 ring-accent-contrast/25"
+          />
           <span className="hidden font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em] sm:inline">
             Preguntale a Migue
           </span>
@@ -113,7 +120,7 @@ export function MigueChat() {
               >
                 {/* Header */}
                 <header className="flex items-center gap-3 border-b border-ink bg-paper-2 px-4 py-3">
-                  <LogoHoja className="h-8 w-8 shrink-0" title="Migue" />
+                  <RetratoMigue sizes="40px" className="h-10 w-10 bg-paper-2" />
                   <div className="min-w-0 flex-1">
                     <Dialog.Title className="font-sans text-[0.72rem] font-bold uppercase tracking-[0.18em] text-ink">
                       Migue
@@ -141,10 +148,13 @@ export function MigueChat() {
                 >
                   {mensajes.length === 0 && (
                     <div className="space-y-3.5">
-                      <p className="font-serif text-[0.95rem] leading-relaxed text-ink-2">
-                        ¡Hola! Soy Migue. Preguntame lo que quieras sobre las
-                        notas de esta edición.
-                      </p>
+                      <div className="flex items-end gap-1">
+                        <CuerpoMigue className="h-28 w-auto" />
+                        <p className="mb-3 flex-1 font-serif text-[0.95rem] leading-relaxed text-ink-2">
+                          ¡Hola! Soy Migue. Preguntame lo que quieras sobre las
+                          notas de esta edición.
+                        </p>
+                      </div>
                       <ul className="space-y-2">
                         {SUGERENCIAS.map((s) => (
                           <li key={s}>
