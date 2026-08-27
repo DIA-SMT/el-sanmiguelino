@@ -1058,3 +1058,41 @@ la forma más corta de filtrar una edición que todavía no salió.
 Verificado creando una nota en agosto, mudándola a septiembre desde el selector
 y comprobando en la base que quedó ahí con el foliado nuevo; y que el editor la
 sigue abriendo después. La nota de prueba se borró.
+
+## Dos cosas de la vista previa y la foto
+
+### "Verla en el diario" no llevaba al diario
+
+El botón sólo marcaba la edición en foco y volvía a dibujar la misma fila. Desde
+donde está parado el editor no pasa nada visible; y encima el botón se convierte
+en "Dejar de verla", así que tampoco queda a mano cómo ir a mirarla. La lectura
+obvia es que la previsualización está rota.
+
+Ahora el botón **lleva al diario**, y la fila de la edición en foco ofrece "Ir al
+diario" además de "Dejar de verla".
+
+### Una foto vertical salía decapitada
+
+El diario tiene un recorte de 8:5 —el del impreso—, y las fotos se dibujan con
+`fill` dentro de una caja de esa proporción porque son remotas y `next/image` no
+puede saber cuánto miden. Con una foto apaisada eso está bien. Con una vertical
+se pierden dos tercios de la imagen, y lo primero que se va es la cara: la tapa
+de septiembre salió con el músico sin cabeza.
+
+Anclar el recorte arriba (`object-top`) parecía la solución barata y **no
+alcanzó**: esa foto tenía aire sobre la cabeza, así que quedó mostrando el fondo
+del escenario. Un ancla fija no puede resolver un recorte que se come el 65%.
+
+Ahora la foto **se mide** —`medirImagen()` lee el encabezado del archivo, los
+primeros 64 kB, y cachea el resultado un mes— y si es más alta que ancha se
+muestra con su propia proporción en una columna angosta, que es lo que hace un
+diario con una foto vertical: no la estira a lo ancho de la página.
+
+No se guardó el tamaño en la base a propósito: habría que migrar el esquema y
+volver a subir todo lo que ya está cargado, y así quedan arregladas también las
+fotos viejas.
+
+Medidas de control, para no cambiar el diseño sin querer: las cuatro fotos que
+ya estaban son apaisadas, con proporciones entre 0.56 y 0.67 —el 8:5 es 0.625,
+justo en el medio—, y siguen dibujándose en una caja de 1.600 exacto. La única
+vertical es la nueva.

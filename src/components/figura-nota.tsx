@@ -1,13 +1,27 @@
 import Image from "next/image";
 import { imagenDisponible } from "@/lib/data/imagenes";
+import { medirImagen } from "@/lib/medir-imagen";
 import { cn } from "@/lib/utils";
 
 /**
  * Figura de nota (Server Component). Si la nota declara `src` y el archivo
  * existe en /public, muestra la foto real; si no, un placeholder duotono con
  * trama de semitono (estética de foto de diario).
+ *
+ * **Las fotos verticales no se recortan.** El diario tiene un recorte de 8:5,
+ * que es el del impreso y el que llevan todas las fotos apaisadas. Meter ahí
+ * una foto vertical es perder dos tercios de la imagen, y lo primero que se va
+ * es la cara: la tapa de septiembre salió con Duki decapitado. Anclar el
+ * recorte arriba tampoco alcanza —esa foto tenía aire sobre la cabeza y quedó
+ * mostrando el fondo—.
+ *
+ * Así que si la foto es más alta que ancha se la muestra **con su propia
+ * proporción, en una columna angosta**, que es lo que hace un diario con una
+ * foto vertical: no la estira a lo ancho de la página. Si no se puede medir
+ * —una imagen local, o el servidor no contesta— se cae al recorte de siempre,
+ * que es lo correcto para todo lo apaisado.
  */
-export function FiguraNota({
+export async function FiguraNota({
   alt,
   epigrafe,
   src,
@@ -28,16 +42,33 @@ export function FiguraNota({
   sizes?: string;
 }) {
   const real = imagenDisponible(src);
+  const medidas = real && src ? await medirImagen(src) : null;
+  // 1.1 y no 1: una foto casi cuadrada entra bien en el recorte, y cambiarle
+  // la caja por tres píxeles de diferencia sería ruido.
+  const vertical = medidas ? medidas.alto / medidas.ancho > 1.1 : false;
 
   return (
     <figure className={cn("w-full", className)}>
       {real ? (
-        <div className={cn("foto-editorial relative w-full", proporcion)}>
+        <div
+          className={cn(
+            "foto-editorial relative",
+            vertical ? "mx-auto w-full max-w-[22rem]" : cn("w-full", proporcion),
+          )}
+          style={
+            vertical && medidas
+              ? { aspectRatio: `${medidas.ancho} / ${medidas.alto}` }
+              : undefined
+          }
+        >
           <Image
             src={src}
             alt={alt}
             fill
-            sizes={sizes}
+            // Una foto vertical se dibuja en una columna de 22rem: pedirla del
+            // ancho de la página sería traer cuatro veces los píxeles que se
+            // ven.
+            sizes={vertical ? "(min-width: 640px) 352px, 100vw" : sizes}
             preload={prioridad}
             className="foto-asienta object-cover"
           />

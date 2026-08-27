@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Eye, Pencil, X } from "lucide-react";
 import {
@@ -73,10 +74,20 @@ export function FilaEdicion({
     });
   }
 
-  function enfocar(slug: string | null) {
+  /**
+   * Pone (o saca) la edición en vista previa.
+   *
+   * Con `irAlDiario`, además **lleva al diario**. Sin eso, "Verla en el
+   * diario" sólo marcaba el foco y volvía a dibujar la misma fila: desde donde
+   * está parado el editor no pasa nada visible, y encima el botón se convierte
+   * en "Dejar de verla", así que tampoco queda a mano cómo ir a mirarla. La
+   * lectura obvia es que la previsualización no anda.
+   */
+  function enfocar(slug: string | null, irAlDiario = false) {
     iniciar(async () => {
       await enfocarEdicionAction(slug);
-      router.refresh();
+      if (irAlDiario) router.push("/diario");
+      else router.refresh();
     });
   }
 
@@ -170,19 +181,29 @@ export function FilaEdicion({
         )}
 
         {enFoco ? (
-          <button
-            type="button"
-            onClick={() => enfocar(null)}
-            disabled={enCurso}
-            className="pressable inline-flex items-center gap-1.5 border border-line px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-2 hover:border-ink hover:text-ink disabled:opacity-50"
-          >
-            <X className="h-3 w-3" aria-hidden="true" />
-            Dejar de verla
-          </button>
+          <>
+            {/* Ya está en foco: lo que falta es poder ir a verla. */}
+            <Link
+              href="/diario"
+              className="pressable inline-flex items-center gap-1.5 border border-accent bg-accent-wash px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-accent hover:bg-accent hover:text-accent-contrast"
+            >
+              <Eye className="h-3 w-3" aria-hidden="true" />
+              Ir al diario
+            </Link>
+            <button
+              type="button"
+              onClick={() => enfocar(null)}
+              disabled={enCurso}
+              className="pressable inline-flex items-center gap-1.5 border border-line px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-2 hover:border-ink hover:text-ink disabled:opacity-50"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+              Dejar de verla
+            </button>
+          </>
         ) : (
           <button
             type="button"
-            onClick={() => enfocar(edicion.slug)}
+            onClick={() => enfocar(edicion.slug, true)}
             disabled={enCurso}
             className="pressable inline-flex items-center gap-1.5 border border-line px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-2 hover:border-ink hover:text-ink disabled:opacity-50"
           >
