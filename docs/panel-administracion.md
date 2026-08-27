@@ -1135,3 +1135,31 @@ aclaran que son de todo el diario.
 Y el consumo de la hora pasó a mostrarse **siempre**: sale de la base
 compartida, así que son consultas reales; esconderlo cuando acá no hay clave era
 mezclar otra vez las dos cosas.
+
+## Migue no sabía tener una opinión
+
+A **"y cuál es la más divertida?"** contestaba *"Eso no lo tengo, pero puedo
+contarte que la edición incluye varias actividades culturales…"* y enumeraba.
+Es la respuesta de alguien que no entiende que le preguntaron.
+
+La causa está en las reglas que le pusimos. Después del incidente en que el
+prompt dejó de prohibir inventar, la regla volvió arriba de todo y con razón —
+pero quedó tan absoluta que también tapó las preguntas de **gusto**, que no son
+preguntas de dato. "Cuál es la más divertida" no pide un hecho del municipio:
+pide que elija entre las notas que ya tiene delante.
+
+Ahora hay un cuarto caso: gustos y recomendaciones. Se contestan **eligiendo**
+una nota concreta y diciendo por qué, con lo que esa nota cuenta.
+
+**Elegir no es inventar**, y esa es la línea: el dato sigue saliendo de la nota,
+lo único propio es cuál elige. Por eso ahí no va la marca de "sin respuesta", y
+por eso se le pide que lo diga como opinión —"para pasarla bien te diría…"— y no
+como una posición del municipio. Se le dice además que ofrecer la lista entera
+en vez de elegir es lo mismo que no contestar, que es exactamente lo que hacía.
+
+El corpus suma ocho frases de este tipo, incluidas las que se escriben en
+confianza —"qué onda, algo copado para el finde", "cuál está buena"—: ninguna
+puede caer en un atajo, porque el del índice devolvería la lista completa.
+
+**Lo que el corpus no puede verificar** es si el modelo efectivamente elige: eso
+prueba el enrutado, no la respuesta. Se comprueba en producción.

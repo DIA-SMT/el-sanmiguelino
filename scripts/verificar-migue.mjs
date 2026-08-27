@@ -131,6 +131,22 @@ grupo("Sobre el diario", "diario", [
   "hola, cuando sale la proxima edicion?",
 ]);
 
+/*
+ * Gustos y recomendaciones. Van al modelo: son sobre las notas de la edición,
+ * pero la respuesta es una elección, no un dato. Ningún atajo puede contestarlas
+ * —el del índice devolvería la lista entera, que es lo mismo que no contestar—.
+ */
+grupo("Gustos y recomendaciones", "modelo", [
+  "y cual es la mas divertida?",
+  "¿cuál me recomendás?",
+  "que me recomendas leer",
+  "cual leo primero",
+  "cual es la mas importante",
+  "hay algo interesante",
+  "que onda, algo copado para el finde",
+  "cual esta buena",
+]);
+
 /* Charla: ni atajo ni ficha. Va al modelo, que sabe seguir el hilo. */
 grupo("Charla", "modelo", [
   "escuchame",
