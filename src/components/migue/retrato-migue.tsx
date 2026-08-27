@@ -37,13 +37,20 @@ export function RetratoMigue({
   );
 }
 
-/** Migue entero, para cuando hay lugar: la bienvenida del chat. */
+/**
+ * Migue entero, para cuando hay lugar: la bienvenida del chat.
+ *
+ * El ancho sale del archivo y no de un número redondo: `trim()` recorta la
+ * figura a lo que ocupa de verdad, así que cambia si cambia el recorte del
+ * fondo. Si no coincide con el archivo, Next sirve la imagen con otra relación
+ * de aspecto.
+ */
 export function CuerpoMigue({ className }: { className?: string }) {
   return (
     <Image
       src="/migue/cuerpo.webp"
       alt=""
-      width={387}
+      width={388}
       height={900}
       sizes="120px"
       className={cn("shrink-0 object-contain", className)}
