@@ -1112,3 +1112,26 @@ Lo que sí depende del contenido es cuánto se llena: con la nota que motivó
 esto —un solo bloque, y es una cita, ocho palabras— las columnas 2 y 3 quedan
 vacías porque no hay texto que poner. Verificado con una nota de prueba de
 cuatro párrafos: el texto cae al lado de la foto. La nota de prueba se borró.
+
+## El tablero de Migue decía "sin modelo" mientras Migue andaba
+
+La pantalla mezclaba dos cosas que vienen de lugares distintos y no lo decía:
+
+- Los **números** —consultas, cobertura, lo que no supimos contestar, el consumo
+  de la hora— salen de la base, que es la misma que usa el sitio publicado. Son
+  de los lectores de verdad.
+- El **cartel de arriba** describía la máquina donde corre el panel. Y el panel
+  sólo corre en local, porque `/admin` no existe en producción mientras el login
+  sea el mock.
+
+Resultado: el tablero decía "Sin modelo: responde con el buscador por palabras
+clave" con toda seguridad, mientras en el sitio Migue contestaba con gpt-4o-mini
+sin problema. La clave está cargada en Vercel, no en el `.env.local` de nadie.
+
+Ahora cada cosa dice de qué habla: el cartel arranca con "En esta computadora" y
+abajo aclara que describe esta máquina y no el sitio publicado. Los números
+aclaran que son de todo el diario.
+
+Y el consumo de la hora pasó a mostrarse **siempre**: sale de la base
+compartida, así que son consultas reales; esconderlo cuando acá no hay clave era
+mezclar otra vez las dos cosas.

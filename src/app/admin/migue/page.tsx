@@ -58,34 +58,68 @@ export default async function AdminMigue() {
         </h1>
         <p className="mt-1 font-sans text-[0.8rem] text-ink-3">
           Últimos 30 días · {resumen.total}{" "}
-          {resumen.total === 1 ? "consulta" : "consultas"}
+          {resumen.total === 1 ? "consulta" : "consultas"} ·{" "}
+          <span className="text-ink-2">de todo el diario, incluido lo publicado</span>
         </p>
-        {/* Con qué está contestando. Importa para leer los números: el
-            buscador por palabras clave falla mucho más que el modelo, así que
-            una tanda de "sin respuesta" significa cosas distintas según cuál
-            estuviera activo. */}
-        <p className="mt-2 inline-flex items-center gap-2 border border-hairline px-2.5 py-1 font-sans text-[0.7rem] text-ink-2">
+        {/*
+         * Con qué está contestando **acá**, y por qué eso no es lo mismo que
+         * en producción.
+         *
+         * Esta pantalla mezcla dos cosas que vienen de lugares distintos, y
+         * decirlo importa: los números salen de la base, que es la misma que
+         * usa el sitio publicado, así que son los de los lectores de verdad.
+         * El cartel de abajo, en cambio, describe la máquina donde corre el
+         * panel — y el panel sólo corre en local, porque /admin no existe en
+         * producción mientras el login sea el mock.
+         *
+         * Sin esa aclaración el tablero dice "Sin modelo" con toda seguridad
+         * mientras Migue contesta perfecto en el sitio, que es exactamente la
+         * confusión que hubo.
+         *
+         * Además importa para leer los números: el buscador por palabras clave
+         * falla mucho más que el modelo, así que una tanda de "sin respuesta"
+         * significa cosas distintas según cuál estuviera activo.
+         */}
+        <p className="mt-2 inline-flex flex-wrap items-center gap-x-2 gap-y-1 border border-hairline px-2.5 py-1 font-sans text-[0.7rem] text-ink-2">
           {conModelo ? (
             <>
-              Responde con{" "}
-              <code className="font-mono text-[0.68rem] text-ink">
-                {modeloDeMigue()}
-              </code>{" "}
-              sobre las notas de la edición
+              <span>
+                En esta computadora Migue responde con{" "}
+                <code className="font-mono text-[0.68rem] text-ink">
+                  {modeloDeMigue()}
+                </code>{" "}
+                sobre las notas de la edición.
+              </span>
             </>
           ) : (
             <>
-              Sin modelo: responde con el buscador por palabras clave. Falta{" "}
-              <code className="font-mono text-[0.68rem] text-ink">
-                OPENROUTER_API_KEY
-              </code>
-              .
+              <span>
+                En esta computadora no hay modelo: Migue responde con el
+                buscador por palabras clave, porque falta{" "}
+                <code className="font-mono text-[0.68rem] text-ink">
+                  OPENROUTER_API_KEY
+                </code>{" "}
+                en <code className="font-mono text-[0.68rem] text-ink">.env.local</code>.
+              </span>
             </>
           )}
         </p>
+        <p className="mt-1.5 font-sans text-[0.72rem] leading-relaxed text-ink-3">
+          Eso describe <strong>esta máquina</strong>, no el sitio publicado: el
+          panel sólo corre acá.{" "}
+          {conModelo
+            ? "En producción la clave se configura aparte, en Vercel."
+            : "En producción la clave se configura en Vercel, y Migue puede estar contestando con el modelo aunque este cartel diga que no."}
+        </p>
       </div>
 
-      {conModelo && (
+      {/*
+       * El consumo de la hora sale de la base, que es la misma que usa el sitio
+       * publicado: son consultas de verdad, no de esta máquina. Por eso se
+       * muestra siempre y no sólo cuando ACÁ hay clave — esconderlo según la
+       * configuración local era mezclar otra vez las dos cosas.
+       */}
+      {(
         <p className="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-1 border border-hairline bg-paper-2 px-4 py-3 font-sans text-[0.8rem] text-ink-2">
           <span>
             Esta hora:{" "}
