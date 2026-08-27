@@ -107,13 +107,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  let body: { pregunta?: string; notaSlug?: string };
+  let body: {
+    pregunta?: string;
+    notaSlug?: string;
+    /** Los turnos anteriores del chat, que manda el cliente. */
+    historial?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
   }
   const pregunta = (body.pregunta ?? "").trim();
+
+  /**
+   * El hilo de la conversación, saneado.
+   *
+   * Llega del cliente, así que no se confía: se valida la forma, se descartan
+   * los turnos que no la cumplen y se recorta el largo. Es texto que va a
+   * entrar en el prompt del modelo, y lo que entra en un prompt tiene que
+   * llegar acotado.
+   *
+   * No se guarda en ningún lado: viaja en el pedido y muere ahí. El registro
+   * de consultas sigue siendo una pregunta suelta y anónima.
+   */
+  const historial = (Array.isArray(body.historial) ? body.historial : [])
+    .filter(
+      (t): t is { rol: "usuario" | "migue"; texto: string } =>
+        typeof t === "object" &&
+        t !== null &&
+        ((t as { rol?: unknown }).rol === "usuario" ||
+          (t as { rol?: unknown }).rol === "migue") &&
+        typeof (t as { texto?: unknown }).texto === "string" &&
+        (t as { texto: string }).texto.trim() !== "",
+    )
+    .slice(-12)
+    .map((t) => ({ rol: t.rol, texto: t.texto.slice(0, 800) }));
   if (!pregunta) {
     return NextResponse.json({ error: "Falta la pregunta" }, { status: 400 });
   }
@@ -124,8 +153,23 @@ export async function POST(request: NextRequest) {
   ]);
   const tokens = tokenizar(pregunta);
 
+  /**
+   * Los atajos deterministas sólo valen para el PRIMER mensaje.
+   *
+   * Saltean el modelo, así que por definición no ven la conversación: son la
+   * forma más directa de perder el hilo. Y el atajo del índice es de gatillo
+   * ancho —"notas", "temas", "trae"—, así que en medio de una charla se comía
+   * preguntas que pedían otra cosa y contestaba la lista de siempre.
+   *
+   * Con un mensaje solo ahorran una llamada y responden mejor que el modelo,
+   * porque la lista de notas es exacta. Con conversación encima, todo va al
+   * modelo, que es el único que puede saber a qué se refiere un "decime".
+   */
+  const empezandoDeCero = historial.length === 0;
+
   // Saludo / smalltalk
   if (
+    empezandoDeCero &&
     /\b(hola|buenas|buen dia|buen día|como estas|cómo estás)\b/i.test(pregunta)
   ) {
     return responder(
@@ -137,6 +181,7 @@ export async function POST(request: NextRequest) {
 
   // Índice de la edición
   if (
+    empezandoDeCero &&
     /\b(edicion|ediciones|notas|temas|indice|índice|resumen|trae)\b/i.test(
       pregunta,
     )
@@ -205,6 +250,7 @@ export async function POST(request: NextRequest) {
       notas: paraElModelo,
       mes: edicion.mes,
       nombreUsuario: usuario.nombre.split(" ")[0],
+      historial,
     });
 
     if (delModelo) {

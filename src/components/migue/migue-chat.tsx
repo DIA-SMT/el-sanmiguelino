@@ -52,13 +52,22 @@ export function MigueChat() {
       if (!limpia || cargando) return;
       setErrorUltima(null);
       setTexto("");
+      // Los turnos anteriores, tomados ANTES de agregar el actual: el que se
+      // pregunta ahora viaja aparte, en `pregunta`. Sin esto Migue recibía cada
+      // mensaje suelto y a un "decime" no podía contestar más que un saludo,
+      // porque no sabía qué acababa de ofrecer.
+      const anteriores = mensajes.slice(-12);
       setMensajes((prev) => [...prev, { rol: "usuario", texto: limpia }]);
       setCargando(true);
       try {
         const res = await fetch("/api/migue", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pregunta: limpia, notaSlug }),
+          body: JSON.stringify({
+            pregunta: limpia,
+            notaSlug,
+            historial: anteriores,
+          }),
         });
         if (!res.ok) throw new Error();
         const data: { respuesta: string } = await res.json();
@@ -70,7 +79,7 @@ export function MigueChat() {
         inputRef.current?.focus();
       }
     },
-    [cargando, notaSlug],
+    [cargando, notaSlug, mensajes],
   );
 
   return (
