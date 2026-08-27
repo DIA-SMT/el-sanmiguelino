@@ -49,6 +49,22 @@ export function aHoraTucuman(instante: Date): string {
   return local.toISOString().slice(0, 16);
 }
 
+/**
+ * Para decirla en una frase: "1 de septiembre de 2026".
+ *
+ * Sin la hora, al revés que `textoHoraTucuman`. El panel necesita el minuto
+ * exacto —lo está cargando—, pero a un lector que pregunta cuándo sale el
+ * diario, "a las 12:00 a. m." no le dice nada y le ensucia la respuesta.
+ */
+export function fechaHablada(instante: Date): string {
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: ZONA,
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(instante);
+}
+
 /** Para mostrar: "1 de septiembre de 2026, 00:00". */
 export function textoHoraTucuman(instante: Date): string {
   return new Intl.DateTimeFormat("es-AR", {

@@ -5,6 +5,7 @@ import type {
   NotaBuscable,
   NotaCompleta,
   NotaResumen,
+  ProximaEdicion,
 } from "@/lib/types";
 import { edicionMockRepo } from "@/lib/repos/edicion-mock";
 import { edicionPostgresRepo } from "@/lib/repos/edicion-postgres";
@@ -44,6 +45,10 @@ export interface EdicionRepo {
 
   /** Las ediciones ya publicadas, de la más nueva a la más vieja. El archivo. */
   publicadas(): Promise<EdicionResumen[]>;
+
+  /** La que viene: la más cercana cuya fecha todavía no llegó, o null si no
+   *  hay ninguna cargada. */
+  proxima(): Promise<ProximaEdicion | null>;
 
   /**
    * Guarda una nota: la crea si el slug no existe, la actualiza si sí.
@@ -117,6 +122,11 @@ export const getIndiceDe = cache(
 /** Las ediciones ya publicadas, de la más nueva a la más vieja. */
 export const getPublicadas = cache(async (): Promise<EdicionResumen[]> =>
   repo.publicadas(),
+);
+
+/** La edición que viene, con su fecha. Null si no hay ninguna cargada. */
+export const getProximaEdicion = cache(
+  async (): Promise<ProximaEdicion | null> => repo.proxima(),
 );
 
 /** Para validar que un slug existe sin traerse la nota. Hoy cuesta lo mismo;

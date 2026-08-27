@@ -85,6 +85,20 @@ export interface EdicionResumen {
   etiqueta?: string;
 }
 
+/**
+ * La próxima edición, cuando ya está cargada y con fecha.
+ *
+ * Existe para Migue: "¿cuándo sale la próxima?" es la pregunta más obvia que
+ * se le puede hacer a un mensual, y hasta ahora contestaba que eso no estaba
+ * en la edición de agosto —que es cierto y no sirve para nada—.
+ */
+export interface ProximaEdicion {
+  mes: string;
+  numero: number;
+  /** El instante de publicación, ya en UTC como lo guarda la base. */
+  publicaEn: Date;
+}
+
 /** Nota como la necesita el buscador: el resumen más el texto plano del
  *  cuerpo. `textoPlano` es exactamente `cuerpo.map(textoDeBloque).join(" ")`,
  *  y tiene que seguir siéndolo: el resaltado de resultados corta el fragmento

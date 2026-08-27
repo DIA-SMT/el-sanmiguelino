@@ -15,6 +15,8 @@ import { db } from "@/lib/db";
 export type ResultadoConsulta =
   | "saludo"
   | "indice"
+  /** Sobre el diario en sí: cuándo sale la próxima, cada cuánto, el archivo. */
+  | "diario"
   | "nota"
   | "sin_respuesta";
 

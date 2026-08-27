@@ -796,3 +796,107 @@ adentro lo primero que tenga forma de slug. Ser estricto ahí no protegía de
 nada: lo único que lograba era dejar pasar basura a la pantalla. El slug igual
 se verifica contra la edición, así que tolerar de más al leerlo no abre ningún
 riesgo.
+
+## Migue, más comunicativo
+
+Dos respuestas de producción que había que arreglar:
+
+> **cuando sale la proxima edicion?**
+> No hay información sobre la fecha de la próxima edición en la edición de
+> Agosto de 2026.
+
+> **escuchame**
+> No hay información sobre eso en la edición de Agosto de 2026.
+
+### Una sola regla aplicada a todo
+
+El prompt decía una cosa y la decía bien: *respondé únicamente con lo que dicen
+las notas; si no está, decí que no está*. El problema es que esa regla se
+aplicaba a **todo lo que entrara por el chat**, y no todo lo que entra por el
+chat es una pregunta sobre el municipio.
+
+Ahora son tres casos y se contestan distinto:
+
+1. **Información del municipio** —obras, trámites, horarios, montos, quién dijo
+   qué—. Sigue igual de cerrado que antes, palabra por palabra: sólo las notas,
+   nunca completar con conocimiento propio. Esto no se aflojó ni un poco, y es
+   el único caso donde va la marca `[SIN_RESPUESTA]`.
+2. **El diario en sí** —cuándo sale la próxima, cada cuánto, qué hay en el
+   archivo—. Se contesta con una ficha de hechos que sale de la base.
+3. **Conversación** —"escuchame", "che", "gracias", "dale"—. Se contesta como
+   contesta una persona.
+
+Que un asistente no sepa cuándo sale el diario del que es asistente no era
+prudencia: el dato estaba en `publicaEn` desde que existe el cambio de edición
+automático. Nadie se lo pasaba.
+
+### La ficha sale de la base, no del modelo
+
+`proxima()` es nuevo en el repo de ediciones: la más cercana cuya fecha todavía
+no llegó. Pide que tenga notas, igual que la elección de la edición en la calle
+—una edición vacía con fecha no sale ese día, así que anunciarla sería prometer
+algo que no va a pasar—.
+
+Es la misma regla de siempre, no una excepción: Migue **sigue sin hablar de
+memoria**. Se le amplió de qué tiene ficha, no cuánto puede inventar.
+
+### Cómo escribe la gente
+
+Se le pidió explícitamente que entienda cómo se habla acá: sin tildes, sin
+puntuación, en minúscula y con lunfardo. Y que nunca pida que le reformulen la
+pregunta.
+
+Eso mismo hizo falta del lado del código. `\b` es ASCII, así que en
+`¿Qué notas trae?` la `é` no cuenta como letra y el patrón del índice no
+matcheaba: andaba con `que notas trae` y fallaba con la misma pregunta bien
+escrita. Ahora todo lo que decide un camino mira la pregunta ya simplificada
+—minúsculas, sin tildes—.
+
+### Dos atajos que se comían la pregunta
+
+Son los que saltean el modelo, así que un falso positivo ahí no se recupera.
+
+- **El del índice** se disparaba con la palabra "edición" en cualquier lado. Por
+  eso `cuando sale la proxima edicion` recibía de vuelta la lista de notas de
+  agosto: se preguntaba por una fecha y se contestaba con un índice. Ahora exige
+  la *forma* de la pregunta —qué notas, qué trae, índice— y se aparta si la
+  pregunta habla de otra edición.
+- **El del saludo** se disparaba con "hola" en cualquier lado, así que
+  `hola, ¿cuándo sale la próxima edición?` perdía la pregunta entera. Ahora está
+  anclado: saluda sólo si el mensaje es un saludo y nada más.
+
+Errar de menos no cuesta nada —lo que no matchea va al modelo, que contesta bien
+igual—. Errar de más sí, porque saltea al modelo.
+
+### El camino de emergencia también
+
+Cuando OpenRouter no está o se llenó el cupo de la hora, Migue cae al buscador
+por palabras clave. Ahí las preguntas sobre el diario se contestan igual, con la
+misma ficha. Sin eso, el día que se llene el cupo vuelve exactamente la
+respuesta que hubo que arreglar.
+
+Cada caso exige que la pregunta **nombre al diario**. Sin esa condición,
+`¿cuándo sale la obra del parque?` recibiría la fecha de la próxima edición: una
+respuesta segura de sí misma y sobre otra cosa, que es peor que no contestar.
+
+### En el tablero
+
+`diario` es un resultado nuevo y cuenta como respondida, porque lo es.
+
+Lo que más importa: **`escuchame` ya no entra en "Lo que no supimos
+contestar"**. Esa lista es la única pantalla del tablero que se lee para decidir
+temas del mes que viene, y llenarla de saludos y muletillas la vuelve ilegible.
+
+### Qué se verificó y qué no
+
+Contra la base y el diario andando: los 17 casos de los dos atajos (con y sin
+tildes), la ficha llegando al prompt con la fecha real de una edición de
+septiembre creada y borrada para la prueba, el camino de emergencia contestando
+las cinco preguntas sobre el diario, y tres controles —"cuándo sale la obra del
+parque", "qué pasó con el bacheo", "cuándo abre el registro civil"— que **no**
+tienen que recibir la fecha de la edición, y no la reciben. El buscador por
+palabras clave y la huella del diario, sin cambios.
+
+**Lo que no se pudo probar acá**: si GPT-4o mini efectivamente contesta mejor.
+El prompt se verificó contra un OpenRouter de mentira, que confirma qué le
+llega, no qué hace con eso. Eso se ve en producción.

@@ -11,6 +11,7 @@ import type {
   NotaBuscable,
   NotaCompleta,
   NotaResumen,
+  ProximaEdicion,
 } from "@/lib/types";
 
 /**
@@ -376,6 +377,24 @@ export const edicionPostgresRepo: EdicionRepo = {
       anio: e.anio,
       etiqueta: e.etiqueta ?? undefined,
     }));
+  },
+
+  /**
+   * La edición que viene.
+   *
+   * Pide notas, igual que la elección automática de la edición en la calle:
+   * una edición vacía con fecha no va a salir ese día —se la saltea—, así que
+   * anunciarla sería prometer algo que no va a pasar.
+   */
+  async proxima(): Promise<ProximaEdicion | null> {
+    const fila = await db().edicion.findFirst({
+      where: { publicaEn: { gt: new Date() }, notas: { some: {} } },
+      orderBy: { publicaEn: "asc" },
+      select: { mes: true, numero: true, publicaEn: true },
+    });
+    return fila?.publicaEn
+      ? { mes: fila.mes, numero: fila.numero, publicaEn: fila.publicaEn }
+      : null;
   },
 
   async buscables(): Promise<NotaBuscable[]> {

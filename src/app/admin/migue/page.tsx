@@ -12,6 +12,7 @@ export const metadata = { title: "Migue" };
 const NOMBRES: Record<string, string> = {
   nota: "Respondidas con una nota",
   indice: "Pidieron el índice",
+  diario: "Sobre el diario",
   saludo: "Saludos",
   sin_respuesta: "Sin respuesta",
 };
@@ -38,7 +39,9 @@ export default async function AdminMigue() {
   const tituloDe = new Map(indice.map((n) => [n.slug, n.titulo]));
 
   const respondidas =
-    (resumen.porResultado.nota ?? 0) + (resumen.porResultado.indice ?? 0);
+    (resumen.porResultado.nota ?? 0) +
+    (resumen.porResultado.indice ?? 0) +
+    (resumen.porResultado.diario ?? 0);
   const sinRespuesta = resumen.porResultado.sin_respuesta ?? 0;
   // El saludo no cuenta como pregunta: nadie le pregunta "hola" al diario.
   const preguntasReales = respondidas + sinRespuesta;

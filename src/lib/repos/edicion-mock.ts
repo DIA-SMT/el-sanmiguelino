@@ -84,6 +84,12 @@ export const edicionMockRepo: EdicionRepo = {
       : [];
   },
 
+  /** El mock es una sola edición congelada: no hay una próxima, y decir que
+   *  sí la hay sería inventarla. */
+  async proxima() {
+    return null;
+  },
+
   async publicadas() {
     const { slug, mes, numero, anio, etiqueta } = edicionActual;
     return [{ slug, mes, numero, anio, etiqueta }];

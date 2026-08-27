@@ -3,8 +3,11 @@ import { getUsuario } from "@/lib/auth/session";
 import {
   getCompletas,
   getIndice,
+  getProximaEdicion,
+  getPublicadas,
   getResumenEdicion,
 } from "@/lib/repos/edicion";
+import { fechaHablada } from "@/lib/fecha-edicion";
 import type { NotaCompleta } from "@/lib/types";
 import { textoDeBloque } from "@/lib/derivar";
 import { registrarConsulta, type ResultadoConsulta } from "@/lib/repos/migue";
@@ -12,6 +15,7 @@ import {
   migueTieneModelo,
   preguntarAlModelo,
   type NotaParaElModelo,
+  type SobreElDiario,
 } from "@/lib/migue/openrouter";
 import {
   contarConsultaAlModelo,
@@ -44,6 +48,54 @@ import {
  * lo menos relacionado con la pregunta.
  */
 const TOPE_CONTEXTO = 24_000;
+
+/**
+ * La pregunta en su forma más simple: minúsculas y sin tildes.
+ *
+ * Todo lo que decide un camino mira **esta** versión y no el texto crudo. No es
+ * cosmético: `\b` es ASCII, así que en "¿Qué notas trae?" la `é` no cuenta como
+ * letra y `\bqué\b` no matchea. El atajo del índice fallaba exactamente ahí —
+ * andaba con "que notas trae" y no con "¿Qué notas trae?", que es la misma
+ * pregunta bien escrita.
+ *
+ * Y es lo que corresponde igual: la gente escribe sin tildes y en minúscula.
+ */
+function simplificar(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+/**
+ * Un saludo **y nada más**.
+ *
+ * Anclado a propósito. Antes alcanzaba con que la palabra apareciera en algún
+ * lado, así que "hola, ¿cuándo sale la próxima edición?" se comía la pregunta y
+ * devolvía un saludo. Saludar es lo único que este atajo sabe hacer: si el
+ * saludo viene pegado a otra cosa, no es su turno.
+ */
+const ES_SOLO_UN_SALUDO =
+  /^[\s¡!¿?,.]*(hola|buenas|buen dia|buenas tardes|buenas noches|holis|hey|ey)([\s,!¡.]*(migue|como estas|como andas|que tal|todo bien))?[\s!¡.?]*$/;
+
+/**
+ * Pide la lista de notas de ESTA edición.
+ *
+ * Antes bastaba con nombrar la palabra "edición", y por eso "cuándo sale la
+ * próxima edición" recibía de vuelta el índice de agosto: la pregunta era por
+ * una fecha y la respuesta era una lista de notas. Ahora se exige la forma de
+ * la pregunta —qué notas, qué trae, índice— y no una palabra suelta.
+ *
+ * Errar de menos no cuesta nada: lo que no matchea va al modelo, que contesta
+ * bien igual. Errar de más sí cuesta, porque el atajo saltea al modelo.
+ */
+const PIDE_EL_INDICE =
+  /(\b(que|cuales)\b[^?]{0,24}\b(notas?|temas?|trae|tiene|hay)\b)|\b(indice|sumario)\b|\bde que (trata|va)\b/;
+
+/** Habla de otra edición, no de la que está en la calle: no es el índice de
+ *  hoy lo que están pidiendo. */
+const HABLA_DE_OTRA =
+  /\b(proxim[ao]|siguiente|que viene|anterior|pasad[ao]|archivo)\b/;
 
 const STOPWORDS = new Set(
   "el la los las un una unos unas de del al a en y o que se su sus por para con sobre es son fue como mas más hay este esta estos estas donde cuando quien cual cuales qué cómo dónde cuándo quién cuál me te le nos".split(
@@ -82,6 +134,55 @@ function mejorParrafo(nota: NotaCompleta, tokens: string[]): string {
     }
   }
   return mejor;
+}
+
+/**
+ * Preguntas sobre el diario mismo, contestadas **sin modelo**.
+ *
+ * Es el camino de emergencia: cuando OpenRouter no está o se llenó el cupo de
+ * la hora, Migue cae al buscador por palabras clave, y ahí "¿cuándo sale la
+ * próxima?" vuelve a recibir "no encontré nada en la edición de agosto" —justo
+ * la respuesta que hubo que arreglar—.
+ *
+ * Cada caso exige que la pregunta **nombre al diario**. Sin esa condición,
+ * "¿cuándo sale la obra del parque?" recibiría la fecha de la próxima edición:
+ * una respuesta segura de sí misma y sobre otra cosa, que es peor que no
+ * contestar.
+ */
+function respuestaSobreElDiario(
+  /** Ya simplificada: minúsculas y sin tildes. Ver simplificar(). */
+  p: string,
+  d: SobreElDiario,
+): string | null {
+  const nombraElDiario =
+    /\b(edicion|ediciones|diario|periodico|sanmiguelino|numero)\b/.test(p);
+
+  if (
+    nombraElDiario &&
+    /\b(proxim[ao]|siguiente|que viene|nuev[ao]|cuando|que dia|para cuando)\b/.test(
+      p,
+    )
+  ) {
+    return d.proxima
+      ? `La próxima es la edición de ${d.proxima.mes} y sale el ${d.proxima.fecha}. Mientras tanto tenés la de ${d.mes}.`
+      : `Todavía no hay fecha para la próxima. El Sanmiguelino sale una vez por mes, así que la que viene es la del mes próximo; la que está en la calle es la de ${d.mes}.`;
+  }
+
+  if (nombraElDiario && /\b(cada cuanto|frecuencia|seguido)\b/.test(p)) {
+    return `El Sanmiguelino sale una vez por mes. La edición que está en la calle es la de ${d.mes}.`;
+  }
+
+  if (
+    /\b(ediciones|numeros) (anteriores|viejas|viejos|pasados|pasadas)\b|\barchivo\b/.test(
+      p,
+    )
+  ) {
+    return d.archivo.length
+      ? `En el archivo están las ediciones anteriores: ${d.archivo.join(", ")}. La de ahora es la de ${d.mes}.`
+      : `Todavía no hay archivo: la de ${d.mes} es la primera edición.`;
+  }
+
+  return null;
 }
 
 /**
@@ -147,11 +248,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Falta la pregunta" }, { status: 400 });
   }
 
-  const [edicion, indice] = await Promise.all([
+  const [edicion, indice, proxima, publicadas] = await Promise.all([
     getResumenEdicion(),
     getIndice(),
+    getProximaEdicion(),
+    getPublicadas(),
   ]);
+
+  /**
+   * Los hechos del diario en sí.
+   *
+   * Todo sale de la base. Es la regla de siempre —Migue no habla de memoria—
+   * aplicada a un tema del que hasta ahora no le pasábamos nada, y por eso a
+   * "¿cuándo sale la próxima edición?" contestaba que eso no estaba en la
+   * edición de agosto: cierto, y completamente inútil.
+   */
+  const diario: SobreElDiario = {
+    mes: edicion.mes,
+    numero: edicion.numero,
+    proxima: proxima
+      ? { mes: proxima.mes, fecha: fechaHablada(proxima.publicaEn) }
+      : undefined,
+    archivo: publicadas.filter((e) => e.slug !== edicion.slug).map((e) => e.mes),
+  };
   const tokens = tokenizar(pregunta);
+  // Lo que miran los atajos: sin tildes y en minúscula. Ver simplificar().
+  const simple = simplificar(pregunta);
 
   /**
    * Los atajos deterministas sólo valen para el PRIMER mensaje.
@@ -168,10 +290,7 @@ export async function POST(request: NextRequest) {
   const empezandoDeCero = historial.length === 0;
 
   // Saludo / smalltalk
-  if (
-    empezandoDeCero &&
-    /\b(hola|buenas|buen dia|buen día|como estas|cómo estás)\b/i.test(pregunta)
-  ) {
+  if (empezandoDeCero && ES_SOLO_UN_SALUDO.test(simple)) {
     return responder(
       "saludo",
       `¡Hola, ${usuario.nombre.split(" ")[0]}! Soy Migue 👋. Puedo contarte qué trae la edición de ${edicion.mes} o responder preguntas sobre cualquiera de sus notas. ¿Qué te interesa?`,
@@ -182,9 +301,8 @@ export async function POST(request: NextRequest) {
   // Índice de la edición
   if (
     empezandoDeCero &&
-    /\b(edicion|ediciones|notas|temas|indice|índice|resumen|trae)\b/i.test(
-      pregunta,
-    )
+    PIDE_EL_INDICE.test(simple) &&
+    !HABLA_DE_OTRA.test(simple)
   ) {
     const lista = indice.map((n) => `• ${n.titulo} (${n.seccion})`).join("\n");
     return responder(
@@ -248,7 +366,7 @@ export async function POST(request: NextRequest) {
     const delModelo = await preguntarAlModelo({
       pregunta,
       notas: paraElModelo,
-      mes: edicion.mes,
+      diario,
       nombreUsuario: usuario.nombre.split(" ")[0],
       historial,
     });
@@ -280,6 +398,19 @@ export async function POST(request: NextRequest) {
   void limpiarVentanasViejas();
 
   // --- Sin modelo: el buscador por palabras clave ---------------------------
+  //
+  // Las preguntas sobre el diario mismo se contestan igual acá. Sin esto, el
+  // día que se llene el cupo de la hora "¿cuándo sale la próxima?" vuelve a
+  // recibir "no encontré nada en la edición de agosto", que es justo la
+  // respuesta que hubo que arreglar.
+  const sobreElDiario = respuestaSobreElDiario(simple, diario);
+  if (sobreElDiario) {
+    return responder("diario", sobreElDiario, {
+      pregunta,
+      contextoSlug: body.notaSlug,
+    });
+  }
+
   if (!mejorNota || mejorPuntaje < 2) {
     // La salida que le da sentido al registro entero: cada una de estas es
     // un tema que los vecinos buscan y el diario no cubre.
