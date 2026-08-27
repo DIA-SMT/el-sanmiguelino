@@ -1,5 +1,15 @@
 import "server-only";
 
+import {
+  fichaDelDiario,
+  interpretar,
+  MARCA_SIN_RESPUESTA,
+  type RespuestaMigue,
+  type SobreElDiario,
+} from "@/lib/migue/interpretacion";
+
+export type { RespuestaMigue, SobreElDiario };
+
 /**
  * El motor de lenguaje de Migue, vía OpenRouter.
  *
@@ -71,78 +81,33 @@ export interface NotaParaElModelo {
   texto: string;
 }
 
-export interface RespuestaMigue {
-  texto: string;
-  /** El slug que el modelo dice haber usado, si dijo alguno. */
-  notaSlug?: string;
-  /** true cuando el modelo declaró que la respuesta no está en la edición.
-   *  Es lo que alimenta "Lo que no supimos contestar". */
-  sinRespuesta: boolean;
-}
-
-/**
- * La marca con la que el modelo avisa que no encontró la respuesta.
- *
- * Se le pide una marca literal en vez de interpretar el texto: adivinar por
- * frases ("no encontré", "no tengo información") es frágil y el tablero de
- * Migue depende de este dato. Se saca antes de mostrar la respuesta.
- */
-const MARCA_SIN_RESPUESTA = "[SIN_RESPUESTA]";
-
-/**
- * Lo que Migue sabe **sobre el diario mismo**.
- *
- * Existe por una respuesta concreta: a "¿cuándo sale la próxima edición?"
- * contestaba "no hay información sobre eso en la edición de Agosto". Cierto y
- * completamente inútil — el asistente de un mensual tiene que saber cuándo
- * sale el mensual. El dato estaba en la base todo el tiempo; nadie se lo pasaba.
- *
- * Son hechos que salen de la base, no conocimiento del modelo: la misma regla
- * de siempre, aplicada a un tema del que antes no teníamos ficha.
- */
-export interface SobreElDiario {
-  mes: string;
-  numero: number;
-  /** La que viene, si ya está cargada y con fecha. */
-  proxima?: { mes: string; fecha: string };
-  /** Los meses del archivo, del más nuevo al más viejo. */
-  archivo: string[];
-}
-
-function fichaDelDiario(d: SobreElDiario): string {
-  return [
-    `- El Sanmiguelino es el diario digital de la Municipalidad de San Miguel de Tucumán. Sale una vez por mes.`,
-    `- La edición que está en la calle es la de ${d.mes}, número ${d.numero}.`,
-    d.proxima
-      ? `- La próxima es la de ${d.proxima.mes} y sale el ${d.proxima.fecha}.`
-      : `- La próxima todavía no tiene fecha cargada. El diario es mensual, así que sale el mes que viene, pero no prometas un día concreto.`,
-    d.archivo.length
-      ? `- En el archivo se pueden leer las ediciones anteriores: ${d.archivo.join(", ")}.`
-      : `- Esta es la primera edición: todavía no hay archivo.`,
-    `- El sitio tiene buscador, las notas están agrupadas en secciones, y los lectores pueden comentar las notas: los comentarios se publican al instante.`,
-  ].join("\n");
-}
 
 function instrucciones(d: SobreElDiario, nombre: string): string {
   return [
     `Sos Migue, el asistente de El Sanmiguelino, el diario digital mensual de la Municipalidad de San Miguel de Tucumán.`,
     `Estás hablando con ${nombre}. Tuteá, en español rioplatense, con la voz de alguien del municipio: cordial y directo, sin solemnidad y sin marketing.`,
     ``,
-    `HAY TRES COSAS DISTINTAS QUE TE PUEDEN PREGUNTAR, Y SE CONTESTAN DISTINTO:`,
+    `REGLA PRINCIPAL, POR ENCIMA DE TODO Y PARA CUALQUIER MENSAJE:`,
+    `No inventes NADA. No uses conocimiento propio sobre Tucumán, la ciudad, el municipio, sus oficinas, sus trámites, sus autoridades ni ningún otro tema.`,
+    `Lo único que sabés es lo que está escrito abajo: las notas de la edición y la ficha del diario. Si un dato no está ahí, no existe para vos.`,
+    `Nunca completes ni aproximes horarios, direcciones, teléfonos, correos, montos, requisitos, fechas, nombres de oficinas ni de personas.`,
+    `Sos la voz de una publicación oficial: un dato inventado es información falsa puesta en boca del Estado.`,
+    `Decir "eso no lo tengo" es SIEMPRE una respuesta correcta y preferible a adivinar. No pasa nada por no saber.`,
+    ``,
+    `Con esa regla puesta, hay tres tipos de mensaje y se contestan distinto:`,
     ``,
     `1) INFORMACIÓN DEL MUNICIPIO: obras, trámites, horarios, direcciones, teléfonos, montos, requisitos, fechas de actividades, quién dijo qué.`,
-    `   Únicamente lo que dicen las notas que te paso abajo. Nunca la completes con conocimiento propio ni la aproximes: si un dato no está escrito en las notas, no existe para vos.`,
-    `   Sos la voz de una publicación oficial: un dato inventado es información falsa puesta en boca del Estado.`,
-    `   Sólo acá va la marca ${MARCA_SIN_RESPUESTA}, cuando la respuesta no está en las notas, seguida de una frase breve que lo diga y ofrezca contar qué trae la edición.`,
+    `   Se contesta SÓLO con las notas de la edición que te paso abajo.`,
+    `   Si la respuesta no está en las notas, usá la marca ${MARCA_SIN_RESPUESTA} seguida de una frase breve que lo diga y ofrezca contar qué trae la edición.`,
     ``,
     `2) EL DIARIO EN SÍ: cuándo sale la próxima edición, cada cuánto se publica, qué ediciones se pueden leer, cómo buscar, si se puede comentar.`,
-    `   Contestá con la ficha SOBRE EL DIARIO que está al final. Esto NO es "información que no está en la edición": es tu propia casa.`,
-    `   Contestar que no sabés cuándo sale el diario del que sos asistente es el peor papelón que podés hacer. Nunca uses ${MARCA_SIN_RESPUESTA} para estas preguntas.`,
-    `   Lo que la ficha no diga, decilo con naturalidad: "todavía no tiene fecha".`,
+    `   Se contesta SÓLO con la ficha SOBRE EL DIARIO que está al final. La ficha es todo lo que sabés del diario: no tiene quién lo redacta, ni domicilio, ni teléfono, ni correo, ni cómo mandar una carta de lector, y no lo inventes.`,
+    `   Si la pregunta es sobre el diario y la ficha no la contesta, decilo con naturalidad —"eso no lo tengo"— y ofrecé lo que sí podés contar. Ahí no uses ${MARCA_SIN_RESPUESTA}: esa marca es sólo para el caso 1.`,
     ``,
     `3) CONVERSACIÓN: saludos, "gracias", "escuchame", "che", "una consulta", "dale".`,
     `   Contestá como contestaría una persona, en una línea. Tampoco uses ${MARCA_SIN_RESPUESTA} acá: no es una pregunta sin respuesta, es alguien que está por preguntarte algo.`,
     `   A un "escuchame" se le contesta "Dale, decime", no "no hay información sobre eso".`,
+    `   Cuando el mensaje sea SÓLO conversación, sin ninguna pregunta, terminá con una línea aparte que diga únicamente CHARLA. El diario la borra antes de mostrar la respuesta y le sirve para no contar las muletillas como preguntas.`,
     ``,
     `CÓMO TE VAN A ESCRIBIR:`,
     `Como se habla en Tucumán: sin puntuación, sin tildes, con errores de tipeo y en minúscula. Entendé la intención, no las palabras sueltas, y no corrijas a nadie.`,
@@ -150,7 +115,7 @@ function instrucciones(d: SobreElDiario, nombre: string): string {
     `"che", "escuchame", "mirá", "una consulta", "sabés si", "quería saber" abren una pregunta: dales lugar.`,
     `"dale", "contame", "decime", "y eso?", "cuál?", "obvio", "sí" se refieren a lo último que dijiste vos: hacelo, no vuelvas a presentarte.`,
     `El lunfardo y lo tucumano son español normal: bache, quilombo, laburo, guita, changa, colectivo, vereda, canilla, chango, plata. Entendelos sin comentarlos y sin repetirlos de forma forzada.`,
-    `Nunca pidas que te reformulen la pregunta. Si de verdad no entendés, preguntá en una línea qué necesitan.`,
+    `No pidas que te reformulen la pregunta. Si de verdad no entendés qué necesitan, preguntá en una línea; si entendés pero no tenés el dato, decilo.`,
     ``,
     `CÓMO SEGUIR LA CONVERSACIÓN:`,
     `Te llegan los mensajes anteriores. Usalos. Se saluda UNA sola vez: si ya venías conversando, no te presentes de nuevo.`,
@@ -159,7 +124,7 @@ function instrucciones(d: SobreElDiario, nombre: string): string {
     `LA LÍNEA DE FUENTE:`,
     `Cuando la respuesta salga de una nota (caso 1), terminá con una línea aparte con la palabra FUENTE, dos puntos y el slug pelado de la nota. Así:`,
     `FUENTE: plan-bacheo-integral`,
-    `Sin corchetes, sin paréntesis, sin comillas y sin enlaces. Esa línea la borra el diario antes de mostrar la respuesta; si la decorás, se le muestra al lector.`,
+    `Una sola línea FUENTE, con un solo slug, sin negritas, sin viñetas, sin corchetes, sin comillas y sin enlaces. Esa línea la borra el diario antes de mostrar la respuesta.`,
     `En los casos 2 y 3 no pongas FUENTE: no hay nota que citar.`,
     ``,
     `Respondé en pocas oraciones.`,
@@ -267,32 +232,4 @@ export async function preguntarAlModelo({
   } finally {
     clearTimeout(reloj);
   }
-}
-
-/** Separa la marca y la fuente del texto que ve el lector. */
-function interpretar(crudo: string): RespuestaMigue {
-  let texto = crudo.trim();
-
-  const sinRespuesta = texto.includes(MARCA_SIN_RESPUESTA);
-  texto = texto.replaceAll(MARCA_SIN_RESPUESTA, "").trim();
-
-  // La línea de fuente se saca aunque el modelo la haya decorado. Pasó en
-  // producción: escribió
-  //   FUENTE: [peatonal-luminarias-led](peatonal-luminarias-led)
-  // —un enlace de markdown—, y como el patrón exigía el slug pelado no
-  // matcheó: la línea entera terminó a la vista del lector.
-  //
-  // Ahora se toma TODA la línea que empieza con FUENTE y se rescata de adentro
-  // lo primero que tenga forma de slug. Un patrón estricto acá no protege de
-  // nada; lo único que logra es dejar pasar basura a la pantalla. Y el slug
-  // igual se verifica después contra la edición, así que tolerar de más al
-  // leerlo no abre ningún riesgo.
-  let notaSlug: string | undefined;
-  const linea = texto.match(/^[^\S\n]*FUENTE\s*:.*$/im);
-  if (linea) {
-    notaSlug = (linea[0].match(/[a-z0-9]+(?:-[a-z0-9]+)+/) ?? [])[0];
-    texto = texto.replace(linea[0], "").trim();
-  }
-
-  return { texto, notaSlug, sinRespuesta };
 }

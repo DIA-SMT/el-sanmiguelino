@@ -900,3 +900,96 @@ palabras clave y la huella del diario, sin cambios.
 **Lo que no se pudo probar acá**: si GPT-4o mini efectivamente contesta mejor.
 El prompt se verificó contra un OpenRouter de mentira, que confirma qué le
 llega, no qué hace con eso. Eso se ve en producción.
+
+## Lo que el commit anterior rompió
+
+Una revisión adversarial del commit de arriba encontró dieciocho defectos, seis
+graves. Todos verificados a mano después. Tres de ellos contradicen lo que ese
+mismo commit dice de sí mismo, así que van primero.
+
+### El atajo del índice se comía las preguntas de los vecinos
+
+El patrón nuevo era `que|cuales` + hasta 24 caracteres + `notas|temas|trae|
+tiene|hay`. Se escribió creyendo que era más angosto que el anterior. **Es la
+forma de casi cualquier pregunta de un vecino**:
+
+| Pregunta | Patrón viejo | El "más angosto" |
+|---|---|---|
+| ¿Qué horario **tiene** el Registro Civil? | pasa al modelo | **lista de notas** |
+| ¿Qué teléfono **tiene** Defensa Civil? | pasa al modelo | **lista de notas** |
+| Qué trámites **hay** para el carnet | pasa al modelo | **lista de notas** |
+| **De qué trata** la ordenanza de estacionamiento | pasa al modelo | **lista de notas** |
+
+El atajo saltea el modelo, así que la pregunta se perdía entera; y se anotaba
+como `indice`, o sea como respondida, así que tampoco aparecía en "Lo que no
+supimos contestar". Estuvo así en producción.
+
+Ahora se exige que la pregunta **nombre a la edición** o pida el índice con esa
+palabra. Errar de menos no cuesta nada —lo que no matchea va al modelo, que
+tiene la lista de notas delante—. Errar de más le cambia la respuesta al vecino.
+
+### Se había aflojado la regla de no inventar
+
+El prompt viejo abría con `REGLA PRINCIPAL, POR ENCIMA DE TODO` y decía *no uses
+conocimiento propio sobre Tucumán, la ciudad, el municipio ni ningún otro tema*.
+Al partirlo en tres casos, esa regla quedó **adentro del caso 1**, alcanzando
+sólo a lo que ese caso enumera. Los casos 2 y 3 quedaron sin ninguna prohibición
+—y el caso 2, encima, con presión para contestar: *"es tu propia casa"*, *"el
+peor papelón"*, *"nunca uses [SIN_RESPUESTA]"*.
+
+A "¿quién hace el diario? le quiero mandar una carta de lector" no le queda otra
+salida que inventarse una oficina y un correo. Y como en ese caso la marca está
+prohibida, vuelve como respondida y no aparece en el tablero.
+
+La regla volvió arriba de todo y vale para cualquier mensaje. Los tres casos
+ahora dicen **de dónde** sale la respuesta, no si hace falta tenerla. Y el caso
+2 está acotado a la ficha, con permiso explícito para decir "eso no lo tengo".
+
+### La línea de FUENTE seguía llegando a la pantalla
+
+El commit anterior dice que la línea "se saca aunque el modelo la haya
+decorado". Lo que se toleró fue el **valor** —el enlace de markdown—, no el
+rótulo. Seguían pasando enteras `**FUENTE:** slug`, `- FUENTE: slug` y
+`> FUENTE: slug`, que es el hábito más común del modelo. Y como el patrón no
+tenía bandera global, de dos líneas se sacaba una sola.
+
+Se dejó de perseguir la forma con una expresión regular. Ahora a cada línea se
+le saca la puntuación de markdown y se mira si lo que queda **empieza** con la
+palabra de servicio.
+
+### El camino de emergencia le robaba preguntas al buscador
+
+`respuestaSobreElDiario` corría **antes** del buscador por palabras clave, así
+que ganaba siempre. "¿Cuándo abre la edición 2026 del Septiembre Musical?" tiene
+la nota escrita y recibía la fecha de publicación del diario.
+
+Ahora corre **al final**, y sólo si el buscador no encontró nada. Un falso
+positivo ahí ya sólo puede reemplazar un "no encontré nada", que es el peor
+resultado posible de todos modos. Además:
+
+- La rama del archivo no exigía nombrar al diario, pese a que el comentario de
+  la función afirmaba que todas lo hacían: `archivo` suelto le contestaba la
+  lista de meses a quien preguntaba por el Archivo Histórico Municipal.
+- `diario` y `numero` sueltos alcanzaban para disparar: el abono **diario** del
+  colectivo y el **número** de teléfono de la guardia recibían la fecha de la
+  próxima edición.
+- `HABLA_DE_OTRA` usaba `anterior` y `pasado` en singular, y `\b` corta antes de
+  la "s": "qué ediciones **anteriores** hay" no quedaba protegida.
+
+### Y la charla inflaba la cobertura
+
+El caso 3 invita a conversar y no existía ningún resultado que lo representara:
+cada "gracias" volvía como `nota` y subía la cobertura. El modelo ahora marca la
+charla con una línea `CHARLA` y se anota como `saludo`, que es lo único que el
+tablero **no** cuenta como pregunta.
+
+### Un corpus, que es lo que faltó
+
+El cambio anterior se probó con diecisiete casos elegidos a mano, **todos sobre
+el diario**. Por eso pasó: el defecto estaba en las preguntas que nadie pensó en
+probar.
+
+`npm run verificar:migue` corre 55 frases contra los caminos de verdad, y la
+mayoría son preguntas de vecinos que tienen que pasar de largo. Para que exista,
+lo que decide caminos se mudó a `src/lib/migue/interpretacion.ts`: sin red, sin
+base y sin `server-only`, así que se puede cargar desde un script.

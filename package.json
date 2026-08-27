@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "verificar:comentarios": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-comentarios.mjs",
     "verificar:comentarios:pg": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-comentarios-pg.mjs",
+    "verificar:migue": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-migue.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
