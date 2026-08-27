@@ -6,6 +6,7 @@ import { ViewTransition } from "react";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
+import { medirImagen } from "@/lib/medir-imagen";
 import { CitaPersona } from "@/components/cita-persona";
 import { HojaDiario } from "@/components/hoja-diario";
 import { ColumnaDelLector } from "@/components/comentarios/columna-del-lector";
@@ -111,6 +112,12 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
     getIndice(),
   ]);
 
+  // Dónde va la foto: a lo ancho si es apaisada, adentro de las columnas si es
+  // vertical. medirImagen() está en cache(), así que comparte la lectura con
+  // la propia figura.
+  const medidas = nota.imagen?.src ? await medirImagen(nota.imagen.src) : null;
+  const fotoVertical = medidas ? medidas.alto / medidas.ancho > 1.1 : false;
+
   // El foliado se cuenta sobre la edición DE LA NOTA, no sobre la que está en
   // la calle: en el archivo son distintas.
   //
@@ -181,7 +188,11 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                 </div>
               </header>
 
-              {nota.imagen && (
+              {/* La apaisada va arriba, a lo ancho. La vertical entra en el
+              flujo de las columnas —ocupa la primera y el texto sigue por las
+              otras—, que es lo que hace un diario con una foto parada. A todo
+              lo ancho dejaría dos costados muertos. */}
+              {nota.imagen && !fotoVertical && (
                 <FiguraNota
                   alt={nota.imagen.alt}
                   epigrafe={nota.imagen.epigrafe}
@@ -193,6 +204,15 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
               )}
 
               <div className="entra entra-3 note-columns mx-auto mt-9 max-w-6xl">
+                {nota.imagen && fotoVertical && (
+                  <FiguraNota
+                    alt={nota.imagen.alt}
+                    epigrafe={nota.imagen.epigrafe}
+                    src={nota.imagen.src}
+                    prioridad
+                    className="mb-4"
+                  />
+                )}
                 {nota.cuerpo.map((bloque, i) => (
                   <Bloque key={i} bloque={bloque} />
                 ))}

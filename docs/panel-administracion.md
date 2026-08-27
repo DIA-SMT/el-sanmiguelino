@@ -1096,3 +1096,19 @@ Medidas de control, para no cambiar el diseño sin querer: las cuatro fotos que
 ya estaban son apaisadas, con proporciones entre 0.56 y 0.67 —el 8:5 es 0.625,
 justo en el medio—, y siguen dibujándose en una caja de 1.600 exacto. La única
 vertical es la nueva.
+
+### Y el texto al costado de la foto vertical
+
+No pasaba solo. La foto era un bloque a todo el ancho y el cuerpo arrancaba
+**debajo**, en columnas: con una foto apaisada eso es el banner del impreso y
+está bien, pero una vertical dejaba dos costados muertos.
+
+Ahora, cuando la foto es vertical, entra **dentro del flujo de las columnas**:
+ocupa la primera y el texto sigue por las otras. Es lo que hace un diario con
+una foto parada, y no hace falta maquetar nada a mano — lo resuelve el propio
+multicol—. Vale para la tapa y para la página de la nota.
+
+Lo que sí depende del contenido es cuánto se llena: con la nota que motivó
+esto —un solo bloque, y es una cita, ocho palabras— las columnas 2 y 3 quedan
+vacías porque no hay texto que poner. Verificado con una nota de prueba de
+cuatro párrafos: el texto cae al lado de la foto. La nota de prueba se borró.

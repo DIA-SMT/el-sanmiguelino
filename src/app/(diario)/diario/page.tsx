@@ -14,6 +14,7 @@ import {
 import { getUsuario } from "@/lib/auth/session";
 import { transicionPagina } from "@/lib/transiciones";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
+import { medirImagen } from "@/lib/medir-imagen";
 import type { NotaCompleta } from "@/lib/types";
 
 function parrafosDe(nota: NotaCompleta): string[] {
@@ -47,6 +48,24 @@ export default async function Portada() {
    * "Cannot read properties of undefined (reading 'cuerpo')" antes de llegar
    * al cartel. Un guard que se saltea no es un guard.
    */
+  /*
+   * Dónde va la foto de tapa: arriba o adentro de las columnas.
+   *
+   * Una foto **apaisada** va a todo el ancho de la hoja, como el banner del
+   * impreso, y el texto arranca debajo. Una **vertical** no: a todo el ancho
+   * dejaría dos costados muertos y el texto empezaría recién abajo de todo.
+   * Metida en el flujo de las columnas ocupa la primera y el texto sigue por
+   * las otras dos — que es exactamente lo que hace un diario con una foto
+   * parada—.
+   *
+   * `medirImagen()` está en `cache()`, así que esto no agrega una lectura:
+   * comparte la que hace la propia figura.
+   */
+  const medidas = principal?.imagen?.src
+    ? await medirImagen(principal.imagen.src)
+    : null;
+  const fotoVertical = medidas ? medidas.alto / medidas.ancho > 1.1 : false;
+
   const parrafos = principal ? parrafosDe(principal) : [];
   const cita = principal ? citaDe(principal) : null;
   // Las notas empiezan en la página 2: la 1 es esta portada.
@@ -97,9 +116,10 @@ export default async function Portada() {
                 </p>
               </div>
 
-              {/* La foto de tapa, a todo el ancho de la hoja. Antes vivía dentro
-              de la columna del medio y quedaba del tamaño de una ficha. */}
-              {principal.imagen && (
+              {/* La foto apaisada, a todo el ancho de la hoja. Antes vivía
+              dentro de la columna del medio y quedaba del tamaño de una ficha.
+              La vertical va abajo, adentro de las columnas: ver arriba. */}
+              {principal.imagen && !fotoVertical && (
                 <FiguraNota
                   alt={principal.imagen.alt}
                   epigrafe={principal.imagen.epigrafe}
@@ -116,6 +136,17 @@ export default async function Portada() {
               versión honesta del mismo recurso, y aguanta los tres
               breakpoints sin maquetar cada uno a mano. */}
               <div className="entra entra-3 note-columns mt-8">
+                {/* Primera de la columna uno: el texto la rodea por las otras. */}
+                {principal.imagen && fotoVertical && (
+                  <FiguraNota
+                    alt={principal.imagen.alt}
+                    epigrafe={principal.imagen.epigrafe}
+                    src={principal.imagen.src}
+                    prioridad
+                    className="mb-4"
+                  />
+                )}
+
                 {parrafos.slice(0, 2).map((texto, i) => (
                   <p
                     key={`a${i}`}
