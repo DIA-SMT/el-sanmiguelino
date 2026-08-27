@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { EdicionRepo } from "@/lib/repos/edicion";
 import { db } from "@/lib/db";
 import { edicionEnFoco } from "@/lib/auth/vista-previa";
@@ -128,7 +129,7 @@ function aCuerpo(valor: unknown): BloqueNota[] {
  * Un administrador puede poner otra "en foco" y ver el diario entero con ella
  * —ver `vista-previa.ts`—. Para el lector no cambia nada.
  */
-async function edicionActualFila() {
+const edicionActualFila = cache(async () => {
   const enFoco = await edicionEnFoco();
   if (enFoco) {
     const elegida = await db().edicion.findUnique({ where: { slug: enFoco } });
@@ -160,7 +161,7 @@ async function edicionActualFila() {
     );
   }
   return edicion;
-}
+});
 
 export const edicionPostgresRepo: EdicionRepo = {
   async resumen(): Promise<EdicionResumen> {

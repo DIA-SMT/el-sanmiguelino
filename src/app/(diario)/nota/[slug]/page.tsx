@@ -113,7 +113,15 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
 
   // El foliado se cuenta sobre la edición DE LA NOTA, no sobre la que está en
   // la calle: en el archivo son distintas.
-  const indiceDeSuEdicion = await getIndiceDe(nota.edicionSlug);
+  //
+  // Pero cuando la nota ES de la edición en curso —el caso normal, todo lo que
+  // no es archivo— el índice que hace falta es el que ya se trajo arriba. Sin
+  // esta comparación se pedía dos veces la misma lista de notas, y como el pool
+  // era de una conexión, el segundo viaje esperaba al primero.
+  const indiceDeSuEdicion =
+    nota.edicionSlug === edicion.slug
+      ? indice
+      : await getIndiceDe(nota.edicionSlug);
   const numeroPagina =
     indiceDeSuEdicion.findIndex((n) => n.slug === nota.slug) + 2;
 

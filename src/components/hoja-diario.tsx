@@ -1,6 +1,6 @@
 import { PasadorPaginas } from "@/components/pasador-paginas";
 import { paginasDeEdicion } from "@/lib/data/paginas";
-import { getIndice, getIndiceDe } from "@/lib/repos/edicion";
+import { getIndice, getIndiceDe, getResumenEdicion } from "@/lib/repos/edicion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,8 +25,14 @@ export async function HojaDiario({
   children: React.ReactNode;
   className?: string;
 }) {
+  // Si lo que se está mostrando es de la edición en curso —todo lo que no sea
+  // archivo— alcanza con el índice que ya pidió la página. Pedirlo "de" esa
+  // edición sería la misma lista por otra consulta.
+  const enLaCalle = await getResumenEdicion();
   const paginas = paginasDeEdicion(
-    edicionSlug ? await getIndiceDe(edicionSlug) : await getIndice(),
+    !edicionSlug || edicionSlug === enLaCalle.slug
+      ? await getIndice()
+      : await getIndiceDe(edicionSlug),
   );
   const indice = numeroPagina === null ? -1 : numeroPagina - 1;
 

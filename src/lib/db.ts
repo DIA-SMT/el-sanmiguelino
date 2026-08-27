@@ -27,14 +27,25 @@ function cadena(): string {
 }
 
 function crear(): PrismaClient {
-  // `max: 1` es lo que de verdad limita el pool, y por eso está acá y no en
-  // la URL: `pg-pool` lee `max`, nunca el `connection_limit` que se le pone
-  // como query param. Ese parámetro era del motor viejo de Prisma; con el
-  // modelo de driver adapters de la 7 no lo lee nadie.
+  // El tope del pool va acá y no en la URL: `pg-pool` lee `max`, nunca el
+  // `connection_limit` que se le pone como query param —ese era del motor viejo
+  // de Prisma y con los driver adapters de la 7 no lo lee nadie—.
   //
-  // El tope importa porque en serverless cada invocación es un proceso propio:
-  // un pool de veinte por invocación agota Supabase con tráfico normal.
-  const adapter = new PrismaPg({ connectionString: cadena(), max: 1 });
+  // Era 1, con el argumento de que en serverless cada invocación es un proceso
+  // propio. **Esa premisa es falsa**: una misma instancia atiende varios
+  // pedidos a la vez, y con el pool en uno TODAS las consultas de la instancia
+  // hacen fila india. Se nota justo donde más molesta: entrar a una nota
+  // dispara la precarga de las dos vecinas, así que son tres renders —quince
+  // consultas— esperando por una sola conexión.
+  //
+  // Tres es deliberadamente conservador. Contra el pooler de Supabase en modo
+  // transacción las conexiones de cliente son baratas —el pooler multiplexa
+  // contra pocas conexiones de servidor—, pero el número se multiplica por
+  // cada instancia que Vercel levante, así que no conviene la generosidad.
+  const adapter = new PrismaPg({
+    connectionString: cadena(),
+    max: Number(process.env.DB_POOL_MAX ?? 3),
+  });
   return new PrismaClient({ adapter });
 }
 
