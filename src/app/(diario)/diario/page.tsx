@@ -38,11 +38,21 @@ export default async function Portada() {
   // porque justamente sirve para ir viendo cómo queda mientras se arma—.
   const primera = indice[0];
   const [principal] = primera ? await getCompletas([primera.slug]) : [];
-  const parrafos = parrafosDe(principal);
-  const cita = citaDe(principal);
+
+  /*
+   * Todo esto se calcula **sólo si hay nota**, y no es una precaución de más:
+   * el caso de arriba —una edición en preparación, sin notas todavía— tenía su
+   * cartel escrito más abajo en el JSX, pero estas tres líneas corrían primero
+   * y sin condición. Previsualizar una edición recién creada tiraba
+   * "Cannot read properties of undefined (reading 'cuerpo')" antes de llegar
+   * al cartel. Un guard que se saltea no es un guard.
+   */
+  const parrafos = principal ? parrafosDe(principal) : [];
+  const cita = principal ? citaDe(principal) : null;
   // Las notas empiezan en la página 2: la 1 es esta portada.
-  const paginaPrincipal =
-    indice.findIndex((n) => n.slug === principal.slug) + 2;
+  const paginaPrincipal = principal
+    ? indice.findIndex((n) => n.slug === principal.slug) + 2
+    : 1;
 
   return (
     <ViewTransition {...transicionPagina}>

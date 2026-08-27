@@ -14,6 +14,17 @@ import { enfocarEdicionAction } from "@/app/admin/acciones";
  * al revés, revisar agosto pensando que es septiembre y dar por buena una tapa
  * que no es—. Si el aviso se puede pasar por alto, no sirve.
  */
+/**
+ * Le saca el punto final a la frase de la fecha.
+ *
+ * En español "a. m." y "p. m." terminan en punto, así que pegarle el punto de
+ * la oración daba "a las 10:29 a. m.. El lector...". El punto lo pone la
+ * oración; la fecha entra sin él.
+ */
+function sinPuntoFinal(frase: string): string {
+  return frase.replace(/.$/, "");
+}
+
 export function BarraVistaPrevia({ mes, sale }: { mes: string; sale: string }) {
   const router = useRouter();
   const [saliendo, iniciar] = useTransition();
@@ -28,8 +39,8 @@ export function BarraVistaPrevia({ mes, sale }: { mes: string; sale: string }) {
         Vista previa
       </span>
       <span className="font-sans text-[0.8rem]">
-        Estás viendo <strong>{mes}</strong>, que {sale}. El lector todavía no ve
-        esto.
+        Estás viendo <strong>{mes}</strong>, que {sinPuntoFinal(sale)}. El lector
+        todavía no ve esto.
       </span>
       <button
         type="button"

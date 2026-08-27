@@ -993,3 +993,33 @@ probar.
 mayoría son preguntas de vecinos que tienen que pasar de largo. Para que exista,
 lo que decide caminos se mudó a `src/lib/migue/interpretacion.ts`: sin red, sin
 base y sin `server-only`, así que se puede cargar desde un script.
+
+## La vista previa de una edición vacía rompía la portada
+
+Crear septiembre desde el panel y darle "previsualizar" tiraba
+`Cannot read properties of undefined (reading 'cuerpo')`.
+
+El caso estaba previsto —hay un cartel escrito para él, "Esta edición todavía no
+tiene notas cargadas"— y hasta comentado: la elección automática de la edición
+exige que tenga notas, **pero la vista previa no, y no debería**, porque sirve
+justamente para ir viendo cómo queda mientras se arma.
+
+El problema es que el cartel estaba en el JSX y tres líneas antes se
+desreferenciaba la nota sin condición:
+
+```ts
+const [principal] = primera ? await getCompletas([primera.slug]) : [];
+const parrafos = parrafosDe(principal);   // ← acá reventaba
+```
+
+**Un guard que se saltea no es un guard.** Ahora los tres valores derivados se
+calculan sólo si hay nota.
+
+Verificado con septiembre-2026 vacía en foco, recorriendo el diario entero:
+portada, buscador, archivo, la edición de agosto por su URL y el panel. La
+portada muestra el cartel y la barra azul de vista previa dice qué edición se
+está mirando y cuándo sale.
+
+De paso: esa barra decía "a las 10:29 a. m.. El lector todavía no ve esto", con
+punto doble. En español "a. m." ya termina en punto, así que la fecha entra sin
+el suyo y el punto lo pone la oración.
