@@ -115,9 +115,19 @@ const etiqueta =
 export function EditorNota({
   nota,
   secciones,
+  ediciones,
+  edicionInicial,
 }: {
   /** La nota a editar, o null para una nota nueva. */
   nota: NotaCompleta | null;
+  /** Todas las ediciones, de la más nueva a la más vieja. */
+  ediciones: {
+    slug: string;
+    mes: string;
+    estado: "publicada" | "programada" | "sin_fecha";
+  }[];
+  /** A qué edición va por defecto: la de la nota, o la que está en foco. */
+  edicionInicial: string;
   /** Las secciones que ya existen en la edición, para no inventar nombres
    *  nuevos por un error de tipeo. Igual se puede escribir una. */
   secciones: string[];
@@ -146,6 +156,7 @@ export function EditorNota({
   }
 
   const slugOriginal = nota?.slug;
+  const [edicionSlug, setEdicionSlug] = useState(edicionInicial);
   const [slug, setSlug] = useState(nota?.slug ?? "");
   const [seccion, setSeccion] = useState(nota?.seccion ?? "");
   const [titulo, setTitulo] = useState(nota?.titulo ?? "");
@@ -256,6 +267,7 @@ export function EditorNota({
         const res = await guardarNotaAction({
           slug,
           slugOriginal,
+          edicionSlug,
           seccion,
           titulo,
           bajada,
@@ -320,6 +332,39 @@ export function EditorNota({
             className={cn(campo, "mt-1.5 resize-y")}
             placeholder="Las dos o tres líneas que resumen la nota"
           />
+        </label>
+
+        {/*
+          * A qué edición va.
+          *
+          * Antes esto no se elegía ni se veía: la nota caía en la edición que
+          * estuviera en previsualización, y quien cargaba no tenía cómo
+          * saberlo. Una nota de un recital de septiembre terminó publicada en
+          * agosto, y no había forma de moverla desde acá.
+          */}
+        <label className="sm:col-span-2">
+          <span className={etiqueta}>Edición</span>
+          <select
+            value={edicionSlug}
+            onChange={(e) => alEditar(setEdicionSlug)(e.target.value)}
+            className={cn(campo, "mt-1.5")}
+          >
+            {ediciones.map((e) => (
+              <option key={e.slug} value={e.slug}>
+                {e.mes}
+                {e.estado === "publicada"
+                  ? " — en la calle"
+                  : e.estado === "programada"
+                    ? " — programada"
+                    : " — sin fecha"}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 font-sans text-[0.72rem] text-ink-3">
+            {nota
+              ? "Cambiarla mueve la nota a esa edición, al final del foliado."
+              : "En qué número va a salir la nota."}
+          </p>
         </label>
 
         <label>

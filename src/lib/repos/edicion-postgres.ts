@@ -236,9 +236,47 @@ export const edicionPostgresRepo: EdicionRepo = {
       }));
   },
 
+  /** Ver el contrato: es la del panel, sin filtro de edición. */
+  async notaDeCualquierEdicion(slug: string): Promise<NotaCompleta | null> {
+    const fila = await db().nota.findUnique({
+      where: { slug },
+      select: {
+        ...CAMPOS_RESUMEN,
+        cuerpo: true,
+        edicion: { select: { slug: true } },
+      },
+    });
+    if (!fila) return null;
+    return {
+      ...aResumen(fila),
+      cuerpo: aCuerpo(fila.cuerpo),
+      edicionSlug: fila.edicion.slug,
+    };
+  },
+
   async guardarNota(borrador: NotaBorrador): Promise<NotaCompleta> {
-    const { slug, slugOriginal, seccion, titulo, bajada, cuerpo, imagen } =
-      borrador;
+    const {
+      slug,
+      slugOriginal,
+      seccion,
+      titulo,
+      bajada,
+      cuerpo,
+      imagen,
+      edicionSlug,
+    } = borrador;
+
+    // La edición de destino, si la pidieron. Se resuelve una sola vez y sirve
+    // para los dos caminos: crear en otra edición y mover una que ya existe.
+    const destino = edicionSlug
+      ? await db().edicion.findUnique({
+          where: { slug: edicionSlug },
+          select: { id: true },
+        })
+      : null;
+    if (edicionSlug && !destino) {
+      throw new Error(`No existe la edición "${edicionSlug}".`);
+    }
 
     // Los derivados se calculan ACÁ, con las mismas funciones que usan el
     // motor mock y la semilla. Es el único camino de escritura, así que no
@@ -279,7 +317,7 @@ export const edicionPostgresRepo: EdicionRepo = {
     const existente = slugOriginal
       ? await db().nota.findUnique({
           where: { slug: clave },
-          select: { id: true },
+          select: { id: true, edicionId: true },
         })
       : null;
 
@@ -298,11 +336,35 @@ export const edicionPostgresRepo: EdicionRepo = {
           );
         }
       }
+      /*
+       * Mover de edición.
+       *
+       * `orden` es único por edición, así que la nota no puede llevarse el
+       * suyo: se le da el último de la edición de destino. El hueco que deja
+       * atrás no molesta —el foliado se calcula por posición en el índice, no
+       * por el número— y el alta ya se calcula desde el máximo justamente para
+       * tolerar huecos.
+       */
+      const mudanza =
+        destino && destino.id !== existente.edicionId
+          ? {
+              edicionId: destino.id,
+              orden:
+                ((
+                  await db().nota.findFirst({
+                    where: { edicionId: destino.id },
+                    orderBy: { orden: "desc" },
+                    select: { orden: true },
+                  })
+                )?.orden ?? -1) + 1,
+            }
+          : {};
+
       // El slug puede haber cambiado: el ON UPDATE CASCADE del esquema hace
       // que los comentarios lo sigan en vez de quedar huérfanos.
       const fila = await db().nota.update({
         where: { slug: clave },
-        data: { ...campos, slug },
+        data: { ...campos, slug, ...mudanza },
         select: {
           ...CAMPOS_RESUMEN,
           cuerpo: true,
@@ -320,9 +382,9 @@ export const edicionPostgresRepo: EdicionRepo = {
     // que se calcula desde el máximo actual y no desde el conteo de filas: si
     // alguna vez queda un hueco en el medio, contar daría un número ya usado
     // y el guardado fallaría por la restricción.
-    const edicion = await edicionActualFila();
+    const edicionId = destino?.id ?? (await edicionActualFila()).id;
     const ultima = await db().nota.findFirst({
-      where: { edicionId: edicion.id },
+      where: { edicionId },
       orderBy: { orden: "desc" },
       select: { orden: true },
     });
@@ -331,7 +393,7 @@ export const edicionPostgresRepo: EdicionRepo = {
         ...campos,
         slug,
         orden: (ultima?.orden ?? -1) + 1,
-        edicionId: edicion.id,
+        edicionId,
       },
       select: {
         ...CAMPOS_RESUMEN,

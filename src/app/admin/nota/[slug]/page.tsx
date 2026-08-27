@@ -3,7 +3,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { EditorNota } from "@/components/admin/editor-nota";
 import { requerirAdmin } from "@/lib/auth/dal";
-import { getIndice, getNota, repoEscribe } from "@/lib/repos/edicion";
+import {
+  getIndice,
+  getNotaParaEditar,
+  getResumenEdicion,
+  repoEscribe,
+} from "@/lib/repos/edicion";
+import { db } from "@/lib/db";
 
 /**
  * Editar una nota existente, o crear una nueva con el slug reservado `nueva`.
@@ -22,11 +28,45 @@ export default async function AdminEditarNota({
   if (!repoEscribe()) notFound();
 
   const esNueva = slug === "nueva";
-  const nota = esNueva ? null : await getNota(slug);
+  // Del panel, no del diario: tiene que abrir también las notas de ediciones
+  // que todavía no salieron. Ver getNotaParaEditar().
+  const nota = esNueva ? null : await getNotaParaEditar(slug);
   if (!esNueva && !nota) notFound();
 
   const indice = await getIndice();
   const secciones = [...new Set(indice.map((n) => n.seccion))].sort();
+
+  /*
+   * Las ediciones, para poder elegir a cuál va la nota.
+   *
+   * Se leen acá y no por el repo porque el repo sólo expone las publicadas
+   * —es lo que necesita el archivo—, y el editor necesita también las
+   * programadas y las que todavía no tienen fecha: son justamente las que se
+   * están armando.
+   *
+   * El estado se calcula igual que en /admin/ediciones. Si las dos formas se
+   * separan, el panel se contradice a sí mismo.
+   */
+  const ahora = new Date();
+  const filas = await db().edicion.findMany({
+    orderBy: [{ anio: "desc" }, { numero: "desc" }],
+    select: { slug: true, mes: true, publicaEn: true },
+  });
+  const ediciones = filas.map((e) => ({
+    slug: e.slug,
+    mes: e.mes,
+    estado: (!e.publicaEn
+      ? "sin_fecha"
+      : e.publicaEn <= ahora
+        ? "publicada"
+        : "programada") as "publicada" | "programada" | "sin_fecha",
+  }));
+
+  // Para una nota nueva, la que se está mirando: `getResumenEdicion()` ya
+  // respeta la previsualización, así que crear desde la vista previa de
+  // septiembre propone septiembre.
+  const actual = await getResumenEdicion();
+  const edicionInicial = nota?.edicionSlug ?? actual.slug;
 
   return (
     <>
@@ -63,7 +103,12 @@ export default async function AdminEditarNota({
       </div>
 
       <div className="mt-6">
-        <EditorNota nota={nota} secciones={secciones} />
+        <EditorNota
+        nota={nota}
+        secciones={secciones}
+        ediciones={ediciones}
+        edicionInicial={edicionInicial}
+      />
       </div>
     </>
   );

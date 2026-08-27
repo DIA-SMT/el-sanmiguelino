@@ -59,6 +59,20 @@ export interface EdicionRepo {
    * `repoEscribe()`.
    */
   guardarNota?(borrador: NotaBorrador): Promise<NotaCompleta>;
+
+  /**
+   * Una nota de **cualquier** edición, haya salido o no.
+   *
+   * `nota()` se limita a las ediciones legibles, y eso es lo correcto para el
+   * diario: una nota de un número que todavía no salió no se puede leer por su
+   * URL. Pero el panel tiene que poder abrir la que está armando —y sobre todo
+   * la que acaba de mover a una edición programada, que si no queda
+   * inalcanzable apenas se guarda—.
+   *
+   * Opcional por lo mismo que `guardarNota`: es del panel, y el panel sólo
+   * existe con Postgres.
+   */
+  notaDeCualquierEdicion?(slug: string): Promise<NotaCompleta | null>;
 }
 
 /**
@@ -134,6 +148,23 @@ export const getProximaEdicion = cache(
 export async function notaExiste(slug: string): Promise<boolean> {
   const indice = await getIndice();
   return indice.some((n) => n.slug === slug);
+}
+
+/**
+ * La nota como la ve el panel: de cualquier edición, publicada o no.
+ *
+ * No está en `cache()` junto a las lecturas del diario a propósito: son dos
+ * consultas distintas sobre la misma clave, y compartir memo entre "la que el
+ * lector puede ver" y "la que el editor puede abrir" es exactamente el tipo de
+ * confusión que termina filtrando una edición que no salió.
+ */
+export async function getNotaParaEditar(
+  slug: string,
+): Promise<NotaCompleta | null> {
+  if (!repo.notaDeCualquierEdicion) {
+    throw new Error("El motor activo no sabe leer notas fuera de la edición.");
+  }
+  return repo.notaDeCualquierEdicion(slug);
 }
 
 /** ¿El motor activo sabe escribir? Sólo Postgres. El panel lo consulta para no

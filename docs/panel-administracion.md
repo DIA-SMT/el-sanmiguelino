@@ -1023,3 +1023,38 @@ está mirando y cuándo sale.
 De paso: esa barra decía "a las 10:29 a. m.. El lector todavía no ve esto", con
 punto doble. En español "a. m." ya termina en punto, así que la fecha entra sin
 el suyo y el punto lo pone la oración.
+
+## Elegir a qué edición va una nota
+
+Se cargó una nota de un recital del 25 de septiembre y terminó publicada **en la
+edición de agosto**, a la vista de los lectores. Y no había forma de moverla.
+
+La edición de destino se decidía sola: la nota nueva caía en la que estuviera en
+previsualización —o en la publicada, si no había ninguna—. Nada de eso se veía
+en el editor. Quien cargaba la nota no tenía cómo saber a qué número iba, y el
+único campo que nombraba algo parecido era el slug, así que ahí terminó escrito
+`septiembre-2026`, que es el slug de la **edición**, no de la nota.
+
+Ahora el editor tiene un campo **Edición** con todas —publicada, programadas y
+sin fecha—, y dice en qué estado está cada una. En una nota que ya existe,
+cambiarlo la mueve.
+
+### Dos cosas que la mudanza tuvo que resolver
+
+**El foliado.** `orden` es único por edición, así que una nota no puede llevarse
+el suyo: se le da el último de la edición de destino. El hueco que deja atrás no
+molesta, porque el foliado se calcula por posición en el índice y el alta ya
+toma el máximo justamente para tolerar huecos.
+
+**Y que la nota no se volviera inalcanzable.** Al mover una nota a una edición
+programada, el editor tiraba 404 apenas guardaba: `nota()` se limita a las
+ediciones legibles —lo correcto para el diario, porque una nota de un número que
+no salió no se puede leer por su URL— y esa es justamente la edición a la que
+uno la acaba de mandar. El panel usa ahora `getNotaParaEditar()`, que no filtra
+por edición. Es un método aparte y no un parámetro de `nota()`: mezclar "la que
+el lector puede ver" con "la que el editor puede abrir" en una sola función es
+la forma más corta de filtrar una edición que todavía no salió.
+
+Verificado creando una nota en agosto, mudándola a septiembre desde el selector
+y comprobando en la base que quedó ahí con el foliado nuevo; y que el editor la
+sigue abriendo después. La nota de prueba se borró.

@@ -130,6 +130,18 @@ export interface NotaSemilla {
  * número que no corresponde al texto y nadie se enteraría.
  */
 export interface NotaBorrador extends NotaSemilla {
+  /**
+   * A qué edición va.
+   *
+   * Ausente = la que esté en foco, o la publicada. Ese era el único
+   * comportamiento posible antes, y no se veía por ningún lado: quien cargaba
+   * una nota no tenía forma de saber a qué número iba a parar, ni de mandarla
+   * a otro. Una nota de un recital de septiembre terminó publicada en agosto.
+   *
+   * En una nota que ya existe, cambiarlo la **mueve** de edición.
+   */
+  edicionSlug?: string;
+
   /** El slug con el que la nota estaba guardada. Ausente = nota nueva.
    *  Existe porque el slug es la clave: cambiarlo es mover la nota, no crear
    *  otra, y los comentarios tienen que seguirla. */

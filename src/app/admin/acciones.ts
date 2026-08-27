@@ -112,8 +112,16 @@ export async function guardarNotaAction(
   try {
     if (!esObjeto(borrador)) throw new Error("Falta la nota.");
 
-    const { slug, slugOriginal, seccion, titulo, bajada, cuerpo, imagen } =
-      borrador;
+    const {
+      slug,
+      slugOriginal,
+      seccion,
+      titulo,
+      bajada,
+      cuerpo,
+      imagen,
+      edicionSlug,
+    } = borrador;
 
     if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
       throw new Error(
@@ -135,6 +143,9 @@ export async function guardarNotaAction(
       bajada,
       cuerpo: cuerpo.map(validarBloque),
       ...(textoNoVacio(slugOriginal) ? { slugOriginal } : {}),
+      // Si no viene, el repo la manda a la edición en foco, como antes. Que
+      // exista de verdad lo verifica el repo, que es quien tiene la base.
+      ...(textoNoVacio(edicionSlug) ? { edicionSlug } : {}),
       ...(esObjeto(imagen) && textoNoVacio(imagen.alt)
         ? {
             imagen: {
