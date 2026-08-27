@@ -45,6 +45,28 @@ function crear(): PrismaClient {
   const adapter = new PrismaPg({
     connectionString: cadena(),
     max: Number(process.env.DB_POOL_MAX ?? 3),
+
+    // **El arreglo que más se nota.** `pg-pool` cierra por defecto las
+    // conexiones ociosas a los 10 segundos, y con el pool sin mínimo eso deja
+    // la instancia sin ninguna. La siguiente consulta paga de nuevo el TCP, el
+    // TLS y la autenticación del pooler.
+    //
+    // Medido contra la base real: 54 ms en caliente contra **271 ms** tras 12
+    // segundos quieto. Y 10 segundos es justo el peor número posible para un
+    // diario: el lector lee la nota un minuto, pasa de página, y siempre cae
+    // del lado frío. Pagaba el reconecte en cada vuelta de hoja.
+    //
+    // Cero significa "no cerrar por ocioso". Lo que queda abierto es a lo sumo
+    // `max` conexiones por instancia viva, y contra el pooler de Supabase en
+    // modo transacción eso es barato —multiplexa contra pocas conexiones de
+    // servidor—. Si algún día hay muchas instancias a la vez, se acota con
+    // DB_POOL_IDLE_MS.
+    idleTimeoutMillis: Number(process.env.DB_POOL_IDLE_MS ?? 0),
+
+    // Que el socket no se muera en silencio del otro lado mientras nadie
+    // pregunta. Sin esto, "no cerrar por ocioso" sólo garantiza que el pool
+    // CREE que la conexión sigue viva.
+    keepAlive: true,
   });
   return new PrismaClient({ adapter });
 }
