@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogoDireccionIA, LogoHoja } from "@/components/brand/logos";
+import { SuscripcionPapel } from "@/components/suscripcion-papel";
 
 export function SiteFooter() {
   return (
@@ -16,6 +17,13 @@ export function SiteFooter() {
             de Tucumán (4000), Tucumán.
           </p>
           <p className="meta mt-2">Publicación gratuita, prohibida su venta</p>
+
+          {/* Anotarse para recibirlo impreso. Va en el pie y no en la bandera
+              porque no es navegación: es algo que se hace una vez, y el pie es
+              donde uno mira cuando ya leyó. */}
+          <div className="mt-4 flex justify-center">
+            <SuscripcionPapel />
+          </div>
           {/* El archivo se llega desde el pie, que está en todas las páginas.
               En la bandera competiría con las secciones de la edición en curso,
               que es lo que la mayoría viene a leer. */}

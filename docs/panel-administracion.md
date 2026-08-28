@@ -1182,3 +1182,44 @@ bien: esas respuestas se anotaban como saludo y desaparecían de las cuentas.
 
 El barrido queda igual, y ahora tolera la puntuación del final: una respuesta
 vieja en el historial de alguien puede traerla.
+
+## Suscripción al papel
+
+Un botón en el pie del diario —"Recibilo en papel"— abre un formulario con
+correo, dirección, nombre y edad. La lista se ve en el panel y se baja en CSV
+para pasársela a quien reparte.
+
+**Los datos van en su propia tabla.** Es el único lugar del proyecto que guarda
+datos personales de un vecino: nombre, edad, correo y domicilio. Todo lo demás
+maneja contenido del diario, y el registro de Migue está hecho a propósito para
+lo contrario —no guardar quién pregunta—. Acá el dato **es** la persona, porque
+hay que llevarle el diario a la casa. Por eso la tabla está aparte, el repo es
+`server-only`, y la pantalla del panel lo dice en un cartel.
+
+El formulario pone el correo y la dirección **primero**, y el nombre y la edad
+en una fila propia al final. No es estético: cuando llegue el SSO de Cidituc
+esos dos van a venir de ahí y esa fila se va entera sin mover el resto.
+
+Si alguien se anota dos veces con el mismo correo **no es un error**: es la
+misma persona apretando el botón de nuevo, o alguien que se mudó. Se actualizan
+los datos y se le avisa que se actualizaron. Un cartel de error ahí parecería
+una falla del sitio.
+
+### Dos cosas del CSV que no son obvias
+
+**Las comillas no son decorativas.** Un domicilio argentino trae comas —"Av.
+Sarmiento 1234, 2º B"— y sin comillas la primera dirección con coma corre todas
+las columnas de esa fila.
+
+**Y lo que empieza con `=`, `+`, `-` o `@` lleva un apóstrofo adelante**, porque
+Excel lo interpreta como fórmula. Una lista de vecinos no tiene por qué poder
+ejecutar algo en la máquina de quien la abre. Va además el BOM al principio: sin
+él, Excel en Windows abre "Tucumán" como "TucumÃ¡n".
+
+La descarga pide `requerirAdmin()` **adentro del handler** y no confía en el
+layout: en el App Router el layout no corre para los route handlers, y sin eso
+la lista de domicilios sería una URL que cualquiera con sesión puede pedir.
+
+Verificado de punta a punta: formulario enviado desde el diario, la fila en la
+base con el domicilio con coma intacto, la lista en el panel y el CSV con las
+comillas y el BOM donde van. La suscripción de prueba se borró.

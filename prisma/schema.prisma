@@ -217,3 +217,35 @@ model ConsumoMigue {
   @@index([ventana])
   @@map("consumo_migue")
 }
+
+/// Quién quiere recibir El Sanmiguelino en papel.
+///
+/// Va en su propia tabla y no colgada de nada: son **datos personales de un
+/// vecino** —nombre, edad, correo y domicilio— guardados por el municipio, y
+/// mezclarlos con el resto haría que cualquier consulta de más los arrastre.
+/// Es lo contrario del registro de Migue, que a propósito no guarda quién
+/// pregunta: acá el dato ES la persona, porque hay que llevarle el diario.
+///
+/// Cuando llegue el SSO de Cidituc, `nombre` y `edad` van a salir de ahí y el
+/// formulario va a pedir sólo correo y domicilio. Por eso `usuarioId` se
+/// guarda desde ahora: es lo que después permite reconocer al mismo vecino.
+model Suscripcion {
+  id     String @id @default(cuid())
+  nombre String
+  /// Opcional: hoy la carga la persona, y no es un dato que valga la pena
+  /// exigir para recibir un diario.
+  edad   Int?
+  /// Único: dos suscripciones al mismo correo son la misma persona apretando
+  /// el botón dos veces, no dos ejemplares.
+  email     String @unique
+  direccion String
+
+  /// De qué sesión salió. Hoy el login es el mock y esto es siempre el mismo
+  /// valor; con Cidituc real pasa a identificar de verdad.
+  usuarioId String?
+
+  fecha DateTime @default(now())
+
+  @@index([fecha])
+  @@map("suscripciones")
+}

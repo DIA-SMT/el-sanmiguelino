@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarClock, FileText, MessageSquare, Sparkles } from "lucide-react";
+import { CalendarClock, FileText, Mailbox, MessageSquare, Sparkles } from "lucide-react";
 import { LogoHoja } from "@/components/brand/logos";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
@@ -10,6 +10,7 @@ const SECCIONES = [
   { href: "/admin/ediciones", icono: CalendarClock, texto: "Ediciones" },
   { href: "/admin/comentarios", icono: MessageSquare, texto: "Comentarios" },
   { href: "/admin/migue", icono: Sparkles, texto: "Migue" },
+  { href: "/admin/suscripciones", icono: Mailbox, texto: "Suscripciones" },
 ] as const;
 
 /**
