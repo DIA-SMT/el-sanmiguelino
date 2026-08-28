@@ -117,6 +117,11 @@ grupo("Piden el audio de otra nota", "audio-de-otra", [
   "pasame un audio de la nota de la peatonal",
   "me haces un resumen en audio de la agenda cultural",
   "escuchame la noticia del bacheo",
+  // La forma mas corta y mas comun, y la que se escapaba: no dice "nota".
+  "dame un audio de la peatonal",
+  "y ahora dame un audio de la peatonal",
+  "pasame el audio del transporte",
+  "leeme lo del parque",
 ]);
 
 /*

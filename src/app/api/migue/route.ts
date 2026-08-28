@@ -145,6 +145,10 @@ export async function POST(request: NextRequest) {
   let body: {
     pregunta?: string;
     notaSlug?: string;
+    /** El slug de la ultima nota que Migue cito, que el cliente devuelve para
+     *  que un "dame un audio de eso" tenga referente. Se verifica contra la
+     *  edicion antes de usarlo: llega del navegador. */
+    ultimaNota?: unknown;
     /** Los turnos anteriores del chat, que manda el cliente. */
     historial?: unknown;
   };
@@ -375,9 +379,46 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    // Sin tema claro se sigue de largo a propósito: contesta el modelo, que
-    // puede preguntar a cuál se refería. Un `return` acá sería un "no sé qué
-    // leerte" que corta la conversación en vez de continuarla.
+    /**
+     * "Me interesa eso, dame un resumen en audio": el referente está en la
+     * conversación, no en el mensaje.
+     *
+     * Salió de producción, y es la forma en que la gente habla de verdad: se
+     * pregunta por el bacheo, Migue contesta, y el pedido de audio dice "eso".
+     * Sin esto Migue respondía por escrito que eso no lo tenía, con la nota
+     * recién nombrada dos burbujas más arriba.
+     *
+     * **Es la única concesión de los atajos de la voz al hilo de la charla**, y
+     * se puede hacer sin adivinar nada porque no se interpreta la conversación:
+     * el cliente devuelve el `notaSlug` que esta misma ruta le mandó en el turno
+     * anterior, y acá se verifica contra la edición. Lo que llega del navegador
+     * no se cree, se comprueba.
+     *
+     * Va DESPUÉS de buscar por tema: si el mensaje nombra una nota, esa gana.
+     * "Dame un audio de la peatonal" en medio de una charla sobre el bacheo
+     * tiene que leer la peatonal.
+     */
+    const ultima =
+      typeof body.ultimaNota === "string"
+        ? indice.find((n) => n.slug === body.ultimaNota)
+        : undefined;
+    if (ultima) {
+      return responder(
+        "leer",
+        `Te leo el título y la bajada de “${ultima.titulo}”. Tocá de nuevo para que pare.`,
+        {
+          pregunta,
+          notaSlug: ultima.slug,
+          contextoSlug: body.notaSlug,
+          leer: textoDeResumenDeNota(ultima),
+        },
+      );
+    }
+
+    // Sin tema claro y sin nota en el hilo se sigue de largo a propósito:
+    // contesta el modelo, que puede preguntar a cuál se refería. Un `return`
+    // acá sería un "no sé qué leerte" que corta la conversación en vez de
+    // continuarla.
   }
 
   // Recuperación por puntaje sobre todas las notas (con leve sesgo a la nota abierta)

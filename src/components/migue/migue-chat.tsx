@@ -35,6 +35,19 @@ export function MigueChat() {
   const reducirMovimiento = useReducedMotion();
   const listaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /**
+   * El slug de la última nota que Migue cita.
+   *
+   * Existe para que "me interesa eso, dame un resumen en audio" tenga
+   * referente. Los atajos de la voz no miran la conversación a propósito —el
+   * referente sale de la ruta, no del hilo—, pero cuando alguien pide audio y
+   * no nombra ninguna nota, la que acaba de mencionarse ES la que quiere. Sin
+   * esto Migue contestaba por escrito que eso no lo tenía, con la nota recién
+   * nombrada dos burbujas más arriba.
+   *
+   * Va en un ref y no en estado: cambiarlo no tiene que repintar nada.
+   */
+  const ultimaNotaRef = useRef<string | undefined>(undefined);
   // Migue lee en voz alta cuando el servidor le manda un texto para decir.
   // El motor vive en el chat, que está montado en el layout, así que la voz
   // sobrevive al paso de página igual que la conversación.
@@ -71,11 +84,19 @@ export function MigueChat() {
           body: JSON.stringify({
             pregunta: limpia,
             notaSlug,
+            // La última nota de la que se habló, para que "dame un audio de
+            // eso" tenga a qué referirse. Ver `ultimaNotaRef`.
+            ultimaNota: ultimaNotaRef.current,
             historial: anteriores,
           }),
         });
         if (!res.ok) throw new Error();
-        const data: { respuesta: string; leer?: string } = await res.json();
+        const data: { respuesta: string; notaSlug?: string; leer?: string } =
+          await res.json();
+        // El hilo de QUÉ nota se está hablando. El historial de texto no
+        // alcanza: el servidor tendría que releer sus propias respuestas para
+        // adivinar de cuál habló, y el slug ya viaja en la respuesta.
+        if (data.notaSlug) ultimaNotaRef.current = data.notaSlug;
         setMensajes((prev) => [...prev, { rol: "migue", texto: data.respuesta }]);
         /*
          * Migue habla.

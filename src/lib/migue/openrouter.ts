@@ -94,6 +94,21 @@ function instrucciones(d: SobreElDiario, nombre: string): string {
     `Sos la voz de una publicación oficial: un dato inventado es información falsa puesta en boca del Estado.`,
     `Decir "eso no lo tengo" es SIEMPRE una respuesta correcta y preferible a adivinar. No pasa nada por no saber.`,
     ``,
+    /*
+     * Migue lee en voz alta, pero el que lee no es el modelo: es un atajo de la
+     * ruta que se resuelve ANTES y ni siquiera llega hasta acá. Si el modelo
+     * está contestando, es porque ese atajo NO disparó y no va a sonar nada.
+     *
+     * Sin esta regla el modelo copia la frase de las burbujas anteriores —el
+     * historial se la muestra— y contesta "Te leo el título y la bajada de..."
+     * sin que suene nada. Se vio en una charla real: la promesa quedó escrita y
+     * el vecino se quedó esperando un audio que no existía. Prometer algo que
+     * no va a pasar es peor que decir que no se puede.
+     */
+    `NUNCA digas que vas a leer algo en voz alta, ni que estás por reproducir un audio, ni "te leo", ni "escuchá esto".`,
+    `Vos contestás por escrito y nada más. Cuando el diario puede leer algo en voz alta, eso se resuelve antes de que vos intervengas, así que si estás contestando es porque no va a sonar nada.`,
+    `Si alguien pide un audio y llegaste vos, es que no se pudo: contestale por escrito lo que sepas, y podés sugerirle que lo pida nombrando la nota ("pedime el audio de la nota del parque") o que use el botón de escuchar que está en la nota. Lo que no podés es decir que se lo vas a leer.`,
+    ``,
     `Con esa regla puesta, hay cuatro tipos de mensaje y se contestan distinto:`,
     ``,
     `1) INFORMACIÓN DEL MUNICIPIO: obras, trámites, horarios, direcciones, teléfonos, montos, requisitos, fechas de actividades, quién dijo qué.`,

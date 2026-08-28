@@ -303,8 +303,31 @@ export function PIDE_QUE_LE_LEA(simple: string): boolean {
  * deja pasar al modelo — leerle en voz alta la nota equivocada es peor que
  * contestarle bien por escrito.
  */
-const PIDE_AUDIO_EXPLICITO =
-  /\b(audio|en voz alta|escuchar|escucharla|escucharlo|escuchame|leeme|leemelo|leemela|leelo|leela|dictame|narrame)\b/;
+/**
+ * Palabras que **solas** ya son un pedido de audio.
+ *
+ * Nadie le pide a un diario "un audio" ni "que se lo lean en voz alta" salvo
+ * que quiera exactamente eso. Son inequívocas, así que no necesitan una segunda
+ * condición: "dame un audio de la peatonal" es un pedido de audio aunque no
+ * diga la palabra "nota" en ningún lado. Exigirla dejaba afuera la forma más
+ * corta y más común de pedirlo, que fue lo que pasó en producción.
+ *
+ * `\b` protege el caso que parece problema y no lo es: "hay audioguías en el
+ * museo" no matchea, porque `audio` ahí no termina en borde de palabra.
+ */
+const PIDE_AUDIO_SIN_DUDA =
+  /\b(audio|audios|en voz alta|leeme|leemelo|leemela|leelo|leela|dictame|narrame)\b/;
+
+/**
+ * Palabras que piden audio **sólo si además se nombra algo del diario**.
+ *
+ * "Escuchar" es de las dos: "quiero escuchar la nota del parque" es un pedido
+ * de audio y "dónde puedo escuchar música en vivo" es la pregunta de un vecino.
+ * Lo que las separa es si nombra una unidad de contenido del diario, así que
+ * para estas la segunda condición sigue haciendo falta.
+ */
+const PIDE_AUDIO_CON_CONTENIDO =
+  /\b(escuchar|escucharla|escucharlo|escuchame|escucho)\b/;
 
 const MENCIONA_CONTENIDO =
   /\b(nota|notas|noticia|noticias|articulo|articulos|resumen|resumenes|tapa|portada|edicion)\b/;
@@ -314,7 +337,10 @@ export function PIDE_AUDIO_DE_OTRA_NOTA(simple: string): boolean {
   // exactamente qué leer sin adivinar nada. Este es sólo para lo que aquél no
   // atrapa.
   if (PIDE_QUE_LE_LEA(simple)) return false;
-  return PIDE_AUDIO_EXPLICITO.test(simple) && MENCIONA_CONTENIDO.test(simple);
+  if (PIDE_AUDIO_SIN_DUDA.test(simple)) return true;
+  return (
+    PIDE_AUDIO_CON_CONTENIDO.test(simple) && MENCIONA_CONTENIDO.test(simple)
+  );
 }
 
 /**
