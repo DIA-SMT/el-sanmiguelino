@@ -276,3 +276,61 @@ export function PIDE_QUE_LE_LEA(simple: string): boolean {
   if (SOLO_UN_LEEME.test(simple)) return true;
   return VERBO_DE_ESCUCHAR.test(simple) && ESTA_PAGINA.test(simple);
 }
+
+/**
+ * Pide el audio de una nota que **no** es la que está mirando.
+ *
+ * El caso que lo hizo falta: "dame un resumen en audio de bacheo", escrito
+ * desde la tapa. Tiene el pedido de audio pero ninguna referencia a la página
+ * actual —"esta página" ahí habría sido la tapa, no bacheo—, así que
+ * `PIDE_QUE_LE_LEA` no dispara y Migue contesta en texto que eso no lo tiene.
+ *
+ * La segunda condición no es una referencia a la página sino a **una unidad de
+ * contenido del diario**: nota, noticia, resumen, tapa. Esa palabra es lo que
+ * separa un pedido de audio del diario de la pregunta de un vecino: "¿dónde
+ * puedo escuchar música en vivo?" tiene el verbo y no nombra ninguna, así que
+ * sigue yendo al modelo, que es donde tiene que ir.
+ *
+ * **`leer` a secas quedó afuera de la lista de verbos, y es deliberado.**
+ * "quiero leer la nota del parque" es alguien que quiere leerla con los ojos:
+ * tiene verbo y tiene unidad de contenido, y convertirlo en audio sería
+ * exactamente el error que este archivo viene evitando. Los que entran son los
+ * que sólo se pueden querer escuchando: `audio`, `en voz alta`, `escuchar`, y
+ * los imperativos `leeme`/`leemelo`, que son "leer A MÍ" y no "leer".
+ *
+ * Encontrar la nota es otro problema y vive en la ruta: acá sólo se reconoce la
+ * intención. Si después no hay una nota claramente mejor que las demás, la ruta
+ * deja pasar al modelo — leerle en voz alta la nota equivocada es peor que
+ * contestarle bien por escrito.
+ */
+const PIDE_AUDIO_EXPLICITO =
+  /\b(audio|en voz alta|escuchar|escucharla|escucharlo|escuchame|leeme|leemelo|leemela|leelo|leela|dictame|narrame)\b/;
+
+const MENCIONA_CONTENIDO =
+  /\b(nota|notas|noticia|noticias|articulo|articulos|resumen|resumenes|tapa|portada|edicion)\b/;
+
+export function PIDE_AUDIO_DE_OTRA_NOTA(simple: string): boolean {
+  // El pedido sobre la página actual ya lo cubre `PIDE_QUE_LE_LEA`, y ese sabe
+  // exactamente qué leer sin adivinar nada. Este es sólo para lo que aquél no
+  // atrapa.
+  if (PIDE_QUE_LE_LEA(simple)) return false;
+  return PIDE_AUDIO_EXPLICITO.test(simple) && MENCIONA_CONTENIDO.test(simple);
+}
+
+/**
+ * Las palabras que describen el PEDIDO y no el tema.
+ *
+ * Se sacan antes de buscar la nota: en "dame un resumen en audio de bacheo" lo
+ * único que dice de qué nota hablamos es "bacheo". Sin quitarlas, "resumen" y
+ * "audio" puntúan contra cualquier nota que las mencione —y hay una sobre
+ * Migue que las menciona— y el desempate se lo lleva la nota equivocada.
+ */
+export const PALABRAS_DEL_PEDIDO = new Set([
+  "dame", "damelo", "pasame", "quiero", "podes", "puedes", "necesito",
+  "hacer", "haceme", "hace", "decime", "contame", "mandame", "ponme", "poneme",
+  "audio", "voz", "alta", "escuchar", "escucharla", "escucharlo", "escuchame",
+  "leeme", "leemelo", "leemela", "leelo", "leela", "leer", "lee", "lectura",
+  "dictame", "narrame", "resumen", "resumenes", "resumime", "resumir",
+  "nota", "notas", "noticia", "noticias", "articulo", "articulos",
+  "tapa", "portada", "edicion", "sobre", "acerca", "por", "favor",
+]);

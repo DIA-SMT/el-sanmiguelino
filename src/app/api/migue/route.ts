@@ -20,6 +20,8 @@ import {
   ES_SOLO_UN_SALUDO,
   HABLA_DE_OTRA,
   PIDE_EL_INDICE,
+  PIDE_AUDIO_DE_OTRA_NOTA,
+  PALABRAS_DEL_PEDIDO,
   PIDE_QUE_LE_LEA,
   respuestaSobreElDiario,
   simplificar,
@@ -298,6 +300,84 @@ export async function POST(request: NextRequest) {
       "Todavía no hay nada cargado en esta edición para leerte.",
       { pregunta, contextoSlug: body.notaSlug },
     );
+  }
+
+  /**
+   * "Dame un resumen en audio de bacheo": el audio de una nota que NO es la
+   * que está mirando.
+   *
+   * Salió de un caso real en producción, escrito desde la tapa. El pedido de
+   * audio estaba, pero la referencia a la página no —y no podía estar, porque
+   * la página era la tapa y la nota era otra—, así que el atajo de arriba no
+   * disparaba y Migue contestaba por escrito que eso no lo tenía.
+   *
+   * **Si no hay una nota claramente mejor que las demás, NO lee y deja pasar al
+   * modelo.** Leerle en voz alta la nota equivocada es peor que contestarle
+   * bien por escrito: en pantalla un desacierto se ve de un vistazo, hablado
+   * hay que escucharlo entero para darse cuenta.
+   *
+   * "Claramente" son dos condiciones, y las dos hacen falta: que la mejor
+   * puntúe, y que puntúe MÁS que la segunda. Con un empate no hay forma de
+   * saber a cuál se refería —"la nota de la plaza" con dos notas sobre plazas—
+   * y elegir la primera sería elegir por orden de carga.
+   *
+   * Se busca sobre el índice, que ya está pedido arriba y trae titular y
+   * bajada. No hace falta `getCompletas()`: quien pide "el audio de bacheo"
+   * nombra el tema como lo nombra el titular, no con una palabra enterrada en
+   * el séptimo párrafo.
+   */
+  if (PIDE_AUDIO_DE_OTRA_NOTA(simple)) {
+    // Sin las palabras del pedido, lo que queda es el tema. Ver el comentario
+    // de PALABRAS_DEL_PEDIDO: sin esto "resumen" y "audio" puntúan contra la
+    // nota que habla de Migue y se llevan el desempate.
+    const delTema = tokens.filter((t) => !PALABRAS_DEL_PEDIDO.has(t));
+
+    if (delTema.length > 0) {
+      /*
+       * El titular pesa el triple que la bajada, y ese peso es lo que hace
+       * utilizable a la regla del desempate.
+       *
+       * Sin él, "la nota sobre el transporte" empataba: una nota lo lleva en el
+       * titular y otra —la del bacheo— menciona "los corredores del transporte
+       * público" en su bajada, al pasar. Con las dos en uno, no había ganador
+       * claro y Migue no leía nada, que es correcto pero inútil: para quien
+       * pregunta, una de las dos es obviamente la nota "del transporte".
+       *
+       * El titular dice de qué ES la nota; la bajada puede nombrar cualquier
+       * cosa que la nota toque. Tres es suficiente para que un titular le gane
+       * a una mención y poco para que le gane a otro titular.
+       */
+      const puntuadas = indice
+        .map((n) => {
+          const enTitulo = new Set(tokenizar(n.titulo));
+          const enResto = new Set(tokenizar(`${n.bajada} ${n.seccion}`));
+          const puntaje = delTema.reduce(
+            (t, palabra) =>
+              t + (enTitulo.has(palabra) ? 3 : enResto.has(palabra) ? 1 : 0),
+            0,
+          );
+          return { nota: n, puntaje };
+        })
+        .sort((a, b) => b.puntaje - a.puntaje);
+
+      const mejor = puntuadas[0];
+      const segunda = puntuadas[1];
+      if (mejor && mejor.puntaje > 0 && mejor.puntaje > (segunda?.puntaje ?? 0)) {
+        return responder(
+          "leer",
+          `Te leo el título y la bajada de “${mejor.nota.titulo}”. Tocá de nuevo para que pare.`,
+          {
+            pregunta,
+            notaSlug: mejor.nota.slug,
+            contextoSlug: body.notaSlug,
+            leer: textoDeResumenDeNota(mejor.nota),
+          },
+        );
+      }
+    }
+    // Sin tema claro se sigue de largo a propósito: contesta el modelo, que
+    // puede preguntar a cuál se refería. Un `return` acá sería un "no sé qué
+    // leerte" que corta la conversación en vez de continuarla.
   }
 
   // Recuperación por puntaje sobre todas las notas (con leve sesgo a la nota abierta)

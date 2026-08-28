@@ -23,6 +23,7 @@
  */
 const {
   ES_SOLO_UN_SALUDO,
+  PIDE_AUDIO_DE_OTRA_NOTA,
   PIDE_QUE_LE_LEA,
   HABLA_DE_OTRA,
   PIDE_EL_INDICE,
@@ -40,16 +41,30 @@ const DIARIO = {
   archivo: ["Julio de 2026", "Junio de 2026"],
 };
 
-/** El camino que toma una pregunta, igual que en la ruta. */
+/**
+ * El camino que toma una pregunta, **en el mismo orden que la ruta**.
+ *
+ * El orden importa y por eso se copia: saludo, índice, leer la página, audio de
+ * otra nota, y recién al final el diario. Una frase puede matchear dos atajos y
+ * lo que decide es cuál corre primero; si este archivo los evaluara en otro
+ * orden, verificaría un sistema que no existe.
+ *
+ * Lo que NO se puede reproducir acá es si el pedido de audio de otra nota
+ * encuentra a cuál se refería: eso necesita el índice de la edición. Este
+ * archivo verifica que la INTENCIÓN se reconozca —que es donde están los falsos
+ * positivos que duelen—; que resuelva la nota correcta se prueba con la
+ * edición cargada.
+ */
 function camino(pregunta) {
   const s = simplificar(pregunta);
   if (ES_SOLO_UN_SALUDO.test(s)) return "saludo";
-  // El atajo de la lectura en voz alta. En la ruta va despues del indice y,
-  // a diferencia de los otros dos, vale tambien en medio de una charla.
-  if (PIDE_QUE_LE_LEA(s)) return "leer";
   if (PIDE_EL_INDICE.some((p) => p.test(s)) && !HABLA_DE_OTRA.test(s)) {
     return "indice";
   }
+  // Los dos atajos de la voz. A diferencia del saludo y del índice, valen
+  // también en medio de una charla: el referente no sale de la conversación.
+  if (PIDE_QUE_LE_LEA(s)) return "leer";
+  if (PIDE_AUDIO_DE_OTRA_NOTA(s)) return "audio-de-otra";
   // En la ruta esto corre al final, sólo si el buscador no encontró nada.
   if (respuestaSobreElDiario(s, DIARIO)) return "diario";
   return "modelo";
@@ -87,14 +102,41 @@ grupo("Piden que Migue les lea la página", "leer", [
   "leeme la pagina en la que estoy",
 ]);
 
-/* Tienen el verbo pero NO hablan de la página: son preguntas de vecinos. */
-grupo("Hablan de escuchar, pero no le piden nada a Migue", "modelo", [
+/*
+ * Piden el audio de OTRA nota, no de la página donde están.
+ *
+ * Salió de un caso real en producción: "dame un resumen en audio de bacheo",
+ * escrito desde la tapa. Acá la segunda condición no es la página actual sino
+ * una unidad de contenido del diario —nota, noticia, resumen, tapa—, que es lo
+ * que separa un pedido de audio del diario de la pregunta de un vecino.
+ */
+grupo("Piden el audio de otra nota", "audio-de-otra", [
+  "dame un resumen en audio de bacheo",
+  "leeme la nota del parque",
+  "quiero escuchar la nota sobre el transporte",
+  "pasame un audio de la nota de la peatonal",
+  "me haces un resumen en audio de la agenda cultural",
+  "escuchame la noticia del bacheo",
+]);
+
+/*
+ * Tienen el verbo pero NO hablan de la página NI del diario: son preguntas de
+ * vecinos y van al modelo.
+ *
+ * Las dos últimas son la razón por la que `leer` a secas quedó fuera de la lista
+ * de verbos que piden audio: "quiero leer la nota del parque" tiene verbo Y
+ * tiene unidad de contenido, y es alguien que quiere leerla con los ojos.
+ * Convertirlo en audio sería el mismo error de siempre, con otra ropa.
+ */
+grupo("Hablan de escuchar o leer, pero no piden audio", "modelo", [
   "donde puedo escuchar musica en vivo",
   "cuando puedo escuchar la banda municipal",
   "donde escucho el recital de septiembre",
   "donde hay talleres de lectura",
   "quiero leer sobre el parque 9 de julio",
   "hay audioguias en el museo",
+  "quiero leer la nota del parque",
+  "donde leo la noticia del bacheo",
 ]);
 
 /*
