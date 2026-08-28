@@ -25,6 +25,23 @@ const TOPE_POR_PERSONA = Number(process.env.MIGUE_TOPE_PERSONA ?? 20);
 const TOPE_GLOBAL = Number(process.env.MIGUE_TOPE_GLOBAL ?? 300);
 
 /**
+ * La clave con la que la lectura en voz alta anota su consumo.
+ *
+ * **Vive acá aunque la escriba `/api/voz`, y eso es a propósito.** La tabla
+ * `ConsumoMigue` la comparten dos presupuestos que no se mezclan: las llamadas
+ * al modelo, que deciden si Migue puede responder preguntas, y las
+ * generaciones de audio, que son otra cosa y otra plata. Las dos consultas de
+ * este archivo excluyen esta clave.
+ *
+ * Si la constante viviera del lado de quien escribe, un cambio de string
+ * rompería el filtro **en silencio**: la voz volvería a comerle a Migue sus
+ * llamadas de la hora y a contarse como una persona en el tablero, sin que
+ * nada falle. Exportada desde acá, quien filtra y quien escribe no pueden
+ * diferir.
+ */
+export const CLAVE_DE_LA_VOZ = "voz";
+
+/**
  * El identificador de quien pregunta, sin poder decir quién es.
  *
  * Se saltea con `SESSION_SECRET`, que no sale del servidor. Sin sal, un hash
@@ -88,8 +105,13 @@ export async function contarConsultaAlModelo(
 
     // El global se mira sólo si el individual pasó: es una consulta más y no
     // hace falta pagarla en cada request de alguien que ya se pasó.
+    // `clave: { not: CLAVE_DE_LA_VOZ }`: la tabla la comparte el fusible de la
+    // lectura en voz alta (`/api/voz`), que reusa el mecanismo pero NO el
+    // presupuesto. Sin este filtro, un vecino escuchando notas le come a Migue
+    // sus llamadas al modelo de la hora —hasta 60 de 300 bajo ráfaga— y Migue
+    // deja de responder preguntas por algo que no es una pregunta.
     const total = await db().consumoMigue.aggregate({
-      where: { ventana },
+      where: { ventana, clave: { not: CLAVE_DE_LA_VOZ } },
       _sum: { consultas: true },
     });
     if ((total._sum.consultas ?? 0) > TOPE_GLOBAL) {
@@ -119,8 +141,12 @@ export async function consumoDeLaHora(): Promise<{
   if (!process.env.DATABASE_URL) return vacio;
 
   try {
+    // Mismo filtro que arriba, y acá importa por otra razón: `personas` se
+    // calcula como la cantidad de filas, y la fila de la voz no es una persona.
+    // Sin esto el tablero diría "de 1 persona" en una hora en que no preguntó
+    // nadie.
     const filas = await db().consumoMigue.findMany({
-      where: { ventana: ventanaActual() },
+      where: { ventana: ventanaActual(), clave: { not: CLAVE_DE_LA_VOZ } },
       select: { consultas: true },
     });
     return {
