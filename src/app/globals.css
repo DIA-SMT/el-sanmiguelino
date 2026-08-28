@@ -60,6 +60,35 @@
   /* lavado de acento para fondos y estados */
   --accent-wash: rgb(10 92 232 / 0.08);
 
+  /* --- gráficos del tablero: un color por resultado de Migue ------------
+     Son cuatro y siempre los mismos: si el naranja quiere decir "sin
+     respuesta" en el anillo, tiene que querer decir lo mismo en la línea y en
+     la tabla, o la pantalla enseña dos idiomas.
+
+     El saludo NO tiene color, y no es que falte: no es una pregunta, queda
+     fuera de los gráficos, y pintarlo lo pondría a competir con los que sí
+     importan.
+
+     NO están en `@theme inline` a propósito. Se usan como
+     `fill="var(--grafico-…)"` dentro del SVG y como color de fondo de los
+     cuadraditos de la leyenda; nunca como clase de Tailwind. Meterlas en el
+     tema generaría un juego entero de utilidades (bg-, text-, border-, ring-,
+     divide-, from-…) por color que nadie va a escribir, y ensuciaría el
+     autocompletado con nombres que no son colores de la marca.
+
+     Los cuatro valores del modo claro están validados sobre --paper (#fcfaf4):
+     banda de luminosidad, piso de croma, separación para daltonismo (peor par
+     ΔE 9.4) y piso de visión normal (ΔE 15.5), tomando TODOS los pares y no
+     sólo los vecinos, porque el anillo cierra y el último segmento toca al
+     primero. El celeste queda en 2.54:1 contra el papel, por debajo de 3:1;
+     eso es aceptable únicamente porque la leyenda lleva etiqueta y número
+     escritos al lado del color, así que la identidad nunca depende del color
+     solo. Si alguna vez se saca esa leyenda, hay que oscurecer el celeste. */
+  --grafico-nota: #0a5ce8;
+  --grafico-indice: #22a7f5;
+  --grafico-diario: #b8860b;
+  --grafico-alerta: #c2410c;
+
   /* --- textura y velos -------------------------------------------------- */
   --grano-tinta: rgb(26 22 14 / 0.055);
   /* velo sobre las fotos: en nocturno bajan un punto para no encandilar */
@@ -121,6 +150,25 @@
   --accent-contrast: #05131f;
   --accent-wash: rgb(56 182 255 / 0.12);
 
+  /* Los cuatro colores de los gráficos, en nocturno. NO son los del modo claro
+     aclarados: en oscuro la banda de luminosidad utilizable es angosta (OKLCH
+     L entre 0.48 y 0.67), así que la diferencia no se puede pagar con claridad
+     y hay que pagarla con TONO.
+
+     Por eso el "índice" deja de ser un azul claro y se va al verde-azulado: el
+     par azul ↔ celeste del modo claro, subido a esta banda, quedaba por debajo
+     del piso de visión normal y se veía como un solo azul con dos brillos.
+
+     Validado sobre --paper (#141922) y también sobre --paper-2 (#191f2a),
+     tomando TODOS los pares —el anillo cierra y el último segmento toca al
+     primero—: peor par para daltonismo ΔE 10.7 (oro ↔ alerta, deuteranopía),
+     peor par de visión normal ΔE 17.8 (azul ↔ verde-azulado), y los cuatro por
+     encima de 3:1 contra el fondo. Acá no hay ni un WARN. */
+  --grafico-nota: #2570cc;
+  --grafico-indice: #30a5a6;
+  --grafico-diario: #b98e1b;
+  --grafico-alerta: #c83c25;
+
   --grano-tinta: rgb(196 210 232 / 0.045);
   --velo-foto: rgb(8 12 20 / 0.2);
   --velo-panorama: rgb(9 13 21 / 0.68);
@@ -148,6 +196,14 @@
     --accent-strong: #7fcfff;
     --accent-contrast: #05131f;
     --accent-wash: rgb(56 182 255 / 0.12);
+
+    /* La razón de estos cuatro está escrita arriba, en el bloque del toggle.
+       Acá van pelados para que las dos listas de declaraciones se puedan
+       comparar línea por línea. */
+    --grafico-nota: #2570cc;
+    --grafico-indice: #30a5a6;
+    --grafico-diario: #b98e1b;
+    --grafico-alerta: #c83c25;
 
     --grano-tinta: rgb(196 210 232 / 0.045);
     --velo-foto: rgb(8 12 20 / 0.2);
