@@ -116,16 +116,35 @@ export function MigueChat() {
          * gana el chat es la voz: donde el navegador deja reproducir, Migue
          * suena como Migue en vez de como el sintetizador del sistema.
          *
-         * La fuente sale del pathname, que es de dónde sale todo el contexto
-         * de este componente: si hay nota abierta, se lee la nota; si no, la
-         * tapa. El texto no viaja —lo deriva el servidor—; `data.leer` queda
-         * como el respaldo que se le pasa a la voz del sistema.
+         * **La fuente sale de `data.notaSlug`, no del pathname**, y la
+         * diferencia no es cosmética: es de qué habla la voz.
+         *
+         * Salió roto a producción. Estaba tomando el slug de la URL, que es de
+         * dónde sale el resto del contexto de este componente. Pero desde la
+         * tapa el pathname no tiene slug, así que a "dame un resumen en audio
+         * de la peatonal" el texto contestaba "te leo la peatonal" y sonaba
+         * **el audio de la tapa**. Peor que no sonar: la voz oficial del
+         * municipio leyendo algo que nadie pidió, con la pantalla afirmando
+         * otra cosa.
+         *
+         * Quién decide qué se lee es el servidor —es el único que tiene la
+         * edición— y lo dice en la respuesta. El pathname dice dónde está
+         * parado el lector, que es una pregunta distinta y acá no es la que
+         * importa: se puede pedir el audio de una nota desde cualquier página.
+         *
+         * Sin `notaSlug` en la respuesta, lo que se leyó es la tapa: es el
+         * único caso donde la ruta contesta con `leer` y sin nota.
+         *
+         * El texto no viaja —lo deriva el servidor—; `data.leer` queda como el
+         * respaldo que se le pasa a la voz del sistema.
          */
         if (data.leer) {
-          leer(data.leer, {
-            que: notaSlug ? "nota" : "tapa",
-            slug: notaSlug,
-          });
+          leer(
+            data.leer,
+            data.notaSlug
+              ? { que: "nota", slug: data.notaSlug }
+              : { que: "tapa" },
+          );
         }
       } catch {
         setErrorUltima(limpia);
