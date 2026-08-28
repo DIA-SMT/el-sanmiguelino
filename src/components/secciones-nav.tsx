@@ -14,20 +14,36 @@ import { cn } from "@/lib/utils";
 export function SeccionesNav({
   secciones,
   seccionActiva,
+  tema,
 }: {
   secciones: SeccionInfo[];
   /** slug de la sección activa cuando se está leyendo una nota */
   seccionActiva?: string;
+  /**
+   * De qué se trata el número.
+   *
+   * Si está, **reemplaza a las secciones**: El Sanmiguelino no se divide en
+   * Cultura / Ciudad / Obras, cada edición es un tema y todas sus notas hablan
+   * de eso. Listar las secciones de las notas era listar la misma palabra ocho
+   * veces.
+   *
+   * Si no está —agosto y lo anterior, que salieron con secciones— la barra
+   * queda como estaba. Un número publicado tiene que seguir viéndose como
+   * salió.
+   */
+  tema?: string;
 }) {
   const pathname = usePathname();
 
   const items: { etiqueta: string; href: string; activa: boolean }[] = [
     { etiqueta: "Portada", href: "/diario", activa: pathname === "/diario" },
-    ...secciones.map((s) => ({
-      etiqueta: s.nombre,
-      href: `/seccion/${s.slug}`,
-      activa: pathname === `/seccion/${s.slug}` || seccionActiva === s.slug,
-    })),
+    ...(tema
+      ? []
+      : secciones.map((s) => ({
+          etiqueta: s.nombre,
+          href: `/seccion/${s.slug}`,
+          activa: pathname === `/seccion/${s.slug}` || seccionActiva === s.slug,
+        }))),
   ];
 
   function abrirMigue() {
@@ -66,6 +82,15 @@ export function SeccionesNav({
               />
             </Link>
           ))}
+
+          {/* El tema del número. No es un enlace: no hay a dónde ir, todas las
+              notas son de esto. Es el subtítulo del diario, como el "Edición
+              mensual" del masthead pero diciendo de qué va este número. */}
+          {tema && (
+            <p className="min-w-0 shrink px-3.5 py-3 font-serif text-[0.82rem] italic leading-tight text-ink-2 sm:px-2">
+              <span className="truncate">{tema}</span>
+            </p>
+          )}
         </div>
 
         <span className="flex shrink-0 items-center gap-2 border-l border-hairline pl-2.5 sm:pl-3">

@@ -166,8 +166,16 @@ const edicionActualFila = cache(async () => {
 
 export const edicionPostgresRepo: EdicionRepo = {
   async resumen(): Promise<EdicionResumen> {
-    const { slug, mes, numero, anio, etiqueta } = await edicionActualFila();
-    return { slug, mes, numero, anio, etiqueta: etiqueta ?? undefined };
+    const { slug, mes, numero, anio, etiqueta, tema } =
+      await edicionActualFila();
+    return {
+      slug,
+      mes,
+      numero,
+      anio,
+      etiqueta: etiqueta ?? undefined,
+      tema: tema ?? undefined,
+    };
   },
 
   async indice(): Promise<NotaResumen[]> {
@@ -438,6 +446,7 @@ export const edicionPostgresRepo: EdicionRepo = {
       numero: e.numero,
       anio: e.anio,
       etiqueta: e.etiqueta ?? undefined,
+      tema: e.tema ?? undefined,
     }));
   },
 

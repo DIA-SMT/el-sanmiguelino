@@ -278,6 +278,10 @@ export async function POST(request: NextRequest) {
       pregunta,
       notas: paraElModelo,
       diario,
+      // Para que "resumime esta página" tenga a qué referirse.
+      abierta: notaAbierta
+        ? { slug: notaAbierta.slug, titulo: notaAbierta.titulo }
+        : null,
       nombreUsuario: usuario.nombre.split(" ")[0],
       historial,
     });

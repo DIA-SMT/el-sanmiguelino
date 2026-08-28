@@ -20,6 +20,8 @@ export interface EdicionFila {
   publicaEnLocal: string;
   /** Texto legible de la fecha, o null. */
   publicaEnTexto: string | null;
+  /** De qué se trata el número. null en las ediciones viejas. */
+  tema: string | null;
   notas: number;
   estado: "publicada" | "programada" | "sin_fecha";
 }
@@ -49,6 +51,7 @@ export function FilaEdicion({
   const [editando, setEditando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fecha, setFecha] = useState(edicion.publicaEnLocal);
+  const [tema, setTema] = useState(edicion.tema ?? "");
 
   function guardarFecha() {
     setError(null);
@@ -61,6 +64,7 @@ export function FilaEdicion({
           anio: edicion.anio,
           etiqueta: edicion.etiqueta ?? "",
           publicaEn: fecha,
+          tema,
         });
         if (!res.ok) {
           setError(res.error ?? "No se pudo guardar.");
@@ -123,6 +127,20 @@ export function FilaEdicion({
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
         {editando ? (
           <span className="flex flex-wrap items-center gap-2">
+            {/* De qué se trata el número. El Sanmiguelino no se divide en
+                secciones: cada edición es un tema, y esto es lo que el diario
+                muestra en la barra en lugar de las secciones. */}
+            <label className="flex min-w-0 flex-1 basis-full items-center gap-2">
+              <span className="shrink-0 font-sans text-[0.72rem] text-ink-3">
+                Tema
+              </span>
+              <input
+                value={tema}
+                onChange={(e) => setTema(e.target.value)}
+                className={cn(campo, "min-w-0 flex-1")}
+                placeholder="Historia de San Miguel de Tucumán"
+              />
+            </label>
             <label className="flex items-center gap-2">
               <span className="font-sans text-[0.72rem] text-ink-3">
                 Sale el
@@ -151,6 +169,7 @@ export function FilaEdicion({
               onClick={() => {
                 setEditando(false);
                 setFecha(edicion.publicaEnLocal);
+                setTema(edicion.tema ?? "");
                 setError(null);
               }}
               className="pressable font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-3 hover:text-ink"
@@ -160,6 +179,17 @@ export function FilaEdicion({
           </span>
         ) : (
           <>
+            {/* El tema, a la vista sin tener que abrir el editor: es lo que
+                el lector va a ver en la barra del diario. */}
+            <span className="basis-full font-serif text-[0.85rem] italic text-ink-2">
+              {edicion.tema ? (
+                edicion.tema
+              ) : (
+                <span className="not-italic text-ink-3">
+                  Sin tema: el diario muestra las secciones de las notas.
+                </span>
+              )}
+            </span>
             <span className="font-sans text-[0.8rem] text-ink-2">
               {edicion.publicaEnTexto ? (
                 <>Sale el {edicion.publicaEnTexto}</>
@@ -175,7 +205,7 @@ export function FilaEdicion({
               className="pressable inline-flex items-center gap-1.5 border border-line px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-2 hover:border-ink hover:text-ink"
             >
               <Pencil className="h-3 w-3" aria-hidden="true" />
-              Cambiar fecha
+              Tema y fecha
             </button>
           </>
         )}

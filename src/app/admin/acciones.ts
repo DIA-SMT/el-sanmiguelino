@@ -248,7 +248,8 @@ export async function guardarEdicionAction(datos: unknown): Promise<{
 
   try {
     if (!esObjeto(datos)) throw new Error("Faltan los datos de la edición.");
-    const { slug, mes, numero, anio, etiqueta, publicaEn, esNueva } = datos;
+    const { slug, mes, numero, anio, etiqueta, publicaEn, tema, esNueva } =
+      datos;
 
     if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
       throw new Error(
@@ -276,6 +277,9 @@ export async function guardarEdicionAction(datos: unknown): Promise<{
       anio: a,
       etiqueta: textoNoVacio(etiqueta) ? etiqueta : null,
       publicaEn: instante,
+      // El tema del número. Vacío se guarda como null y no como cadena vacía:
+      // la barra del diario decide con "hay tema o no", y "" es un tema.
+      tema: textoNoVacio(tema) ? tema.trim() : null,
     };
 
     const existente = await db().edicion.findUnique({

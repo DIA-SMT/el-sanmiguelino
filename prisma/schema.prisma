@@ -23,7 +23,20 @@ model Edicion {
   mes      String
   numero   Int
   anio     Int
+  /// "Edición mensual" y cosas así: el rótulo del número, no su contenido.
   etiqueta String?
+
+  /// De qué se trata este número: "Historia de San Miguel de Tucumán".
+  ///
+  /// El Sanmiguelino no se divide en secciones fijas —Cultura, Ciudad, Obras—:
+  /// **cada edición es un tema y todas sus notas hablan de eso**. La barra del
+  /// diario mostraba las secciones de las notas, que con este modelo es una
+  /// lista de una sola cosa repetida.
+  ///
+  /// Opcional porque las ediciones viejas no lo tienen: agosto ya salió con
+  /// secciones cargadas y tiene que seguir viéndose como salió. Si hay tema, la
+  /// barra lo muestra; si no, muestra las secciones de siempre.
+  tema String?
 
   /// Cuándo sale esta edición. `null` = todavía no tiene fecha, así que no
   /// se publica nunca sola.

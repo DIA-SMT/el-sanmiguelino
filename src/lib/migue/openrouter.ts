@@ -160,12 +160,16 @@ export async function preguntarAlModelo({
   notas,
   diario,
   nombreUsuario,
+  abierta,
   historial = [],
 }: {
   pregunta: string;
   notas: NotaParaElModelo[];
   /** Los hechos del diario en sí: mes en la calle, próxima edición, archivo. */
   diario: SobreElDiario;
+  /** Qué está mirando el lector: la nota abierta, o null si está en la tapa.
+   *  Sin esto, "resumime esta página" no tiene a qué referirse. */
+  abierta?: { slug: string; titulo: string } | null;
   nombreUsuario: string;
   /** Los turnos anteriores del chat. Sin esto cada pregunta llega sola, y a
    *  un "decime" no se le puede contestar nada sensato. */
@@ -198,6 +202,14 @@ export async function preguntarAlModelo({
         temperature: 0.2,
         messages: [
           { role: "system", content: instrucciones(diario, nombreUsuario) },
+        {
+          role: "system",
+          content: abierta
+            ? `DÓNDE ESTÁ PARADO EL LECTOR: leyendo la nota "${abierta.titulo}" (slug ${abierta.slug}).
+Si te habla de "esta nota", "esta página", "esto que estoy leyendo" o te pide un resumen sin decir de qué, es ESA.`
+            : `DÓNDE ESTÁ PARADO EL LECTOR: en la tapa del diario.
+Si te pide un resumen de "esta página" sin decir de qué, contale de qué trata la edición y qué notas trae.`,
+        },
           {
             role: "system",
             content: `NOTAS DE LA EDICIÓN DE ${diario.mes.toUpperCase()}:\n\n${contexto(notas)}`,

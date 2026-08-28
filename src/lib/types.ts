@@ -83,6 +83,9 @@ export interface EdicionResumen {
   numero: number;
   anio: number;
   etiqueta?: string;
+  /** De qué se trata el número: "Historia de San Miguel de Tucumán".
+   *  Ausente en las ediciones viejas, que salieron con secciones. */
+  tema?: string;
 }
 
 /**

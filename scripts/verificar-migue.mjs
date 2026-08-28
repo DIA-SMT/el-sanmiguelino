@@ -144,6 +144,11 @@ grupo("Gustos y recomendaciones", "modelo", [
   "cual es la mas importante",
   "hay algo interesante",
   "que onda, algo copado para el finde",
+  // Resumir lo que se esta leyendo: va al modelo, que es el unico que sabe en
+  // que pagina esta parado el lector.
+  "resumime esta pagina",
+  "de que va esta nota",
+  "haceme un resumen de lo que estoy leyendo",
   "cual esta buena",
 ]);
 

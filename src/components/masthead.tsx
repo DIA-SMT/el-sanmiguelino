@@ -120,7 +120,11 @@ export function Masthead({
       </header>
 
       {/* Barra de secciones */}
-      <SeccionesNav secciones={secciones} seccionActiva={seccionActiva} />
+      <SeccionesNav
+        secciones={secciones}
+        seccionActiva={seccionActiva}
+        tema={edicion.tema}
+      />
     </>
   );
 }

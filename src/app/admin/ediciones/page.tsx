@@ -46,6 +46,7 @@ export default async function AdminEdiciones() {
     etiqueta: e.etiqueta,
     publicaEnLocal: e.publicaEn ? aHoraTucuman(e.publicaEn) : "",
     publicaEnTexto: e.publicaEn ? textoHoraTucuman(e.publicaEn) : null,
+    tema: e.tema,
     notas: e._count.notas,
     estado: !e.publicaEn
       ? "sin_fecha"

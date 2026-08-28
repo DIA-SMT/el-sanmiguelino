@@ -1223,3 +1223,43 @@ la lista de domicilios sería una URL que cualquiera con sesión puede pedir.
 Verificado de punta a punta: formulario enviado desde el diario, la fila en la
 base con el domicilio con coma intacto, la lista en el panel y el CSV con las
 comillas y el BOM donde van. La suscripción de prueba se borró.
+
+## El tema de la edición, en lugar de las secciones
+
+El Sanmiguelino **no se divide en secciones fijas**. Cada número es un tema y
+todas sus notas hablan de eso: el 1 fue esculturas y museos, el 2 las plazas, el
+3 es la historia de la ciudad. La barra del diario mostraba las secciones de las
+notas, que con ese modelo es la misma palabra repetida ocho veces.
+
+Ahora la edición tiene un campo **Tema**, que se carga en Ediciones junto con la
+fecha, y la barra lo muestra al lado de PORTADA. No es un enlace: no hay a dónde
+ir, todas las notas son de eso.
+
+**Agosto tiene que seguir viéndose como salió.** Ya está publicado y tiene sus
+secciones cargadas, así que el tema es opcional: si la edición lo tiene, la
+barra lo muestra; si no, muestra las secciones de siempre. Verificado leyendo la
+barra en las dos:
+
+```
+agosto      PORTADA CULTURA CIUDAD HISTORIA OBRAS TRANSPORTE
+septiembre  PORTADA Historia de San Miguel de Tucumán
+```
+
+Vacío se guarda como `null` y no como cadena vacía: la barra decide con "hay
+tema o no", y `""` es un tema.
+
+## Migue sabe en qué página estás
+
+A "resumime esta página" no tenía a qué referirse. La ruta ya sabía qué nota
+estaba abierta —la usa para inclinar el puntaje del buscador— pero no se lo
+decía al modelo.
+
+Ahora se lo dice, y también cuando el lector está en la tapa:
+
+- Leyendo una nota: *"leyendo la nota «Bacheo en marcha…»; si te habla de esta
+  nota o esta página, es ESA"*.
+- En la tapa: *"si te pide un resumen de esta página, contale de qué trata la
+  edición y qué notas trae"*.
+
+Verificado contra el OpenRouter de mentira que el mensaje llega en los dos
+casos. Que el modelo lo aproveche se ve en producción.
