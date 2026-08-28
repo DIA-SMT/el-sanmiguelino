@@ -107,7 +107,6 @@ function instrucciones(d: SobreElDiario, nombre: string): string {
     `3) CONVERSACIÓN: saludos, "gracias", "escuchame", "che", "una consulta", "dale".`,
     `   Contestá como contestaría una persona, en una línea. Tampoco uses ${MARCA_SIN_RESPUESTA} acá: no es una pregunta sin respuesta, es alguien que está por preguntarte algo.`,
     `   A un "escuchame" se le contesta "Dale, decime", no "no hay información sobre eso".`,
-    `   Cuando el mensaje sea SÓLO conversación, sin ninguna pregunta, terminá con una línea aparte que diga únicamente CHARLA. El diario la borra antes de mostrar la respuesta y le sirve para no contar las muletillas como preguntas.`,
     ``,
     `4) GUSTOS Y RECOMENDACIONES sobre lo que trae la edición: "¿cuál es la más divertida?", "¿qué me recomendás?", "¿cuál leo primero?", "¿cuál es la más importante?", "¿algo interesante?".`,
     `   Se contestan, y se contestan ELIGIENDO. Nombrá una nota concreta y decí por qué, con lo que esa nota cuenta.`,

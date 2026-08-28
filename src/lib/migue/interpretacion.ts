@@ -207,13 +207,30 @@ export function interpretar(crudo: string): RespuestaMigue {
   const quedan: string[] = [];
 
   for (const linea of texto.split("\n")) {
-    const pelada = linea.replace(/[>*_#\-`~\s]/g, "").toUpperCase();
+    // Se le saca la puntuación de markdown Y la del final. El modelo escribió
+    // "CHARLA." con punto y la línea entera terminó a la vista del lector: es la
+    // tercera marca que se filtra por pedir una forma exacta.
+    const pelada = linea
+      .replace(/[>*_#\-`~\s]/g, "")
+      .replace(/[.,;:!¡?¿]+$/, "")
+      .toUpperCase();
     if (pelada.startsWith("FUENTE:")) {
       // El primer slug de la primera línea de fuente. Si el modelo cita dos
       // notas, se enlaza una sola y las dos líneas se van igual.
       notaSlug ??= (linea.match(/[a-z0-9]+(?:-[a-z0-9]+)+/) ?? [])[0];
       continue;
     }
+    /*
+     * La marca de charla ya NO se pide —ver `instrucciones()`—, pero se sigue
+     * barriendo: el modelo la venía escribiendo y una respuesta vieja en el
+     * historial de alguien puede traerla.
+     *
+     * Se sacó de las instrucciones porque servía sólo para una métrica del
+     * tablero —que un "gracias" no contara como pregunta— y a cambio le puso la
+     * palabra CHARLA en la pantalla a un lector del diario oficial. Encima el
+     * modelo la ponía también en respuestas de verdad, así que la métrica que
+     * venía a arreglar tampoco quedaba bien.
+     */
     if (pelada === "CHARLA") {
       charla = true;
       continue;

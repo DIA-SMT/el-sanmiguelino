@@ -1163,3 +1163,22 @@ puede caer en un atajo, porque el del índice devolvería la lista completa.
 
 **Lo que el corpus no puede verificar** es si el modelo efectivamente elige: eso
 prueba el enrutado, no la respuesta. Se comprueba en producción.
+
+### Y la marca de charla llegó a la pantalla
+
+El modelo escribió `CHARLA.` —con punto— y la línea entera quedó a la vista de
+un lector. El patrón comparaba contra la palabra pelada.
+
+Es la **tercera** marca que se filtra por lo mismo: primero `FUENTE` decorada
+como enlace, después el rótulo en negrita, ahora el punto final. La lección ya
+no es sobre puntuación: **una marca cuya única defensa es que el modelo escriba
+la forma exacta va a terminar en pantalla.**
+
+Así que se sacó de las instrucciones. Servía sólo para una métrica —que un
+"gracias" no contara como pregunta en el tablero— y a cambio le puso la palabra
+CHARLA a un lector del diario oficial. Encima el modelo la ponía también en
+respuestas de verdad, así que la métrica que venía a arreglar tampoco quedaba
+bien: esas respuestas se anotaban como saludo y desaparecían de las cuentas.
+
+El barrido queda igual, y ahora tolera la puntuación del final: una respuesta
+vieja en el historial de alguien puede traerla.

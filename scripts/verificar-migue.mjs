@@ -174,6 +174,11 @@ const casos = [
   ["sin respuesta", "[SIN_RESPUESTA] Eso no está en la edición.", { texto: "Eso no está en la edición.", sinRespuesta: true }],
   ["charla", "Dale, decime.\nCHARLA", { texto: "Dale, decime.", charla: true }],
   ["charla en negrita", "Dale, decime.\n**CHARLA**", { texto: "Dale, decime.", charla: true }],
+  // Con punto: así la escribió el modelo en producción, y así llegó a la
+  // pantalla de un lector.
+  ["charla con punto", "Dale, decime.\nCHARLA.", { texto: "Dale, decime.", charla: true }],
+  ["charla con punto y negrita", "Dale, decime.\n**CHARLA.**", { texto: "Dale, decime.", charla: true }],
+  ["fuente con punto final", "Hay obras.\nFUENTE: plan-bacheo.", { texto: "Hay obras.", notaSlug: "plan-bacheo" }],
   ["respuesta normal", "Hola, soy Migue.", { texto: "Hola, soy Migue.", notaSlug: undefined, charla: false }],
 ];
 for (const [nombre, crudo, esperado] of casos) {
