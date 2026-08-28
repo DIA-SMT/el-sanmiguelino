@@ -6,6 +6,8 @@ import { CitaPersona } from "@/components/cita-persona";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
 import { HojaDiario } from "@/components/hoja-diario";
+import { BotonEscuchar } from "@/components/voz/boton-escuchar";
+import { textoDeResumenDeTapa } from "@/lib/voz/texto-para-escuchar";
 import {
   getCompletas,
   getIndice,
@@ -114,6 +116,17 @@ export default async function Portada() {
                 <p className="bajada mt-4 max-w-4xl text-[clamp(1rem,1.7vw,1.22rem)]">
                   {principal.bajada}
                 </p>
+                {/* Treinta segundos: qué edición es, de qué se trata y la nota
+                    principal. El sumario de las ocho notas son dos minutos y es
+                    otro control, para otra vuelta. */}
+                <div className="mt-5">
+                  <BotonEscuchar
+                    texto={textoDeResumenDeTapa(edicion, principal)}
+                    fuente={{ que: "tapa" }}
+                    etiqueta="Escuchar la tapa"
+                    descripcion="la tapa de esta edición"
+                  />
+                </div>
               </div>
 
               {/* La foto apaisada, a todo el ancho de la hoja. Antes vivía

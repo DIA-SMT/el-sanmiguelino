@@ -23,6 +23,7 @@
  */
 const {
   ES_SOLO_UN_SALUDO,
+  PIDE_QUE_LE_LEA,
   HABLA_DE_OTRA,
   PIDE_EL_INDICE,
   interpretar,
@@ -43,6 +44,9 @@ const DIARIO = {
 function camino(pregunta) {
   const s = simplificar(pregunta);
   if (ES_SOLO_UN_SALUDO.test(s)) return "saludo";
+  // El atajo de la lectura en voz alta. En la ruta va despues del indice y,
+  // a diferencia de los otros dos, vale tambien en medio de una charla.
+  if (PIDE_QUE_LE_LEA(s)) return "leer";
   if (PIDE_EL_INDICE.some((p) => p.test(s)) && !HABLA_DE_OTRA.test(s)) {
     return "indice";
   }
@@ -62,6 +66,36 @@ function grupo(titulo, esperado, frases) {
 }
 
 console.log("\nQUÉ CAMINO TOMA CADA COSA\n");
+
+/*
+ * Leer en voz alta.
+ *
+ * El atajo exige DOS cosas a la vez —un verbo de escuchar Y una referencia a la
+ * página en la que el lector está parado— y estos dos grupos existen para que
+ * nadie afloje una de las dos. Aflojarlas convierte "dónde puedo escuchar
+ * música en vivo" en una orden de audio, que es exactamente la misma clase de
+ * error que ya cometió el atajo del índice con las preguntas de los vecinos.
+ */
+grupo("Piden que Migue les lea la página", "leer", [
+  "resumime con un audio la pagina en la que estoy",
+  "leeme esto",
+  "leemelo",
+  "leeme esta nota",
+  "¿me lees esta nota en voz alta?",
+  "quiero escuchar esta nota",
+  "me lo pasas a audio? esto",
+  "leeme la pagina en la que estoy",
+]);
+
+/* Tienen el verbo pero NO hablan de la página: son preguntas de vecinos. */
+grupo("Hablan de escuchar, pero no le piden nada a Migue", "modelo", [
+  "donde puedo escuchar musica en vivo",
+  "cuando puedo escuchar la banda municipal",
+  "donde escucho el recital de septiembre",
+  "donde hay talleres de lectura",
+  "quiero leer sobre el parque 9 de julio",
+  "hay audioguias en el museo",
+]);
 
 /*
  * Preguntas de vecinos. **Ninguna** puede caer en un atajo: son para el modelo,

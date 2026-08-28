@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { RefreshCw, Send, X } from "lucide-react";
+import { LoaderCircle, RefreshCw, Send, Square, X } from "lucide-react";
 import { CuerpoMigue, RetratoMigue } from "@/components/migue/retrato-migue";
+import { useLecturaEnVoz } from "@/lib/voz/usar-voz";
 import { cn } from "@/lib/utils";
 
 interface Mensaje {
@@ -34,6 +35,10 @@ export function MigueChat() {
   const reducirMovimiento = useReducedMotion();
   const listaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Migue lee en voz alta cuando el servidor le manda un texto para decir.
+  // El motor vive en el chat, que está montado en el layout, así que la voz
+  // sobrevive al paso de página igual que la conversación.
+  const { leyendo, preparando, leer, detener } = useLecturaEnVoz();
 
   useEffect(() => {
     listaRef.current?.scrollTo({ top: listaRef.current.scrollHeight });
@@ -70,8 +75,37 @@ export function MigueChat() {
           }),
         });
         if (!res.ok) throw new Error();
-        const data: { respuesta: string } = await res.json();
+        const data: { respuesta: string; leer?: string } = await res.json();
         setMensajes((prev) => [...prev, { rol: "migue", texto: data.respuesta }]);
+        /*
+         * Migue habla.
+         *
+         * Esto ROMPE la regla del gesto síncrono de iOS a propósito y con
+         * conocimiento: el `speak()` sale después de un `await fetch`, así que
+         * en Safari de iPhone puede no sonar. No hay forma de evitarlo por este
+         * camino —el texto lo decide el servidor, que es el único que tiene la
+         * nota—, y la alternativa sería que el cliente adivine qué leer, que es
+         * peor. Para quien esté en iPhone existe el botón "Escuchar el resumen"
+         * de la franja de metadatos, que sí habla desde el mismo tick del
+         * click. Los dos caminos comparten el motor.
+         *
+         * El mp3 con la voz de Migue NO arregla esto y no hay que pretender
+         * que sí: `audio.play()` tiene exactamente el mismo requisito de gesto
+         * que `speak()`, y acá el gesto se perdió una llamada antes. Lo que sí
+         * gana el chat es la voz: donde el navegador deja reproducir, Migue
+         * suena como Migue en vez de como el sintetizador del sistema.
+         *
+         * La fuente sale del pathname, que es de dónde sale todo el contexto
+         * de este componente: si hay nota abierta, se lee la nota; si no, la
+         * tapa. El texto no viaja —lo deriva el servidor—; `data.leer` queda
+         * como el respaldo que se le pasa a la voz del sistema.
+         */
+        if (data.leer) {
+          leer(data.leer, {
+            que: notaSlug ? "nota" : "tapa",
+            slug: notaSlug,
+          });
+        }
       } catch {
         setErrorUltima(limpia);
       } finally {
@@ -79,7 +113,7 @@ export function MigueChat() {
         inputRef.current?.focus();
       }
     },
-    [cargando, notaSlug, mensajes],
+    [cargando, notaSlug, mensajes, leer],
   );
 
   return (
@@ -138,6 +172,57 @@ export function MigueChat() {
                       Asistente de El Sanmiguelino
                     </p>
                   </div>
+                  {/*
+                   * Callar a Migue. Aparece SÓLO mientras habla, y va acá —en
+                   * la cabecera, pegado al cerrar— y no adentro de la burbuja
+                   * por una razón concreta: la lectura sobrevive al scroll del
+                   * historial y al paso de página, así que el control que la
+                   * corta no puede vivir en algo que se puede ir de pantalla.
+                   *
+                   * No lleva texto de estado propio: el historial entero ya es
+                   * una región viva (`aria-live` acá abajo), y un anuncio más
+                   * adentro hace que un lector de pantalla lea todo dos veces.
+                   *
+                   * Aparece TAMBIÉN mientras se genera el mp3 —`leyendo` ya es
+                   * true ahí— y eso es medio punto de la función: generar el
+                   * audio puede tardar unos segundos, y si el botón recién
+                   * apareciera cuando empieza a sonar, no habría forma de
+                   * arrepentirse durante la única parte que se hace esperar.
+                   */}
+                  {leyendo && (
+                    <button
+                      type="button"
+                      onClick={detener}
+                      /*
+                       * El label EMPIEZA por la palabra que se ve, en los dos
+                       * estados. Es el criterio 2.5.3 de WCAG (Label in Name):
+                       * quien maneja el diario por voz —Voice Control de iOS,
+                       * Voice Access de Android, Dragon— lee el botón y dice
+                       * "tocar Preparando" o "tocar Parar", y si esa palabra no
+                       * está en el nombre accesible el comando no engancha con
+                       * nada. Antes el label era "Dejar de leer en voz alta"
+                       * fijo: ni "Preparando" ni "Parar" estaban adentro, así
+                       * que el único control que corta la voz quedaba
+                       * inalcanzable justo cuando hace falta arrepentirse.
+                       */
+                      aria-label={
+                        preparando
+                          ? "Preparando la lectura, tocá para cancelar"
+                          : "Parar la lectura en voz alta"
+                      }
+                      className="pressable flex h-8 items-center gap-1.5 border border-accent bg-accent px-2.5 font-sans text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-accent-contrast hover:bg-accent-strong"
+                    >
+                      {preparando ? (
+                        <LoaderCircle
+                          className="h-3 w-3 animate-spin motion-reduce:animate-none"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Square className="h-3 w-3" aria-hidden="true" />
+                      )}
+                      {preparando ? "Preparando" : "Parar"}
+                    </button>
+                  )}
                   <Dialog.Close asChild>
                     <button
                       type="button"

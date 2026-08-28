@@ -241,3 +241,38 @@ export function interpretar(crudo: string): RespuestaMigue {
   return { texto: quedan.join("\n").trim(), notaSlug, sinRespuesta, charla };
 }
 
+
+/**
+ * Pide que Migue le LEA EN VOZ ALTA la página que está mirando.
+ *
+ * Exige **dos** cosas a la vez, y esa conjunción es todo el diseño: un verbo de
+ * escuchar/leer en voz alta, Y una referencia a la página en la que el lector
+ * está parado. Cualquiera de las dos sola es la pregunta de un vecino:
+ *
+ * - "¿dónde puedo escuchar música en vivo?" tiene el verbo y no es para Migue.
+ * - "¿qué dice esta nota sobre el parque?" tiene la referencia y va al modelo.
+ *
+ * Sólo las dos juntas —"leeme esto", "resumime con un audio la página en la que
+ * estoy"— son inequívocamente un pedido de audio. Es la lección que costó cara
+ * con `PIDE_EL_INDICE`: errar de menos no cuesta nada, porque lo que no matchea
+ * va al modelo y se contesta igual; errar de más le come la pregunta al vecino.
+ *
+ * A diferencia del índice y del saludo, este atajo **sí vale en medio de una
+ * charla**. Los otros dos se limitaron al primer mensaje porque saltean al
+ * modelo y por lo tanto pierden el hilo; acá no hay hilo que perder: el
+ * referente no sale de la conversación, sale de la ruta.
+ */
+const VERBO_DE_ESCUCHAR =
+  /\b(lee|leer|leeme|leelo|leela|leemelo|leemela|leermelo|escuchar|escucharlo|escucharla|escuchame|audio|en voz alta|dictame|narrame|leemel[oa])\b/;
+
+const ESTA_PAGINA =
+  /\b(esta (pagina|nota|noticia|publicacion)|este (articulo|texto)|esto|aca|la pagina en la que estoy|la nota en la que estoy|donde estoy|lo que estoy (leyendo|viendo)|la pagina actual)\b/;
+
+/** Un pedido pelado, sin nada más: "leemelo", "leeme esto". */
+const SOLO_UN_LEEME =
+  /^[\s¡!¿?,.]*(leeme|leemelo|leemela|leelo|leela|leermelo)([\s,]*(esto|esta nota|esta pagina))?[\s!¡.?]*$/;
+
+export function PIDE_QUE_LE_LEA(simple: string): boolean {
+  if (SOLO_UN_LEEME.test(simple)) return true;
+  return VERBO_DE_ESCUCHAR.test(simple) && ESTA_PAGINA.test(simple);
+}

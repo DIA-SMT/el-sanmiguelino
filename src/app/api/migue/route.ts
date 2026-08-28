@@ -20,10 +20,15 @@ import {
   ES_SOLO_UN_SALUDO,
   HABLA_DE_OTRA,
   PIDE_EL_INDICE,
+  PIDE_QUE_LE_LEA,
   respuestaSobreElDiario,
   simplificar,
   type SobreElDiario,
 } from "@/lib/migue/interpretacion";
+import {
+  textoDeResumenDeNota,
+  textoDeResumenDeTapa,
+} from "@/lib/voz/texto-para-escuchar";
 import {
   contarConsultaAlModelo,
   limpiarVentanasViejas,
@@ -107,10 +112,26 @@ function mejorParrafo(nota: NotaCompleta, tokens: string[]): string {
 async function responder(
   resultado: ResultadoConsulta,
   respuesta: string,
-  datos: { pregunta: string; notaSlug?: string; contextoSlug?: string },
+  datos: {
+    pregunta: string;
+    notaSlug?: string;
+    contextoSlug?: string;
+    /**
+     * El texto que el cliente tiene que DECIR en voz alta, si hay alguno.
+     *
+     * Viaja aparte de `respuesta` porque son dos cosas distintas: `respuesta`
+     * es lo que Migue escribe en la burbuja y `leer` es lo que suena. Se
+     * parecen pero no son iguales —la burbuja puede decir "te leo el título y
+     * la bajada" y la voz decir el título y la bajada—, y sobre todo: la voz
+     * la pone el navegador del lector, así que el servidor sólo puede mandar
+     * el texto. Nunca audio.
+     */
+    leer?: string;
+  },
 ) {
-  await registrarConsulta({ ...datos, resultado });
-  return NextResponse.json({ respuesta, notaSlug: datos.notaSlug });
+  const { leer, ...paraElRegistro } = datos;
+  await registrarConsulta({ ...paraElRegistro, resultado });
+  return NextResponse.json({ respuesta, notaSlug: datos.notaSlug, leer });
 }
 
 export async function POST(request: NextRequest) {
@@ -219,6 +240,62 @@ export async function POST(request: NextRequest) {
     return responder(
       "indice",
       `La edición de ${edicion.mes} trae estas notas:\n${lista}\n\nPreguntame por cualquiera y te cuento más.`,
+      { pregunta, contextoSlug: body.notaSlug },
+    );
+  }
+
+  /**
+   * "Leeme esto": Migue lee en voz alta la página en la que está parado.
+   *
+   * **No resume nada.** Dice el título y la bajada tal como los escribió el
+   * redactor, que es la decisión de fondo de toda esta función: El Sanmiguelino
+   * es una publicación oficial del municipio, y una voz que le lee a un vecino
+   * un horario o una dirección que un modelo completó es un riesgo que ningún
+   * ahorro justifica. La bajada además ya *es* el resumen —es obligatoria y la
+   * aprobó un editor—, así que pedirle a un modelo que resuma lo que ya viene
+   * resumido sería pagar plata y latencia para empeorar.
+   *
+   * Por eso el atajo va ANTES del modelo y ni siquiera cuenta contra el tope de
+   * consultas de la hora: no hay nada que preguntarle a nadie.
+   *
+   * A diferencia del saludo y del índice, este atajo vale también en medio de
+   * una charla: ver el comentario de `PIDE_QUE_LE_LEA`.
+   *
+   * El texto sale de `indice`, que ya está pedido arriba y trae la bajada: no
+   * hace falta `getCompletas()` ni una consulta más.
+   */
+  if (PIDE_QUE_LE_LEA(simple)) {
+    const abierta = body.notaSlug
+      ? indice.find((n) => n.slug === body.notaSlug)
+      : undefined;
+
+    if (abierta) {
+      return responder(
+        "leer",
+        `Te leo el título y la bajada de “${abierta.titulo}”. Tocá de nuevo para que pare.`,
+        {
+          pregunta,
+          notaSlug: abierta.slug,
+          contextoSlug: body.notaSlug,
+          leer: textoDeResumenDeNota(abierta),
+        },
+      );
+    }
+
+    const principal = indice[0];
+    if (principal) {
+      return responder("leer", `Te leo la tapa de ${edicion.mes}.`, {
+        pregunta,
+        contextoSlug: body.notaSlug,
+        leer: textoDeResumenDeTapa(edicion, principal),
+      });
+    }
+
+    // Una edición sin notas cargadas. Pasa en la vista previa de una edición
+    // vacía, que ya rompió la portada una vez.
+    return responder(
+      "leer",
+      "Todavía no hay nada cargado en esta edición para leerte.",
       { pregunta, contextoSlug: body.notaSlug },
     );
   }

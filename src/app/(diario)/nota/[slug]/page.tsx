@@ -11,6 +11,8 @@ import { CitaPersona } from "@/components/cita-persona";
 import { HojaDiario } from "@/components/hoja-diario";
 import { ColumnaDelLector } from "@/components/comentarios/columna-del-lector";
 import { CompartirNota } from "@/components/compartir-nota";
+import { BotonEscuchar } from "@/components/voz/boton-escuchar";
+import { textoDeResumenDeNota } from "@/lib/voz/texto-para-escuchar";
 import { NotasRelacionadas } from "@/components/notas-relacionadas";
 import { transicionPagina } from "@/lib/transiciones";
 import {
@@ -185,6 +187,15 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                     <Clock className="h-3 w-3" aria-hidden="true" />
                     {nota.minutosLectura} min
                   </p>
+                  {/* Al lado de los minutos y no abajo de la nota: la franja ya
+                      contesta "¿cuánto me lleva esto?", y escuchar en vez de
+                      leer se decide antes de leer. El texto se arma acá, en el
+                      servidor, para que el click no tenga que resolver nada. */}
+                  <BotonEscuchar
+                    separador
+                    texto={textoDeResumenDeNota(nota)}
+                    fuente={{ que: "nota", slug: nota.slug }}
+                  />
                 </div>
               </header>
 
