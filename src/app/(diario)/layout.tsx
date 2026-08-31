@@ -55,7 +55,31 @@ export default async function DiarioLayout({ children }: LayoutProps<"/">) {
           }
         />
       )}
-      <div className="escritorio flex flex-1 flex-col px-0 py-0 sm:px-6 sm:py-8 lg:py-10">
+      {/*
+       * En el teléfono la hoja TAMBIÉN se apoya sobre la mesa, y no es una
+       * decisión estética: es lo que hace legible el giro de página.
+       *
+       * Estuvo en `px-0 py-0` y la hoja iba a sangre. El giro se calculó bien
+       * —la perspectiva está atada al ancho, así que en un teléfono la razón
+       * d/W sigue siendo 1.48— pero el encuadre se lo comía: con el lomo pegado
+       * al bisel y la hoja tapando el 100% de la pantalla, los primeros 405ms
+       * del giro no cambian la silueta (la cara que sale gira HACIA el ojo y se
+       * hincha hasta 1.36 veces su ancho: todo ese excedente lo recorta la
+       * pantalla), y en el medio quedan ~395ms sin ninguna hoja a la vista. De
+       * los 1150ms, dos tercios no llegaban a la pantalla: el lector veía la
+       * hoja oscurecerse, después la foto de la ciudad —que nunca había visto—
+       * y después la página nueva. Corte de escena, no giro.
+       *
+       * En escritorio eso nunca pasó porque la hoja mide 1152px en una ventana
+       * más ancha: siempre hay mesa a la izquierda del lomo y arriba, así que
+       * cuando crece se lee como continuidad. Con estos diez píxeles el teléfono
+       * gana lo mismo: se ve el borde de la hoja, la sombra, y el giro vuelve a
+       * leerse como un giro.
+       *
+       * Diez y no veinte: la hoja de un diario en un teléfono necesita todo el
+       * ancho que pueda para el texto. Es el mínimo que hace visible el canto.
+       */}
+      <div className="escritorio flex flex-1 flex-col px-2.5 py-3 sm:px-6 sm:py-8 lg:py-10">
         {children}
         <MandoPaginas paginas={paginasDeEdicion(await getIndice())} />
         <MigueChat />

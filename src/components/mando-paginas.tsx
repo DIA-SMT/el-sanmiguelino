@@ -105,8 +105,24 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
   // El eje de la cara que SALE. `pasar()` cubre el teclado y el gesto, pero las
   // flechas y los botones del pasador son <Link> y no pasan por ahí: se ancla
   // en captura, antes de que el enlace navegue.
+  //
+  // **La guardia `enCurso` no sobra: sin ella el punto de fuga teleporta a
+  // mitad del giro.** Este listener está en `document`, en captura, sin filtrar
+  // el objetivo, y `::view-transition` tiene `pointer-events: none` justamente
+  // para que los toques lleguen al DOM vivo — así que cualquier dedo apoyado en
+  // cualquier parte de la pantalla, durante los 1150ms que dura la animación,
+  // reescribía `--eje-hoja-vieja`. Y `transform-origin` no es una propiedad
+  // animada: se re-resuelve en el siguiente recálculo y el eje del giro SALTA.
+  //
+  // En una computadora nadie toca la pantalla mientras algo se anima. En un
+  // teléfono apoyar el pulgar dos veces en poco más de un segundo es,
+  // simplemente, leer. De ahí que el mismo gesto diera un giro distinto cada
+  // vez.
   useEffect(() => {
-    const alApoyar = () => anclarEje("vieja");
+    const alApoyar = () => {
+      if (enCurso.current) return;
+      anclarEje("vieja");
+    };
     document.addEventListener("pointerdown", alApoyar, true);
     return () => document.removeEventListener("pointerdown", alApoyar, true);
   }, []);

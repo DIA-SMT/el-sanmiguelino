@@ -1090,6 +1090,28 @@
   z-index: 2;
 }
 
+/* El grupo de la hoja no se anima, y esto es un arreglo, no una prolijidad.
+   Sin declararlo corre la animación del navegador: 250ms morfeando la caja
+   vieja en la nueva. Y las dos cajas no se parecen —la hoja que sale tiene
+   `top = -scrollY` y el alto de la nota entera; la que entra tiene top ≈ 0 y
+   otro alto—, así que durante ese cuarto de segundo el giro ENTERO se traslada
+   `scrollY` píxeles hacia abajo mientras cambia de alto. Las dos capturas
+   cuelgan del borde superior del grupo, así que la cabecera de la hoja que se
+   va entra volando desde arriba justo cuando arranca el giro y la de la nueva
+   aterriza a otra altura: se ven dos mastheads superpuestos.
+
+   En escritorio casi no se notaba porque se pasa de página desde la tapa, con
+   `scrollY` en cero y el morfeo en nada. En un teléfono, leyendo al medio de
+   una nota, `scrollY` son miles de píxeles: la misma nota va en UNA columna
+   abajo de 768px y en TRES arriba de 1100, así que mide como tres veces más.
+
+   El giro ya lo hacen las dos caras con su propio `transform-origin`. El grupo
+   sólo tiene que quedarse quieto y dejarlas girar. */
+::view-transition-group(.pagina-adelante),
+::view-transition-group(.pagina-atras) {
+  animation: none;
+}
+
 /* Las flechas laterales quedan quietas mientras la hoja gira: son el mando,
    no parte del papel. */
 ::view-transition-group(flechas-pagina) {
