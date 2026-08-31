@@ -10,8 +10,16 @@ export type DireccionPagina = "adelante" | "atras";
 const RATIO_HORIZONTAL = 1.2;
 /** Más lento que esto no es un gesto: es alguien seleccionando texto. */
 const DURACION_MAXIMA_MS = 1000;
-/** Franja izquierda que el sistema se reserva para su propio "atrás" (iOS).
- *  Si la tomamos nosotros también, navegan las dos cosas a la vez. */
+/**
+ * Franja que el sistema se reserva para su propia navegación.
+ *
+ * **Son LOS DOS bordes, no sólo el izquierdo.** Estuvo sólo el izquierdo, con la
+ * idea de que ahí vive el "atrás" de iOS. Pero iOS usa el borde DERECHO para
+ * "adelante", y avanzar de página es justamente arrastrar de derecha a
+ * izquierda: el gesto más natural para pasar de hoja arranca en la franja que
+ * Safari se queda. Se filmó en un iPhone: el deslizamiento recién se tomaba a
+ * la tercera o cuarta.
+ */
 const BORDE_DEL_SISTEMA = 24;
 /** Recorrido mínimo antes de decidir si el gesto es horizontal o vertical.
  *  En un dedo real el primer `pointermove` ya viene con un salto grande, así
@@ -132,6 +140,7 @@ export function useDeslizarPaginas({
         return;
       }
       if (e.clientX <= BORDE_DEL_SISTEMA) return;
+      if (e.clientX >= window.innerWidth - BORDE_DEL_SISTEMA) return;
       if (esZonaAjena(e.target)) return;
 
       puntero = e.pointerId;
@@ -169,20 +178,63 @@ export function useDeslizarPaginas({
         pintar(null, 0);
         return;
       }
+
+      /*
+       * Desde acá el gesto ES NUESTRO, y hay que decírselo al navegador.
+       *
+       * `touch-action: pan-y` ya le avisa que el horizontal no es un paneo suyo,
+       * pero eso no cubre las navegaciones por borde de iOS ni el cambio de
+       * pestaña: cuando el sistema decide quedarse con el arrastre, manda
+       * `pointercancel`, deja de mandar `pointermove` y el `pointerup` nunca
+       * llega. El lector arrastró, no pasó nada, y tiene que volver a intentar —
+       * que es exactamente lo que se filmó: el gesto entraba recién a la tercera.
+       *
+       * Este `preventDefault` sólo corre cuando ya se cumplen las tres
+       * condiciones (eje horizontal fijado, ratio holgado, y hay página a dónde
+       * ir), así que el scroll vertical nunca lo ve. Por eso el listener de
+       * `pointermove` dejó de ser `passive`: sin eso el navegador ignora el
+       * `preventDefault` y encima avisa por consola.
+       *
+       * NO ESTÁ VERIFICADO EN UN iPHONE: es una mitigación razonada. Si el gesto
+       * sigue costando, el siguiente sospechoso es la inercia del scroll, que en
+       * iOS sigue corriendo después de soltar.
+       */
+      e.preventDefault();
+
       pintar(direccion, Math.min(1, Math.abs(dx) / umbral(window.innerWidth)));
     }
 
     function alLevantar(e: PointerEvent) {
       if (e.pointerId !== puntero) return;
       const dx = e.clientX - x0;
-      const dy = e.clientY - y0;
+      // `dy` ya no se lee acá: el eje se decidió en `alMover` y no se vuelve a
+      // discutir al soltar. Ver el comentario de abajo.
       const dt = e.timeStamp - t0;
       const horizontal = eje === "horizontal";
       soltar();
 
       if (!horizontal || dt > DURACION_MAXIMA_MS) return;
       if (Math.abs(dx) < umbral(window.innerWidth)) return;
-      if (Math.abs(dx) < Math.abs(dy) * RATIO_HORIZONTAL) return;
+      /*
+       * **Acá NO se vuelve a exigir el ratio, y eso es el arreglo.**
+       *
+       * Estaba `if (Math.abs(dx) < Math.abs(dy) * RATIO_HORIZONTAL) return;` y
+       * descartaba gestos legítimos. El eje ya se fijó en `alMover`, cuando el
+       * recorrido pasó la zona muerta y `|dx| > |dy|`: ahí se decidió que el
+       * gesto era horizontal. Volver a medir sobre el recorrido COMPLETO castiga
+       * al pulgar, que describe un arco: arrastrar 60px horizontales y 50
+       * verticales da `60 < 50 × 1.2 = 60` y el giro no pasaba, aunque el gesto
+       * hubiera arrancado clarísimamente horizontal. Con el pulgar de una mano
+       * sosteniendo el teléfono ese arco es la norma, no la excepción.
+       *
+       * Lo que sí se sigue exigiendo es lo que de verdad distingue un gesto de
+       * un accidente: que el eje se haya fijado en horizontal, que el recorrido
+       * horizontal supere el umbral, y que haya durado menos de un segundo.
+       *
+       * `RATIO_HORIZONTAL` se conserva para `alMover`, donde decide si se
+       * ilumina el canto: ahí sirve para no PROMETER un giro que no va a pasar,
+       * y errar de más sólo cuesta un brillo que no se enciende.
+       */
 
       const direccion: DireccionPagina = dx < 0 ? "adelante" : "atras";
       if (!destinoVigente(direccion)) return;
@@ -259,10 +311,14 @@ export function useDeslizarPaginas({
       pasarVigente(direccion);
     }
 
-    // Los de puntero van passive: el scroll vertical tiene que seguir
-    // funcionando igual mientras decidimos si el gesto era horizontal.
+    // `pointerdown` y `pointerup` van passive: no cancelan nada.
+    //
+    // `pointermove` NO puede ir passive, y es a propósito: necesita
+    // `preventDefault()` para quedarse con el gesto una vez que ya decidió que
+    // es horizontal (ver adentro). El scroll vertical sigue funcionando igual,
+    // porque en ese caso la función sale antes de llegar al `preventDefault`.
     window.addEventListener("pointerdown", alApoyar, { passive: true });
-    window.addEventListener("pointermove", alMover, { passive: true });
+    window.addEventListener("pointermove", alMover, { passive: false });
     window.addEventListener("pointerup", alLevantar, { passive: true });
     window.addEventListener("pointercancel", soltar, { passive: true });
     window.addEventListener("click", tragarClick, true);
