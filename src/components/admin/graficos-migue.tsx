@@ -18,18 +18,51 @@
  * se estira mide unidades de usuario, no píxeles: el mismo rótulo salía a 17px
  * en escritorio y a 5px en un teléfono. Los rótulos del eje y las etiquetas de
  * punta son HTML posicionado en porcentajes alrededor del dibujo, así que miden
- * siempre lo mismo (0,6875rem = 11px con la tipografía por defecto) y además
- * acompañan el tamaño de letra que la persona haya configurado en el navegador,
- * cosa que un `<text>` del SVG no hace.
+ * siempre lo mismo —`text-panel-xs`, el escalón más chico de la escala del
+ * panel— y además acompañan el tamaño de letra que la persona haya configurado
+ * en el navegador, cosa que un `<text>` del SVG no hace.
+ *
+ * **Y salen de la escala `text-panel-*`, no de un número escrito a mano.** Este
+ * archivo tenía once tamaños arbitrarios —0,6875 / 0,72 / 0,75 / 0,78 / 0,8rem
+ * para textos que hacen lo mismo—, o sea cinco tamaños para tres jerarquías. Lo
+ * único que sigue en píxeles son los dos `<text>` de adentro del anillo, y ahí
+ * está escrito por qué.
  *
  * **Sobre qué superficie viven.** El anillo funciona sobre cualquiera: no pinta
  * fondo, el hueco entre porciones es la tarjeta vista a través del SVG. La
  * línea sí necesita saberlo, porque los puntos llevan un anillo del color de la
  * superficie para despegarse donde las dos curvas se tocan. Ese color sale de
- * `--fondo-grafico`, con `--paper` como valor por defecto: si estos gráficos se
- * meten en una tarjeta `bg-paper-2` —el gesto natural, los recuadros de dato
- * del tablero son así— esa tarjeta tiene que declarar
- * `--fondo-grafico: var(--paper-2)` o los marcadores quedan con un halo claro.
+ * `--fondo-grafico`, con `--panel-tarjeta` como valor por defecto: si estos
+ * gráficos se meten en una tarjeta `bg-panel-tarjeta-2` esa tarjeta tiene que
+ * declarar `--fondo-grafico: var(--panel-tarjeta-2)` o los marcadores quedan
+ * con un halo del color equivocado.
+ *
+ * **Y de qué color es todo lo que no son datos.** La grilla, los ejes, los
+ * rótulos, la tabla y la leyenda usan los tokens `--panel-*`, no los del
+ * diario. No es prolijidad: `--hairline` y `--ink-3` son beige y tinta cálida,
+ * calculados para papel crema, y sobre el gris azulado del panel se veían
+ * sucios, como una mancha amarillenta. Los colores de los DATOS
+ * —`--grafico-*`— sí siguen siendo los mismos: son la identidad de cada
+ * resultado y tienen que querer decir lo mismo acá que en la tabla de abajo.
+ *
+ * **La paleta está revalidada contra las superficies nuevas** con el validador
+ * de la skill `dataviz`, porque cambiaron las dos: en claro se validó sobre
+ * papel crema (#fcfaf4) y ahora la tarjeta es blanca (#ffffff); en oscuro se
+ * validó sobre #141922 y ahora la tarjeta es #161b24.
+ *
+ *   claro  (#0a5ce8 #22a7f5 #b8860b #c2410c) sobre #ffffff → todo PASA.
+ *          Banda de luminosidad, piso de croma, separación daltónica (el peor
+ *          par adyacente, naranja↔oro, ΔE 9,4 en deuteranopía) y piso de visión
+ *          normal (ΔE 15,5). Único aviso: el celeste del "índice" da 2,65:1
+ *          contra el blanco, abajo de 3:1.
+ *   oscuro (#2570cc #30a5a6 #b98e1b #c83c25) sobre #161b24 → todo PASA, sin
+ *          avisos: los cuatro pasan 3:1 y el peor par adyacente da ΔE 10,7.
+ *
+ * El aviso del celeste no es nuevo ni empeoró —sobre el papel crema daba 2,54:1
+ * y sobre blanco da 2,65:1, o sea que mejoró— y ya tiene su compensación
+ * escrita: la leyenda del anillo lleva etiqueta, número y porcentaje, así que
+ * ninguna porción se lee sólo por el color. Si algún día se saca esa leyenda,
+ * hay que oscurecer el celeste primero.
  *
  * No se anima nada. No es por `prefers-reduced-motion` —que igual quedaría
  * respetado—: es que una barra que crece sola no agrega ninguna información y
@@ -65,11 +98,27 @@ const COLOR: Record<string, string | null> = {
 
 /**
  * El color de la superficie sobre la que está el gráfico, para los recortes que
- * tienen que desaparecer contra el fondo. No es `--paper` a secas: eso ataría
- * el componente a una sola de las tres superficies del panel. La tarjeta que lo
- * contenga puede declarar `--fondo-grafico` y el gráfico la sigue.
+ * tienen que desaparecer contra el fondo. No se escribe `--panel-tarjeta` a
+ * secas: eso ataría el componente a una sola de las superficies del panel. La
+ * tarjeta que lo contenga puede declarar `--fondo-grafico` y el gráfico la
+ * sigue; el valor por defecto es la tarjeta, que es donde viven hoy.
  */
-const FONDO = "var(--fondo-grafico, var(--paper))";
+const FONDO = "var(--fondo-grafico, var(--panel-tarjeta))";
+
+/**
+ * El guía vertical que aparece al pasar el mouse por una columna.
+ *
+ * No es `--panel-borde`: ése es el filete de la grilla, y el guía tiene que
+ * ganarle para que se vea cuál columna se está mirando. Tampoco es
+ * `--panel-tinta-3` entero, que competiría con las dos curvas. El panel tiene
+ * un solo token de filete —el diario tenía dos, `--hairline` y `--line`—, así
+ * que el escalón del medio se arma acá, rebajando la tinta apagada.
+ *
+ * Queda en #abb0bc sobre la tarjeta clara (2,17:1) y en #535b6a sobre la
+ * oscura (2,53:1). La grilla da 1,23:1 y 1,26:1, y las curvas 4,97:1 y 5,36:1:
+ * el guía queda justo en el medio, que es donde tiene que estar.
+ */
+const GUIA = "color-mix(in srgb, var(--panel-tinta-3) 55%, transparent)";
 
 /** El orden de los segmentos del anillo y de la leyenda. Es fijo: el color
  *  sigue al resultado, nunca a su puesto en el ranking. Si un mes hay más
@@ -170,8 +219,22 @@ function techoLindo(max: number): number {
    A) La línea de actividad
    ========================================================================== */
 
-/** Rótulo del eje y etiqueta de punta: siempre 11px, nunca unidades del SVG. */
-const ROTULO = "font-sans text-[0.6875rem] leading-none";
+/**
+ * Rótulo del eje y etiqueta de punta: siempre en unidades de la página, nunca
+ * en unidades del SVG.
+ *
+ * Es `text-panel-xs` y no los 0,6875rem que decía antes a mano. La diferencia
+ * es medio píxel, y a cambio el texto más chico del gráfico es exactamente el
+ * mismo que el de la cabecera de una tabla y el de una píldora, en vez de un
+ * sexto tamaño que sólo existe acá.
+ *
+ * `leading-none` sigue mandando sobre el interlineado del escalón: en Tailwind
+ * v4 el `text-*` deja el suyo detrás de `--tw-leading`, así que la clase de
+ * interlineado lo pisa sin importar en qué orden estén escritas. Hace falta
+ * porque estos rótulos van centrados sobre una coordenada y un interlineado de
+ * 1,35 los correría de su marca.
+ */
+const ROTULO = "font-sans text-panel-xs leading-none";
 
 /** Lo que se le reserva a los números del eje Y y a las etiquetas de punta, en
  *  píxeles. Tienen que coincidir con las clases `w-10` y `w-11` de abajo,
@@ -194,11 +257,13 @@ const COLUMNA_MINIMA = 24;
  * información de verdad, y el espacio entre las dos es exactamente lo que
  * Migue sí supo contestar.
  *
- * El total va en tinta apagada y "sin respuesta" en color: la que importa es
- * la segunda, el total es el contexto que la hace legible. Quince sin
- * respuesta sobre veinte consultas es un desastre; sobre mil, no es nada.
- * Por eso el total no se lleva uno de los cuatro colores de resultado: no es
- * un resultado, es el denominador.
+ * El total va en tinta apagada (`--panel-tinta-3`) y "sin respuesta" en color:
+ * la que importa es la segunda, el total es el contexto que la hace legible.
+ * Quince sin respuesta sobre veinte consultas es un desastre; sobre mil, no es
+ * nada. Por eso el total no se lleva uno de los cuatro colores de resultado: no
+ * es un resultado, es el denominador. La tinta apagada es lo bastante fuerte
+ * para un trazo de 2px —4,97:1 contra la tarjeta clara, 5,36:1 contra la
+ * oscura, y hace falta 3:1— sin robarle la atención a la curva que sí importa.
  */
 export function LineaActividad({
   serie,
@@ -209,7 +274,10 @@ export function LineaActividad({
 
   if (n === 0) {
     return (
-      <p className="border border-hairline px-4 py-6 font-sans text-[0.8rem] text-ink-3">
+      // `rounded-panel-2` es el radio de lo que se apoya DENTRO de una tarjeta,
+      // que es donde vive este cartel. Los 0,5rem que decía antes no eran
+      // ningún escalón: quedaban 1,6px por debajo del vecino más parecido.
+      <p className="rounded-panel-2 border border-panel-borde bg-panel-tarjeta-2 px-4 py-6 font-sans text-panel-sm text-panel-tinta-3">
         Todavía no hay días para graficar.
       </p>
     );
@@ -306,7 +374,7 @@ export function LineaActividad({
       {/* Dos series, así que la leyenda va sí o sí: la identidad de una curva
           no puede depender de acordarse de qué color era cuál. */}
       <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-        <ClaveLinea color="var(--ink-3)" texto="Consultas" />
+        <ClaveLinea color="var(--panel-tinta-3)" texto="Consultas" />
         <ClaveLinea color="var(--grafico-alerta)" texto="Sin respuesta" />
       </ul>
 
@@ -314,7 +382,22 @@ export function LineaActividad({
           coordenada, así que el de arriba de todo asoma media línea por encima
           de la caja del dibujo y sin ese respiro el contenedor con `overflow-x`
           sacaría también una barra vertical. */}
-      <div className="mt-2 overflow-x-auto pt-2">
+      {/*
+       * `min-w-0` no es decoración: sin él este envoltorio no scrollea nunca.
+       *
+       * El hijo de abajo declara un ancho mínimo (unos 800px) para que cada día
+       * conserve su columna de 24px de área sensible. Pero un hijo de grid o de
+       * flex arranca con `min-width: auto`, o sea que se NIEGA a encogerse por
+       * debajo de su contenido: la columna del grid crecía hasta 804px, la
+       * grilla entera pasaba de 1078 a 1268, y el panel terminaba con 158px de
+       * desplazamiento horizontal en una pantalla de 1440. El `overflow-x-auto`
+       * estaba puesto y no se usaba, porque nunca había nada que recortar.
+       *
+       * Con `min-w-0` el envoltorio puede achicarse hasta lo que le den y el
+       * scroll pasa a ser suyo, que es donde tiene que estar: se desplaza el
+       * gráfico, no la página.
+       */}
+      <div className="mt-2 min-w-0 overflow-x-auto pt-2">
         <div className="flex items-start" style={{ minWidth: `${anchoMinimo}px` }}>
           {/* Los números del eje y las etiquetas de punta se cuelgan de la caja
               del dibujo con `right-full` / `left-full`; estas dos columnas son
@@ -342,17 +425,17 @@ export function LineaActividad({
                     x2={DER}
                     y1={y(v)}
                     y2={y(v)}
-                    className="stroke-hairline"
+                    className="stroke-panel-borde"
                     strokeWidth={1}
                   />
                 ))}
 
               {/* El área es un lavado del 10%, nunca un bloque saturado. */}
-              <path d={area} fill="var(--ink-3)" fillOpacity={0.1} />
+              <path d={area} fill="var(--panel-tinta-3)" fillOpacity={0.1} />
               <path
                 d={trazo("total")}
                 fill="none"
-                stroke="var(--ink-3)"
+                stroke="var(--panel-tinta-3)"
                 strokeWidth={2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
@@ -372,7 +455,7 @@ export function LineaActividad({
                 cx={x(n - 1)}
                 cy={yTotal}
                 r={4}
-                fill="var(--ink-3)"
+                fill="var(--panel-tinta-3)"
                 stroke={FONDO}
                 strokeWidth={2}
               />
@@ -418,7 +501,8 @@ export function LineaActividad({
                       x2={x(i)}
                       y1={SUP}
                       y2={INF}
-                      className="stroke-line opacity-0 group-hover:opacity-100"
+                      stroke={GUIA}
+                      className="opacity-0 group-hover:opacity-100"
                       strokeWidth={1}
                       pointerEvents="none"
                     />
@@ -426,7 +510,7 @@ export function LineaActividad({
                       cx={x(i)}
                       cy={y(d.total)}
                       r={4}
-                      fill="var(--ink-3)"
+                      fill="var(--panel-tinta-3)"
                       stroke={FONDO}
                       className="opacity-0 group-hover:opacity-100"
                       strokeWidth={2}
@@ -446,12 +530,18 @@ export function LineaActividad({
                 );
               })}
 
+              {/* La línea de base. Va del mismo filete que la grilla y no de
+                  uno más oscuro como antes: el diario tenía dos tokens de
+                  filete (`--hairline` y `--line`) y el panel tiene uno solo.
+                  No se pierde nada —el eje no es un dato, es el marco— y de
+                  paso queda como lo dibujan los tableros que copiamos: grilla y
+                  ejes al mismo peso, un escalón sobre la superficie. */}
               <line
                 x1={IZQ}
                 x2={DER}
                 y1={INF}
                 y2={INF}
-                className="stroke-line"
+                className="stroke-panel-borde"
                 strokeWidth={1}
               />
             </svg>
@@ -465,7 +555,7 @@ export function LineaActividad({
                 key={v}
                 aria-hidden="true"
                 style={{ top: enPorciento(y(v), ALTO) }}
-                className={`pointer-events-none absolute right-full mr-1.5 -translate-y-1/2 tabular-nums text-ink-3 ${ROTULO}`}
+                className={`pointer-events-none absolute right-full mr-1.5 -translate-y-1/2 tabular-nums text-panel-tinta-3 ${ROTULO}`}
               >
                 {v}
               </span>
@@ -476,7 +566,7 @@ export function LineaActividad({
                 key={i}
                 aria-hidden="true"
                 style={{ left: enPorciento(x(i), ANCHO) }}
-                className={`pointer-events-none absolute top-full mt-1.5 whitespace-nowrap text-ink-3 ${ROTULO} ${
+                className={`pointer-events-none absolute top-full mt-1.5 whitespace-nowrap text-panel-tinta-3 ${ROTULO} ${
                   n === 1 || (i !== 0 && i !== n - 1)
                     ? "-translate-x-1/2"
                     : i === 0
@@ -492,7 +582,7 @@ export function LineaActividad({
               <span
                 aria-hidden="true"
                 style={{ top: enPorciento(yTotal, ALTO) }}
-                className={`pointer-events-none absolute left-full ml-1.5 -translate-y-1/2 font-semibold tabular-nums text-ink-3 ${ROTULO}`}
+                className={`pointer-events-none absolute left-full ml-1.5 -translate-y-1/2 font-semibold tabular-nums text-panel-tinta-3 ${ROTULO}`}
               >
                 {ultimo.total}
               </span>
@@ -501,7 +591,7 @@ export function LineaActividad({
               <span
                 aria-hidden="true"
                 style={{ top: enPorciento(ySin, ALTO) }}
-                className={`pointer-events-none absolute left-full ml-1.5 -translate-y-1/2 font-semibold tabular-nums text-ink ${ROTULO}`}
+                className={`pointer-events-none absolute left-full ml-1.5 -translate-y-1/2 font-semibold tabular-nums text-panel-tinta ${ROTULO}`}
               >
                 {ultimo.sinRespuesta}
               </span>
@@ -518,37 +608,44 @@ export function LineaActividad({
       {/* El gemelo en texto. El `<title>` del SVG no existe para el teclado ni
           para quien lee con lector de pantalla punto por punto, así que el dato
           exacto tiene que estar acá. Va plegado para no tapar el gráfico. */}
-      <details className="mt-3 border-t border-hairline pt-2">
-        <summary className="cursor-pointer font-sans text-[0.72rem] text-ink-3 hover:text-ink-2">
+      <details className="mt-3 border-t border-panel-borde pt-2">
+        <summary className="cursor-pointer font-sans text-panel-xs text-panel-tinta-3 hover:text-panel-tinta-2">
           Ver los números día por día
         </summary>
-        <table className="mt-2 w-full border-collapse font-sans text-[0.75rem]">
+        {/* La tabla va un escalón MÁS GRANDE que el rótulo que la despliega
+            —`text-panel-sm` contra `text-panel-xs`—, que es la misma relación
+            que tienen `TABLA.tabla` y `TABLA.cabecera` en las tablas del panel.
+            Antes eran casi el mismo tamaño (0,72 y 0,75rem), y esto no es un
+            apéndice del gráfico: es el único camino al dato exacto para quien
+            no puede leer el dibujo, así que si alguno de los dos textos tiene
+            que ser el chico, es el rótulo. */}
+        <table className="mt-2 w-full border-collapse font-sans text-panel-sm">
           <caption className="sr-only">
             Consultas por día y cuántas quedaron sin respuesta
           </caption>
           <thead>
-            <tr className="border-b border-hairline text-left">
-              <th scope="col" className="py-1.5 pr-3 font-semibold text-ink-2">
+            <tr className="border-b border-panel-borde text-left">
+              <th scope="col" className="py-1.5 pr-3 font-semibold text-panel-tinta-2">
                 Día
               </th>
-              <th scope="col" className="py-1.5 pr-3 text-right font-semibold text-ink-2">
+              <th scope="col" className="py-1.5 pr-3 text-right font-semibold text-panel-tinta-2">
                 Consultas
               </th>
-              <th scope="col" className="py-1.5 text-right font-semibold text-ink-2">
+              <th scope="col" className="py-1.5 text-right font-semibold text-panel-tinta-2">
                 Sin respuesta
               </th>
             </tr>
           </thead>
           <tbody>
             {serie.map((d) => (
-              <tr key={d.dia} className="border-b border-hairline last:border-0">
-                <th scope="row" className="py-1 pr-3 font-normal text-ink-2">
+              <tr key={d.dia} className="border-b border-panel-borde last:border-0">
+                <th scope="row" className="py-1 pr-3 font-normal text-panel-tinta-2">
                   {diaLargo(d.dia)}
                 </th>
-                <td className="py-1 pr-3 text-right tabular-nums text-ink">
+                <td className="py-1 pr-3 text-right tabular-nums text-panel-tinta">
                   {d.total}
                 </td>
-                <td className="py-1 text-right tabular-nums text-ink">
+                <td className="py-1 text-right tabular-nums text-panel-tinta">
                   {d.sinRespuesta}
                 </td>
               </tr>
@@ -564,7 +661,7 @@ export function LineaActividad({
  *  la marca que hay en el gráfico. */
 function ClaveLinea({ color, texto }: { color: string; texto: string }) {
   return (
-    <li className="flex items-center gap-2 font-sans text-[0.75rem] text-ink-2">
+    <li className="flex items-center gap-2 font-sans text-panel-sm text-panel-tinta-2">
       <span
         aria-hidden="true"
         className="h-0.5 w-4 shrink-0"
@@ -589,9 +686,11 @@ function ClaveLinea({ color, texto }: { color: string; texto: string }) {
  * el caso en el que un anillo se lee de un vistazo.
  *
  * La leyenda lleva etiqueta, número y porcentaje. No es redundancia: en modo
- * claro el celeste del "índice" queda por debajo de 3:1 contra el papel, y eso
- * sólo es aceptable si el dato se puede leer sin distinguir el color. La
- * leyenda es esa vía. Si alguna vez se saca, hay que oscurecer el celeste.
+ * claro el celeste del "índice" da 2,65:1 contra la tarjeta blanca, por debajo
+ * de 3:1, y eso sólo es aceptable si el dato se puede leer sin distinguir el
+ * color. La leyenda es esa vía. Si alguna vez se saca, hay que oscurecer el
+ * celeste. (En oscuro no hace falta: ahí los cuatro pasan 3:1 contra la
+ * tarjeta. Ver la cabecera del archivo para la validación completa.)
  *
  * El viewBox mide lo mismo que el ancho en pantalla, así que **una unidad es un
  * píxel** y todo lo que dicen los comentarios de acá abajo es literal. Antes el
@@ -674,16 +773,17 @@ export function AnilloResultados({
             vacío dice "no hubo preguntas" mucho mejor que un hueco en la
             página. Con datos NO va, y es a propósito: una pista debajo se
             asomaría por los 2px de hueco entre porciones y el color del hueco
-            sería --hairline, o sea un borde alrededor de cada marca esperando a
-            que alguien oscurezca ese token. Sin pista, el hueco es el fondo de
-            la tarjeta visto a través del SVG, sea cual sea esa superficie. */}
+            sería --panel-borde, o sea un borde alrededor de cada marca
+            esperando a que alguien oscurezca ese token. Sin pista, el hueco es
+            el fondo de la tarjeta visto a través del SVG, sea cual sea esa
+            superficie. */}
         {total === 0 && (
           <circle
             cx={CENTRO}
             cy={CENTRO}
             r={R}
             fill="none"
-            className="stroke-hairline"
+            className="stroke-panel-borde"
             strokeWidth={GROSOR}
           />
         )}
@@ -712,12 +812,29 @@ export function AnilloResultados({
         {/* El número del centro va con cifras proporcionales, sin tabular-nums:
             a este tamaño las cifras de ancho fijo hacen que un "121" se vea
             desarmado. La regla de la casa —tabulares— es para los números que
-            se comparan en columna, y este no está en ninguna. */}
+            se comparan en columna, y este no está en ninguna.
+
+            **Estos dos son los únicos tamaños del archivo que NO salen de la
+            escala `text-panel-*`, y es a propósito.** Son los dos textos que
+            viven ADENTRO del SVG, y ahí un tamaño en `rem` no hace lo mismo que
+            en la página: el `rem` sigue la letra que la persona configuró en el
+            navegador, pero el agujero del anillo mide 164px fijos y no la
+            sigue. Con la letra al 150% un `text-panel-xl` se comería el rótulo
+            de abajo y con el 200% se saldría del anillo. En píxeles los dos
+            quedan clavados a la geometría que los contiene, que es de lo único
+            que dependen. Es la contracara de la decisión de la cabecera del
+            archivo: lo que puede ser HTML es HTML y sí acompaña la letra del
+            navegador; lo que no puede, se ata al dibujo.
+
+            Y el 28px tampoco tendría escalón: el mayor de la escala es 22px, y
+            este es el número que hace legible a todas las porciones. Es el
+            mismo caso que el número de `TarjetaDato`, que por lo mismo va en
+            `text-3xl`: no es texto, es un dato mostrado, y hay uno solo. */}
         <text
           x={CENTRO}
           y={total >= 1000 ? 82 : 80}
           textAnchor="middle"
-          className="fill-ink font-sans text-[28px] font-bold"
+          className="fill-panel-tinta font-sans text-[28px] font-bold"
         >
           {total}
         </text>
@@ -725,7 +842,7 @@ export function AnilloResultados({
           x={CENTRO}
           y={100}
           textAnchor="middle"
-          className="fill-ink-3 font-sans text-[11px]"
+          className="fill-panel-tinta-3 font-sans text-[11px]"
         >
           {total === 1 ? "pregunta" : "preguntas"}
         </text>
@@ -733,7 +850,7 @@ export function AnilloResultados({
 
       <div className="min-w-0 flex-1">
         {total === 0 ? (
-          <p className="font-sans text-[0.8rem] text-ink-3">
+          <p className="font-sans text-panel-sm text-panel-tinta-3">
             Todavía no hay preguntas para contar. El anillo se llena solo cuando
             los vecinos empiecen a preguntar.
           </p>
@@ -742,20 +859,31 @@ export function AnilloResultados({
             {leyenda.map((d) => (
               <li
                 key={d.clave}
-                className="flex items-baseline gap-2.5 border-b border-hairline py-1.5 last:border-0"
+                className="flex items-baseline gap-2.5 border-b border-panel-borde py-1.5 last:border-0"
               >
+                {/* La esquina apenas redondeada no es adorno: en el panel no
+                    hay una sola esquina recta, y un cuadradito de 10px con
+                    punta viva al lado de tarjetas de 12px de radio se lee como
+                    de otro juego.
+
+                    Los 2px son el único radio del archivo que no es un escalón,
+                    y no hay escalón que sirva: el más chico de los tres
+                    (`rounded-panel-3`) mide 7,2px, y sobre un cuadrado de 10px
+                    eso ya no es una esquina redondeada, es un círculo. La marca
+                    de la leyenda tiene que repetir la forma del segmento del
+                    anillo, que es un arco de punta recta. */}
                 <span
                   aria-hidden="true"
-                  className="relative top-[1px] h-2.5 w-2.5 shrink-0"
+                  className="relative top-[1px] h-2.5 w-2.5 shrink-0 rounded-[2px]"
                   style={{ backgroundColor: d.color }}
                 />
-                <span className="min-w-0 flex-1 font-sans text-[0.78rem] text-ink-2">
+                <span className="min-w-0 flex-1 font-sans text-panel-sm text-panel-tinta-2">
                   {d.etiqueta}
                 </span>
-                <span className="font-sans text-[0.8rem] font-semibold tabular-nums text-ink">
+                <span className="font-sans text-panel-sm font-semibold tabular-nums text-panel-tinta">
                   {d.valor}
                 </span>
-                <span className="w-10 text-right font-sans text-[0.72rem] tabular-nums text-ink-3">
+                <span className="w-10 text-right font-sans text-panel-xs tabular-nums text-panel-tinta-3">
                   {d.porcentaje}%
                 </span>
               </li>

@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
+import { clasesDeBoton } from "@/components/admin/piezas";
 
 /**
  * La hora de Tucumán, con segundos: "14:32:05".
@@ -105,6 +106,31 @@ export function BotonActualizar() {
     };
   }, [enCurso]);
 
+  /*
+   * `tono="primario"` porque es la única acción de la pantalla: va sólida y no
+   * en contorno, que en un banner con un solo botón se lee como
+   * "deshabilitado". El par `bg-accent` + `text-accent-contrast` ya está medido
+   * (5.66:1 en claro, 8.31:1 en oscuro) y vive en la pieza, junto con el hover
+   * a `accent-strong`, que en cada tema se mueve para el lado que conserva ese
+   * contraste contra el mismo texto.
+   *
+   * Este archivo era el último del panel que escribía su botón a mano, y lo
+   * escribía en números crudos: `rounded-[0.6rem]`, `text-[0.8rem]` y
+   * `disabled:opacity-60`. Los tres coincidían con el sistema —0.6rem es
+   * `rounded-panel-2` y 0.8rem es `text-panel-sm`— así que no se veía, y esa es
+   * justamente la trampa: el día que el token se mueva, este botón se queda
+   * quieto y nadie va a saber por qué. La opacidad del deshabilitado sí cambia,
+   * de 60 a 50, que es la de los otros cinco botones del panel.
+   *
+   * El icono va `h-4`, que es el tamaño que le corresponde al botón normal (el
+   * chico lleva `h-3.5`): antes era el del chico dentro de un botón de 36px,
+   * así que quedaba flotando lejos de su palabra.
+   *
+   * Sin `focus:outline-none` en ninguna parte —tampoco lo trae la pieza—: el
+   * anillo de la casa (`:focus-visible`, 2px de acento con 3px de offset) tiene
+   * que verse también sobre el degradé del banner, y acá se ve porque el botón
+   * deja aire alrededor.
+   */
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <button
@@ -112,10 +138,10 @@ export function BotonActualizar() {
         onClick={() => iniciar(() => router.refresh())}
         disabled={enCurso}
         aria-busy={enCurso}
-        className="pressable inline-flex items-center gap-1.5 border border-line px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-2 hover:border-ink hover:text-ink disabled:opacity-50"
+        className={clasesDeBoton({ tono: "primario" })}
       >
         <RefreshCw
-          className={enCurso ? "h-3 w-3 animate-spin" : "h-3 w-3"}
+          className={enCurso ? "h-4 w-4 animate-spin" : "h-4 w-4"}
           aria-hidden="true"
         />
         {enCurso ? "Actualizando…" : "Actualizar"}
@@ -127,7 +153,7 @@ export function BotonActualizar() {
        * se corra solo al hidratar. Se anuncia sola al cambiar: es un dato de
        * contexto, no un aviso.
        */}
-      <span className="relative font-sans text-[0.72rem] tabular-nums text-ink-3">
+      <span className="relative font-sans text-panel-xs tabular-nums text-panel-tinta-3">
         <span aria-hidden="true" className="invisible">
           Actualizado: 00:00:00
         </span>

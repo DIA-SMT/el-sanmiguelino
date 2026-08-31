@@ -89,6 +89,135 @@
   --grafico-diario: #b8860b;
   --grafico-alerta: #c2410c;
 
+  /* --- el panel de administración ---------------------------------------
+     Estos tokens son SÓLO del panel `/admin`. El diario no los usa y no se
+     entera: son dos sistemas visuales distintos a propósito, por lo mismo que
+     está escrito en `admin/layout.tsx` —confundir el panel con la publicación
+     invita a creer que lo que se ve ahí ya salió.
+
+     **La tinta del panel es FRÍA y la del diario es CÁLIDA, y eso no es un
+     descuido.** El diario es papel crema (--paper #fcfaf4) con tinta cálida
+     (--ink #17140e): el papel tiene un amarillo de base y una tinta que lo
+     acompaña se lee como impresa. El panel no es papel, es una superficie
+     neutra gris azulada, y una tinta cálida sobre un gris frío no se lee
+     cálida: se lee sucia, como un negro desteñido que perdió el negro. Cada
+     tinta pertenece a su fondo, y mezclarlas ensucia las dos.
+
+     El acento NO se inventa: se reusa --accent, que ya es el azul del isotipo
+     municipal y ya cambia con el tema.
+
+     **Los dos azules del panel, y cuál manda.** En claro `--accent` y
+     `--grafico-nota` son los dos #0a5ce8, y en oscuro se separan: el acento se
+     va a #38b6ff y el gráfico se queda en #2570cc. Eso hizo que el filete del
+     banner y el filete de la KPI azul se leyeran como la misma cosa hasta que
+     alguien tocaba el toggle. No son la misma cosa:
+
+       --accent      manda en el CROMO: el filete del banner, el ítem activo de
+                     la barra, el botón primario, el anillo de foco. Es la
+                     identidad del panel, y tiene que poder brillar sobre un
+                     fondo oscuro, que es justamente para lo que se aclaró.
+       --grafico-*   manda en los DATOS: el filete y el icono de las tarjetas
+                     de dato, el anillo, la línea, la leyenda. Son un juego
+                     cerrado de cuatro, validados juntos para daltonismo y
+                     contraste en cada tema; el azul de ahí adentro no puede
+                     seguir al acento sin romper la separación con los otros
+                     tres.
+
+     Que coincidan en claro es herencia —los dos descienden del azul del
+     isotipo—, no una regla. El día que haya que elegir uno para algo nuevo, la
+     pregunta no es "de qué color es", es "¿esto es cromo o es un dato?". */
+  --panel-fondo: #f4f6f9;
+  --panel-tarjeta: #ffffff;
+  --panel-tarjeta-2: #f5f7fa;
+  --panel-borde: #e4e8ef;
+  --panel-tinta: #101828;
+  --panel-tinta-2: #475467;
+  /* El tono más claro que sigue pasando 4.5:1 sobre el gris de la página
+     (4.59:1), que es la superficie más exigente donde aparece. Sobre la
+     tarjeta blanca da 4.97:1. */
+  --panel-tinta-3: #667085;
+  --panel-wash: rgb(10 92 232 / 0.08);
+  /* El filete de un CAMPO no es el filete de una tarjeta, aunque los dos sean
+     una línea de 1px.
+
+     `--panel-borde` mide 1,23:1 sobre la tarjeta blanca: para una tarjeta
+     alcanza y sobra, porque lo que separa la tarjeta del fondo es el escalón
+     de gris más la sombra y el filete es decoración. Un campo de formulario
+     vacío no tiene escalón ni sombra ni contenido: **es un borde y nada más**,
+     así que ese borde es el único límite del control y WCAG 1.4.11 le pide
+     3:1 contra lo que tenga al lado.
+
+     Este valor da 3,39:1 sobre la tarjeta blanca, 3,16:1 sobre la superficie
+     hundida (#f5f7fa) y 3,13:1 sobre el gris de la página (#f4f6f9), que es la
+     más exigente de las tres. Medido, no estimado.
+
+     Es de la misma familia fría que el resto de los grises del panel: es
+     `--panel-tinta-3` un escalón más claro, no un gris nuevo. */
+  --panel-borde-campo: #828c9e;
+  /* --- las esquinas -----------------------------------------------------
+     Tres escalones y un solo paso entre ellos. Los radios NO se repiten en los
+     bloques oscuros: una esquina no cambia con la luz.
+
+     La regla que estaba escrita en prosa en tres archivos —"un escalón por
+     debajo del de la tarjeta"— es esta resta, y por eso se escribe como resta
+     y no como tres números sueltos: lo que hay que poder leer es que son EL
+     MISMO radio bajando de a un paso fijo, no tres decisiones independientes
+     que casualmente quedaron cerca.
+
+     El paso es absoluto y no una proporción a propósito. Con un factor (0,8 ×
+     cada vez) la diferencia se achica junto con el radio y abajo de todo los
+     dos escalones más chicos se vuelven indistinguibles; con una resta fija la
+     diferencia se sigue viendo igual en el escalón más chico, que es
+     justamente donde hay más piezas.
+
+       radio   = 0.75rem (12px) — la tarjeta y todo lo que flota sobre el fondo
+       radio-2 = 0.60rem  (9,6px) — lo que se apoya DENTRO de una tarjeta:
+                 campos, botones, bloques hundidos, filas de una lista
+       radio-3 = 0.45rem  (7,2px) — lo chico que se apoya dentro de eso:
+                 el cuadrado de un icono, un botón que es sólo un icono */
+  --panel-radio-paso: 0.15rem;
+  --panel-radio: 0.75rem;
+  --panel-radio-2: calc(var(--panel-radio) - var(--panel-radio-paso));
+  --panel-radio-3: calc(var(--panel-radio-2) - var(--panel-radio-paso));
+  /* --- la escala tipográfica del panel ----------------------------------
+     Cinco pasos, y ninguno más. Antes había diecinueve tamaños para cinco
+     roles: 0,85 / 0,875 / 0,88rem conviviendo para el MISMO texto, que no es
+     una escala sino seis personas eligiendo por separado.
+
+     Cada paso trae su interlínea puesta (convención `--text-*--line-height` de
+     Tailwind v4), así que `text-panel-base` ya viene con el aire que le
+     corresponde y no hace falta acordarse de agregarle `leading-relaxed`. Se
+     puede pisar con un `leading-*` cuando de verdad haga falta.
+
+       xs   0.72rem  (11,5px) — cuentas, código, metadatos, píldoras
+       sm   0.8rem   (12,8px) — etiquetas, botones, ayudas, texto secundario
+       base 0.875rem (14px)   — el cuerpo del panel Y el de los campos de
+                                formulario, que son el mismo texto: lo que uno
+                                lee es lo que el otro deja escribir
+       lg   1rem     (16px)   — títulos de sección y de fila
+       xl   1.375rem (22px)   — el h1 del banner, uno por pantalla
+
+     El número grande de la tarjeta de dato queda AFUERA de la escala: no es
+     texto, es un dato mostrado, y vive en una sola pieza donde no puede
+     derivar. */
+  --panel-texto-xs: 0.72rem;
+  --panel-texto-sm: 0.8rem;
+  --panel-texto-base: 0.875rem;
+  --panel-texto-lg: 1rem;
+  --panel-texto-xl: 1.375rem;
+  /* La separación mínima entre dos controles vecinos, y el número sale de una
+     cuenta, no del gusto: el foco de la casa es `outline: 2px` con
+     `outline-offset: 3px`, o sea que el anillo sangra 5px más allá de la caja
+     del control. Con menos de 5px de separación el anillo del control enfocado
+     se dibuja ENCIMA del vecino y deja de leerse a cuál de los dos pertenece.
+     8px = los 5px del sangrado más 3px de aire. */
+  --panel-separacion-controles: 0.5rem;
+  /* Dos capas: contacto corto y difusión corta. La tarjeta flota un par de
+     milímetros sobre el fondo, no vuela: el --sombra-flotante del diario es
+     para una hoja apoyada en un escritorio y acá quedaría teatral. */
+  --panel-sombra:
+    0 1px 2px rgb(16 24 40 / 0.05), 0 4px 12px -4px rgb(16 24 40 / 0.08);
+
   /* --- textura y velos -------------------------------------------------- */
   --grano-tinta: rgb(26 22 14 / 0.055);
   /* velo sobre las fotos: en nocturno bajan un punto para no encandilar */
@@ -169,6 +298,40 @@
   --grafico-diario: #b98e1b;
   --grafico-alerta: #c83c25;
 
+  /* El panel en nocturno está DISEÑADO, no es el claro apagado.
+
+     En claro el fondo es gris y las tarjetas son blancas: lo que flota es lo
+     más claro. En oscuro se conserva esa regla y por eso se invierte el orden
+     de los grises: el fondo es el más oscuro (#0d1117) y la tarjeta sube un
+     escalón (#161b24). Apagar el claro habría dado un fondo más claro que las
+     tarjetas, o sea agujeros en vez de tarjetas.
+
+     La sombra tampoco se puede traducir: sobre negro casi no se ve. Acá lo que
+     separa la tarjeta del fondo es el escalón de luminosidad más el filete, y
+     la sombra queda sólo como profundidad de apoyo.
+
+     Contrastes verificados sobre --panel-tarjeta (#161b24): tinta 14.6:1,
+     tinta-2 8.1:1, tinta-3 5.4:1; y sobre la superficie hundida
+     --panel-tarjeta-2 (#1c2230), que es la más exigente: tinta-2 7.4:1,
+     tinta-3 4.9:1. */
+  --panel-fondo: #0d1117;
+  --panel-tarjeta: #161b24;
+  --panel-tarjeta-2: #1c2230;
+  --panel-borde: #262e3c;
+  --panel-tinta: #e8ecf3;
+  --panel-tinta-2: #a8b2c1;
+  --panel-tinta-3: #8590a3;
+  /* El lavado sube de 0.08 a 0.14: el mismo alfa sobre un fondo oscuro rinde
+     mucho menos, y a 0.08 el ítem activo de la barra no se distinguía. */
+  --panel-wash: rgb(56 182 255 / 0.14);
+  /* El filete de los campos, en nocturno: 3,45:1 sobre la tarjeta (#161b24),
+     3,17:1 sobre la superficie hundida (#1c2230) —la más exigente— y 3,78:1
+     sobre el fondo de la página (#0d1117). Mismo criterio y misma familia fría
+     que en claro; lo único que se invierte es de qué lado del gris está. */
+  --panel-borde-campo: #657082;
+  --panel-sombra:
+    0 1px 2px rgb(0 0 0 / 0.4), 0 6px 16px -6px rgb(0 0 0 / 0.55);
+
   --grano-tinta: rgb(196 210 232 / 0.045);
   --velo-foto: rgb(8 12 20 / 0.2);
   --velo-panorama: rgb(9 13 21 / 0.68);
@@ -204,6 +367,21 @@
     --grafico-indice: #30a5a6;
     --grafico-diario: #b98e1b;
     --grafico-alerta: #c83c25;
+
+    /* Los tokens del panel en nocturno. La razón de cada valor está arriba,
+       en el bloque del toggle; acá van pelados para que las dos listas se
+       puedan comparar línea por línea. */
+    --panel-fondo: #0d1117;
+    --panel-tarjeta: #161b24;
+    --panel-tarjeta-2: #1c2230;
+    --panel-borde: #262e3c;
+    --panel-tinta: #e8ecf3;
+    --panel-tinta-2: #a8b2c1;
+    --panel-tinta-3: #8590a3;
+    --panel-wash: rgb(56 182 255 / 0.14);
+    --panel-borde-campo: #657082;
+    --panel-sombra:
+      0 1px 2px rgb(0 0 0 / 0.4), 0 6px 16px -6px rgb(0 0 0 / 0.55);
 
     --grano-tinta: rgb(196 210 232 / 0.045);
     --velo-foto: rgb(8 12 20 / 0.2);
@@ -245,6 +423,43 @@
   --color-celeste: var(--celeste);
   --color-amarillo: var(--amarillo);
   --color-sol: var(--sol);
+
+  /* El panel de administración. Sí van en el tema —al revés que los
+     --grafico-*— porque acá se usan justamente como clases de Tailwind:
+     `bg-panel-tarjeta`, `text-panel-tinta-2`, `border-panel-borde`. Son el
+     vocabulario con el que se escriben todas las pantallas del panel. */
+  --color-panel-fondo: var(--panel-fondo);
+  --color-panel-tarjeta: var(--panel-tarjeta);
+  --color-panel-tarjeta-2: var(--panel-tarjeta-2);
+  --color-panel-borde: var(--panel-borde);
+  --color-panel-tinta: var(--panel-tinta);
+  --color-panel-tinta-2: var(--panel-tinta-2);
+  --color-panel-tinta-3: var(--panel-tinta-3);
+  --color-panel-wash: var(--panel-wash);
+  --color-panel-borde-campo: var(--panel-borde-campo);
+  --radius-panel: var(--panel-radio);
+  --radius-panel-2: var(--panel-radio-2);
+  --radius-panel-3: var(--panel-radio-3);
+  --shadow-panel: var(--panel-sombra);
+
+  /* La escala del panel, con su interlínea. Nombrar el paso y no el número es
+     todo el punto: `text-panel-base` se puede repetir en cinco pantallas sin
+     que nadie tenga que acordarse de si eran 0,875 o 0,88. */
+  --text-panel-xs: var(--panel-texto-xs);
+  --text-panel-xs--line-height: 1.35;
+  --text-panel-sm: var(--panel-texto-sm);
+  --text-panel-sm--line-height: 1.45;
+  --text-panel-base: var(--panel-texto-base);
+  --text-panel-base--line-height: 1.6;
+  --text-panel-lg: var(--panel-texto-lg);
+  --text-panel-lg--line-height: 1.35;
+  --text-panel-xl: var(--panel-texto-xl);
+  --text-panel-xl--line-height: 1.15;
+
+  /* `gap-panel-controles` en una fila de botones. Dice lo que `gap-2` no dice:
+     que ese espacio es el que necesita el anillo de foco, y que achicarlo
+     rompe algo. */
+  --spacing-panel-controles: var(--panel-separacion-controles);
 
   /* Las tres voces, sacadas del impreso. El sistema es sans para todo lo que
      titula y serif sólo para lo que se lee corrido; antes era al revés. */

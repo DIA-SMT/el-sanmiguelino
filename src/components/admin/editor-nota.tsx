@@ -12,6 +12,13 @@ import {
   Upload,
 } from "lucide-react";
 import { guardarNotaAction, subirImagenAction } from "@/app/admin/acciones";
+import {
+  clasesDeBoton,
+  clasesDeBotonIcono,
+  clasesDeCampo,
+  SeccionPanel,
+  TarjetaPanel,
+} from "@/components/admin/piezas";
 import type { BloqueNota, NotaCompleta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +36,11 @@ import { cn } from "@/lib/utils";
  * 2.2 (SC 2.5.7) exige que todo lo que se hace arrastrando se pueda hacer con
  * un solo puntero, así que el arrastre sería trabajo extra sobre esto mismo,
  * no en lugar de esto.
+ *
+ * El formulario se arma con las piezas del panel (`SeccionPanel`,
+ * `TarjetaPanel`) y no con marcado propio: cada bloque del cuerpo ES una
+ * tarjeta que flota sobre el fondo gris, igual que las tarjetas del resto del
+ * panel. Lo único que se escribe acá son los campos, que las piezas no cubren.
  */
 
 const TIPOS: { valor: BloqueNota["tipo"]; nombre: string; ayuda: string }[] = [
@@ -107,10 +119,75 @@ const sinEnviarConEnter = {
   },
 };
 
-const campo =
-  "w-full border border-line bg-chrome px-3 py-2 font-sans text-[0.88rem] text-ink transition-colors placeholder:text-ink-3 focus:border-accent focus:outline-none";
-const etiqueta =
-  "block font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink-2";
+/* ---------------------------------------------------------------------------
+   El aspecto de los campos
+   ---------------------------------------------------------------------------
+   El aspecto NO se decide acá: viene de `clasesDeCampo()`, en `piezas.tsx`.
+   Acá se guarda en una constante nada más para no llamarla en cada campo.
+
+   Lo que sí es decisión de este archivo es el argumento: `"tarjeta"`. Un campo
+   es siempre la superficie contraria a la que tiene abajo, y acá lo que tiene
+   abajo es una tarjeta —por eso los bloques del cuerpo son tarjetas y no
+   recuadros hundidos: si lo fueran, el campo tendría el mismo fondo que su
+   alrededor y habría que inventarle un segundo aspecto.
+
+   Antes esto era una cadena escrita a mano, y era una de las cinco copias del
+   mismo campo que había en el panel: 0,88rem de letra donde otras pantallas
+   ponían 0,8 o 0,85, y el filete de las TARJETAS (`--panel-borde`), que sobre
+   un campo vacío mide 1,23:1 cuando ese filete es el único límite del control.
+--------------------------------------------------------------------------- */
+
+const campo = clasesDeCampo("tarjeta");
+/** El campo que guarda una dirección: el slug y el archivo de la foto, que se
+ *  leen carácter por carácter y por eso van en monoespaciada.
+ *
+ *  Sólo cambia la familia. Antes además bajaba la letra a 0,8rem —uno de los
+ *  diecinueve tamaños—, y no vuelve: el cuerpo de un campo es `text-panel-base`
+ *  y un campo que se lee letra por letra es el último al que conviene achicar. */
+const campoMono = cn(campo, "font-mono");
+const etiqueta = "block text-panel-sm font-medium text-panel-tinta-2";
+const ayudaCampo = "mt-1.5 block text-panel-sm text-panel-tinta-3";
+
+/* ---------------------------------------------------------------------------
+   El aspecto de los botones
+   ---------------------------------------------------------------------------
+   Tampoco se decide acá: viene de `clasesDeBoton()` y `clasesDeBotonIcono()`,
+   en `piezas.tsx`. Antes esto era una constante escrita a mano —una de las SEIS
+   copias del mismo botón que había en el panel—, con un alto (`min-h-8`) y un
+   relleno (`px-3.5 py-2`) que no coincidían con ninguna de las otras cinco.
+
+   Lo que sí decide este archivo es sobre qué superficie apoya cada uno, que es
+   lo único que cambia entre ellos. Se calculan una vez, en el módulo, porque
+   son funciones puras de constantes: llamarlas en cada render no aportaría
+   nada.
+
+   **Se extienden concatenando, nunca con `cn()`.** `cn()` es `twMerge` sin
+   configurar y no conoce la escala del panel: toma `text-panel-sm` por un color
+   de texto y lo tira apenas hay otro `text-*` en la cadena, así que el botón
+   perdería su tamaño en silencio. Está explicado en `piezas.tsx`. */
+const botonSecundario = clasesDeBoton({ tono: "secundario" });
+/** El de "Agregar bloque", que es el único que apoya sobre el gris de la
+ *  página y no dentro de una tarjeta: le toca el relleno contrario. */
+const botonEnLaPagina = clasesDeBoton({ tono: "secundario", sobre: "pagina" });
+const botonPrimario = clasesDeBoton({ tono: "primario" });
+/** El "Agregar entrada" de una ficha: es el botón de adentro del bloque, el que
+ *  acompaña, y por eso no tiene caja. Antes iba con la palabra teñida de acento;
+ *  el acento en el panel es cromo y manda en un solo control por pantalla, que
+ *  acá es "Guardar". */
+const botonFantasmaChico = clasesDeBoton({ tono: "fantasma", tamano: "chico" });
+
+/**
+ * El rojo de los errores, mezclado con la tinta del panel.
+ *
+ * Acá **no** se usa `dark:`: en este proyecto esa variante mira la preferencia
+ * del SISTEMA, y el panel además tiene un toggle propio. Con el sistema en
+ * claro y el toggle en oscuro, un `dark:text-red-400` no se aplicaba nunca y el
+ * rojo oscuro quedaba en 3:1 sobre la tarjeta —justo el mensaje que hay que
+ * poder leer—. Mezclar con `--panel-tinta`, que sí cambia con el tema, deja una
+ * sola fórmula que da 7,7:1 en claro y 5:1 en oscuro.
+ */
+const tintaAlerta =
+  "color-mix(in srgb, var(--grafico-alerta) 72%, var(--panel-tinta))";
 
 export function EditorNota({
   nota,
@@ -309,118 +386,169 @@ export function EditorNota({
         e.preventDefault();
         guardar();
       }}
-      className="pb-24"
+      /* La pila va en `grid gap-6`, que es la misma escalera que usan las cinco
+         pantallas del panel. Antes era `space-y-4`: otro mecanismo Y otra
+         separación —16px contra 24px— entre tarjetas que flotan sobre el mismo
+         fondo gris que las de al lado. Es la pantalla más larga del panel, así
+         que era también donde más se notaba que el editor no era del mismo
+         juego.
+
+         El relleno de abajo es el alto de la barra fija de guardar: sin él, el
+         último bloque del cuerpo queda tapado justo cuando se lo termina de
+         escribir. La barra va `fixed`, así que no es un hijo en flujo de la
+         grilla y no le genera una fila ni se come un `gap`. */
+      className="grid gap-6 pb-28"
     >
-      <section className="grid gap-4 sm:grid-cols-2">
-        <label className="sm:col-span-2">
-          <span className={etiqueta}>Título</span>
-          <textarea
-            value={titulo}
-            onChange={(e) => alEditar(setTitulo)(e.target.value)}
-            rows={2}
-            className={cn(campo, "mt-1.5 resize-y font-semibold")}
-            placeholder="El titular tal como va en la tapa"
-          />
-        </label>
+      <SeccionPanel
+        id="datos-de-la-nota"
+        titulo="La nota"
+        bajada="El titular y la bajada tal como se leen en la tapa, y dónde va publicada."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label htmlFor="nota-titulo" className={etiqueta}>
+              Título
+            </label>
+            <textarea
+              id="nota-titulo"
+              value={titulo}
+              onChange={(e) => alEditar(setTitulo)(e.target.value)}
+              rows={2}
+              className={cn(campo, "mt-1.5 resize-y font-semibold")}
+              placeholder="El titular tal como va en la tapa"
+            />
+          </div>
 
-        <label className="sm:col-span-2">
-          <span className={etiqueta}>Bajada</span>
-          <textarea
-            value={bajada}
-            onChange={(e) => alEditar(setBajada)(e.target.value)}
-            rows={3}
-            className={cn(campo, "mt-1.5 resize-y")}
-            placeholder="Las dos o tres líneas que resumen la nota"
-          />
-        </label>
+          <div className="sm:col-span-2">
+            <label htmlFor="nota-bajada" className={etiqueta}>
+              Bajada
+            </label>
+            <textarea
+              id="nota-bajada"
+              value={bajada}
+              onChange={(e) => alEditar(setBajada)(e.target.value)}
+              rows={3}
+              className={cn(campo, "mt-1.5 resize-y")}
+              aria-describedby="nota-bajada-ayuda"
+              placeholder="Las dos o tres líneas que resumen la nota"
+            />
+            <span id="nota-bajada-ayuda" className={ayudaCampo}>
+              Es también lo que Migue lee en voz alta cuando le piden escuchar
+              la nota. Escribila para ser oída.
+            </span>
+          </div>
 
-        {/*
-          * A qué edición va.
-          *
-          * Antes esto no se elegía ni se veía: la nota caía en la edición que
-          * estuviera en previsualización, y quien cargaba no tenía cómo
-          * saberlo. Una nota de un recital de septiembre terminó publicada en
-          * agosto, y no había forma de moverla desde acá.
-          */}
-        <label className="sm:col-span-2">
-          <span className={etiqueta}>Edición</span>
-          <select
-            value={edicionSlug}
-            onChange={(e) => alEditar(setEdicionSlug)(e.target.value)}
-            className={cn(campo, "mt-1.5")}
-          >
-            {ediciones.map((e) => (
-              <option key={e.slug} value={e.slug}>
-                {e.mes}
-                {e.estado === "publicada"
-                  ? " — en la calle"
-                  : e.estado === "programada"
-                    ? " — programada"
-                    : " — sin fecha"}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 font-sans text-[0.72rem] text-ink-3">
-            {nota
-              ? "Cambiarla mueve la nota a esa edición, al final del foliado."
-              : "En qué número va a salir la nota."}
-          </p>
-        </label>
+          {/*
+            * A qué edición va.
+            *
+            * Antes esto no se elegía ni se veía: la nota caía en la edición que
+            * estuviera en previsualización, y quien cargaba no tenía cómo
+            * saberlo. Una nota de un recital de septiembre terminó publicada en
+            * agosto, y no había forma de moverla desde acá.
+            */}
+          <div>
+            <label htmlFor="nota-edicion" className={etiqueta}>
+              Edición
+            </label>
+            <select
+              id="nota-edicion"
+              value={edicionSlug}
+              onChange={(e) => alEditar(setEdicionSlug)(e.target.value)}
+              className={cn(campo, "mt-1.5")}
+              aria-describedby="nota-edicion-ayuda"
+            >
+              {ediciones.map((e) => (
+                <option key={e.slug} value={e.slug}>
+                  {e.mes}
+                  {e.estado === "publicada"
+                    ? " — en la calle"
+                    : e.estado === "programada"
+                      ? " — programada"
+                      : " — sin fecha"}
+                </option>
+              ))}
+            </select>
+            <span id="nota-edicion-ayuda" className={ayudaCampo}>
+              {nota
+                ? "Cambiarla mueve la nota a esa edición, al final del foliado."
+                : "En qué número va a salir la nota."}
+            </span>
+          </div>
 
-        <label>
-          <span className={etiqueta}>Sección</span>
-          <input
-            list="secciones-existentes"
-            value={seccion}
-            onChange={(e) => alEditar(setSeccion)(e.target.value)}
-            {...sinEnviarConEnter}
-            className={cn(campo, "mt-1.5")}
-            placeholder="Cultura"
-          />
-          <datalist id="secciones-existentes">
-            {secciones.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
-        </label>
-
-        <label>
-          <span className={etiqueta}>Slug (la dirección de la nota)</span>
-          <input
-            value={slug}
-            onChange={(e) => alEditar(setSlug)(e.target.value)}
-            {...sinEnviarConEnter}
-            className={cn(campo, "mt-1.5 font-mono text-[0.8rem]")}
-            placeholder="plan-bacheo-integral"
-          />
-          <span className="mt-1 block font-sans text-[0.7rem] text-ink-3">
-            Sólo minúsculas, números y guiones. Si lo cambiás, los comentarios
-            de la nota lo siguen.
-          </span>
-        </label>
-      </section>
-
-      <section className="mt-8 border-t border-hairline pt-6">
-        <h2 className="font-sans text-[0.8rem] font-bold uppercase tracking-[0.14em] text-ink">
-          Foto
-        </h2>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <label>
-            <span className={etiqueta}>Archivo</span>
+          <div>
+            <label htmlFor="nota-seccion" className={etiqueta}>
+              Sección
+            </label>
             <input
+              id="nota-seccion"
+              list="secciones-existentes"
+              value={seccion}
+              onChange={(e) => alEditar(setSeccion)(e.target.value)}
+              {...sinEnviarConEnter}
+              className={cn(campo, "mt-1.5")}
+              aria-describedby="nota-seccion-ayuda"
+              placeholder="Cultura"
+            />
+            <datalist id="secciones-existentes">
+              {secciones.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+            <span id="nota-seccion-ayuda" className={ayudaCampo}>
+              Se puede elegir una de las que ya existen o escribir una nueva.
+            </span>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label htmlFor="nota-slug" className={etiqueta}>
+              Slug <span className="font-normal">(la dirección de la nota)</span>
+            </label>
+            <input
+              id="nota-slug"
+              value={slug}
+              onChange={(e) => alEditar(setSlug)(e.target.value)}
+              {...sinEnviarConEnter}
+              className={cn(campoMono, "mt-1.5")}
+              aria-describedby="nota-slug-ayuda"
+              placeholder="plan-bacheo-integral"
+            />
+            <span id="nota-slug-ayuda" className={ayudaCampo}>
+              Sólo minúsculas, números y guiones. Si lo cambiás, los comentarios
+              de la nota lo siguen.
+            </span>
+          </div>
+        </div>
+      </SeccionPanel>
+
+      <SeccionPanel
+        id="foto-de-la-nota"
+        titulo="Foto"
+        bajada="La imagen que abre la nota. Se sube acá, pero recién queda publicada cuando guardás."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="nota-imagen-src" className={etiqueta}>
+              Archivo
+            </label>
+            <input
+              id="nota-imagen-src"
               value={imagenSrc}
               onChange={(e) => alEditar(setImagenSrc)(e.target.value)}
               {...sinEnviarConEnter}
-              className={cn(campo, "mt-1.5 font-mono text-[0.8rem]")}
+              className={cn(campoMono, "mt-1.5")}
               placeholder="/notas/plaza-independencia.webp"
             />
-            <span className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-panel-controles">
               {/* El input de archivo va escondido detrás de su etiqueta: el
                   control nativo no se puede estilar y queda como un cuerpo
                   extraño en el panel. La etiqueta ES el disparador, así que
                   sigue andando con teclado y con lector de pantalla. */}
-              <label className="pressable inline-flex cursor-pointer items-center gap-2 border border-ink px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink hover:bg-ink hover:text-paper">
-                <Upload className="h-3 w-3" aria-hidden="true" />
+              <label
+                className={`${botonSecundario} cursor-pointer${
+                  subiendo ? " opacity-60" : ""
+                }`}
+              >
+                <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
                 {subiendo ? "Subiendo…" : "Subir una foto"}
                 <input
                   type="file"
@@ -436,126 +564,185 @@ export function EditorNota({
                   }}
                 />
               </label>
-              <span className="font-sans text-[0.7rem] text-ink-3">
+              <span className="text-panel-sm text-panel-tinta-3">
                 JPG, PNG o WebP, hasta 8 MB.
               </span>
-            </span>
+            </div>
             {errorFoto && (
               <span
                 role="alert"
-                className="mt-1.5 block font-sans text-[0.75rem] text-red-700 dark:text-red-400"
+                className="mt-2 flex items-start gap-2 text-panel-sm"
+                style={{ color: tintaAlerta }}
               >
+                <TriangleAlert
+                  className="mt-[0.15em] h-4 w-4 shrink-0"
+                  aria-hidden="true"
+                />
                 {errorFoto}
               </span>
             )}
-          </label>
-          <label>
-            <span className={etiqueta}>Texto alternativo</span>
+          </div>
+
+          <div>
+            <label htmlFor="nota-imagen-alt" className={etiqueta}>
+              Texto alternativo
+            </label>
             <input
+              id="nota-imagen-alt"
               value={imagenAlt}
               onChange={(e) => alEditar(setImagenAlt)(e.target.value)}
               {...sinEnviarConEnter}
               className={cn(campo, "mt-1.5")}
+              aria-describedby="nota-imagen-alt-ayuda"
               placeholder="Qué se ve en la foto, para quien no puede verla"
             />
-            <span className="mt-1 block font-sans text-[0.7rem] text-ink-3">
+            <span id="nota-imagen-alt-ayuda" className={ayudaCampo}>
               Sin esto no hay foto: es lo que lee un lector de pantalla.
             </span>
-          </label>
-          <label className="sm:col-span-2">
-            <span className={etiqueta}>Epígrafe</span>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label htmlFor="nota-imagen-epigrafe" className={etiqueta}>
+              Epígrafe
+            </label>
             <input
+              id="nota-imagen-epigrafe"
               value={imagenEpigrafe}
               onChange={(e) => alEditar(setImagenEpigrafe)(e.target.value)}
               {...sinEnviarConEnter}
               className={cn(campo, "mt-1.5")}
               placeholder="La línea que va debajo de la foto, a la vista de todos"
             />
-          </label>
+          </div>
         </div>
-      </section>
+      </SeccionPanel>
 
-      <section className="mt-8 border-t border-hairline pt-6">
-        <h2 className="font-sans text-[0.8rem] font-bold uppercase tracking-[0.14em] text-ink">
-          Cuerpo · {cuerpo.length} bloques
-        </h2>
+      {/* El cuerpo no va adentro de una tarjeta: cada bloque ES una tarjeta, y
+          meterlas todas dentro de otra las hundiría en una caja sin fondo. El
+          título de la sección vive sobre el fondo gris, como el rótulo de un
+          grupo de tarjetas.
 
-        <ol className="mt-4 space-y-3">
+          Y sin `pt-2` propio: la separación con la tarjeta de arriba la pone el
+          `gap-6` de la pila y nada más. Un hijo que además trae su propio aire
+          es exactamente cómo se desarma una escalera de separación.
+
+          Adentro, la misma que usa `SeccionPanel` entre su cabecera y su
+          cuerpo: `mb-4`. */}
+      <section aria-labelledby="cuerpo-de-la-nota">
+        <div className="mb-4 px-1">
+          <h2
+            id="cuerpo-de-la-nota"
+            className="text-panel-lg font-semibold tracking-[-0.01em] text-panel-tinta"
+          >
+            Cuerpo de la nota
+          </h2>
+          <p className="mt-1 text-panel-sm text-panel-tinta-3">
+            {cuerpo.length === 1 ? "1 bloque" : `${cuerpo.length} bloques`} · cada
+            forma se maqueta distinto en la hoja.
+          </p>
+        </div>
+
+        {/* `gap-4`, la separación de adentro de una sección en el resto del
+            panel: cada bloque es una tarjeta como cualquier otra y entre dos
+            tarjetas vecinas hay una sola distancia posible. */}
+        <ol className="grid gap-4">
           {cuerpo.map((bloque, i) => (
-            <li
-              key={i}
-              data-bloque={i}
-              className="border border-line bg-paper-2 px-4 py-3.5"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="flex items-center gap-2">
-                  <span className="font-sans text-[0.7rem] tabular-nums text-ink-3">
-                    {i + 1}
-                  </span>
-                  <select
-                    value={bloque.tipo}
-                    onChange={(e) => {
-                      setGuardado(false);
-                      setSucio(true);
-                      setCuerpo((prev) =>
-                        prev.map((b, k) =>
-                          k === i
-                            ? convertirBloque(
-                                b,
-                                e.target.value as BloqueNota["tipo"],
-                              )
-                            : b,
-                        ),
-                      );
-                    }}
-                    className="border border-line bg-chrome px-2 py-1 font-sans text-[0.75rem] font-semibold text-ink"
-                  >
-                    {TIPOS.map((t) => (
-                      <option key={t.valor} value={t.valor}>
-                        {t.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="flex items-center gap-1">
-                  <BotonIcono
-                    titulo="Subir"
-                    dato="subir"
-                    onClick={() => mover(i, -1)}
-                    disabled={i === 0}
-                  >
-                    <ArrowUp className="h-3.5 w-3.5" />
-                  </BotonIcono>
-                  <BotonIcono
-                    titulo="Bajar"
-                    dato="bajar"
-                    onClick={() => mover(i, 1)}
-                    disabled={i === cuerpo.length - 1}
-                  >
-                    <ArrowDown className="h-3.5 w-3.5" />
-                  </BotonIcono>
-                  <BotonIcono
-                    titulo="Eliminar bloque"
-                    onClick={() => {
-                      setGuardado(false);
-                      setSucio(true);
-                      setCuerpo((prev) => prev.filter((_, k) => k !== i));
-                    }}
-                    disabled={cuerpo.length === 1}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </BotonIcono>
+            <li key={i} data-bloque={i}>
+              <TarjetaPanel>
+                <div className="flex flex-wrap items-center justify-between gap-panel-controles">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {/* El número es decoración: la etiqueta de al lado ya dice
+                        "bloque 1" en voz alta. El cuadrado va con el radio más
+                        chico: es lo chico apoyado dentro de la tarjeta. */}
+                    <span
+                      aria-hidden="true"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-panel-3 bg-panel-wash text-panel-xs font-semibold tabular-nums text-accent"
+                    >
+                      {i + 1}
+                    </span>
+                    <label htmlFor={`bloque-${i}-tipo`} className="sr-only">
+                      Tipo del bloque {i + 1}
+                    </label>
+                    <select
+                      id={`bloque-${i}-tipo`}
+                      value={bloque.tipo}
+                      onChange={(e) => {
+                        setGuardado(false);
+                        setSucio(true);
+                        setCuerpo((prev) =>
+                          prev.map((b, k) =>
+                            k === i
+                              ? convertirBloque(
+                                  b,
+                                  e.target.value as BloqueNota["tipo"],
+                                )
+                              : b,
+                          ),
+                        );
+                      }}
+                      /* Es un campo como cualquier otro del formulario, sólo
+                         que se ajusta a su contenido en vez de ocupar la fila:
+                         de ahí `w-auto` y el relleno más chico. Antes estaba
+                         escrito entero a mano, y era la quinta copia del mismo
+                         campo. */
+                      className={cn(
+                        campo,
+                        "min-h-8 w-auto px-2.5 py-1.5 font-medium",
+                      )}
+                    >
+                      {TIPOS.map((t) => (
+                        <option key={t.valor} value={t.valor}>
+                          {t.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* `gap-panel-controles` y no `gap-1`: el anillo de foco de
+                      la casa sangra 5px por lado, así que con 4px de separación
+                      el anillo del botón enfocado se metía 1px dentro del
+                      vecino. Tres botones de sólo icono, pegados, y ninguna
+                      forma de saber cuál estaba enfocado. */}
+                  <div className="flex items-center gap-panel-controles">
+                    <BotonIcono
+                      titulo={`Subir el bloque ${i + 1}`}
+                      dato="subir"
+                      onClick={() => mover(i, -1)}
+                      disabled={i === 0}
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </BotonIcono>
+                    <BotonIcono
+                      titulo={`Bajar el bloque ${i + 1}`}
+                      dato="bajar"
+                      onClick={() => mover(i, 1)}
+                      disabled={i === cuerpo.length - 1}
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </BotonIcono>
+                    <BotonIcono
+                      titulo={`Eliminar el bloque ${i + 1}`}
+                      onClick={() => {
+                        setGuardado(false);
+                        setSucio(true);
+                        setCuerpo((prev) => prev.filter((_, k) => k !== i));
+                      }}
+                      disabled={cuerpo.length === 1}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </BotonIcono>
+                  </div>
                 </div>
-              </div>
 
-              <p className="mt-1.5 font-sans text-[0.7rem] text-ink-3">
-                {TIPOS.find((t) => t.valor === bloque.tipo)?.ayuda}
-              </p>
+                <p className="mt-2 text-panel-sm text-panel-tinta-3">
+                  {TIPOS.find((t) => t.valor === bloque.tipo)?.ayuda}
+                </p>
 
-              <CamposBloque
-                bloque={bloque}
-                onCambio={(c) => editarBloque(i, c)}
-              />
+                <CamposBloque
+                  bloque={bloque}
+                  indice={i}
+                  onCambio={(c) => editarBloque(i, c)}
+                />
+              </TarjetaPanel>
             </li>
           ))}
         </ol>
@@ -567,24 +754,33 @@ export function EditorNota({
             setSucio(true);
             setCuerpo((prev) => [...prev, { tipo: "parrafo", texto: "" }]);
           }}
-          className="pressable mt-4 inline-flex items-center gap-2 border border-ink px-4 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink hover:bg-ink hover:text-paper"
+          className={`${botonEnLaPagina} mt-4`}
         >
-          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
           Agregar bloque
         </button>
       </section>
 
       {/* La barra de guardar queda fija: el cuerpo de una nota es largo y no
-          se debería tener que volver arriba para grabar. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink bg-chrome/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          se debería tener que volver arriba para grabar.
+
+          Arranca después de la barra lateral (`lg:left-72`, el ancho de la
+          barra) en vez de cruzar la pantalla entera: si no, tapa el cambio de
+          tema y el usuario, que viven en el pie de la barra. El relleno de
+          adentro repite el del <main> del panel para que "Guardar" caiga sobre
+          el borde derecho de las tarjetas y no unos píxeles corrido. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-panel-borde bg-panel-tarjeta/95 backdrop-blur lg:left-72">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <p
             role="status"
             aria-live="polite"
-            className="min-w-0 flex-1 font-sans text-[0.78rem]"
+            className="min-w-0 flex-1 text-panel-sm"
           >
             {error ? (
-              <span className="inline-flex items-start gap-2 text-red-700 dark:text-red-400">
+              <span
+                className="inline-flex items-start gap-2 leading-snug"
+                style={{ color: tintaAlerta }}
+              >
                 <TriangleAlert
                   className="mt-[0.15em] h-4 w-4 shrink-0"
                   aria-hidden="true"
@@ -592,12 +788,15 @@ export function EditorNota({
                 {error}
               </span>
             ) : guardado ? (
-              <span className="inline-flex items-center gap-2 text-ink-2">
-                <Check className="h-4 w-4 text-accent" aria-hidden="true" />
+              <span className="inline-flex items-center gap-2 text-panel-tinta-2">
+                <Check
+                  className="h-4 w-4 shrink-0 text-accent"
+                  aria-hidden="true"
+                />
                 Guardado. Ya está en el diario.
               </span>
             ) : sucio ? (
-              <span className="inline-flex items-center gap-2 text-ink-2">
+              <span className="inline-flex items-center gap-2 text-panel-tinta-2">
                 <TriangleAlert
                   className="h-4 w-4 shrink-0 text-accent"
                   aria-hidden="true"
@@ -605,7 +804,7 @@ export function EditorNota({
                 Hay cambios sin guardar.
               </span>
             ) : (
-              <span className="text-ink-3">
+              <span className="text-panel-tinta-3">
                 Los cambios se publican al guardar: no hay borradores todavía.
               </span>
             )}
@@ -613,7 +812,10 @@ export function EditorNota({
           <button
             type="submit"
             disabled={guardando}
-            className="pressable inline-flex shrink-0 items-center gap-2 bg-accent px-6 py-2.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-accent-contrast hover:bg-accent-strong disabled:opacity-50"
+            /* La acción principal de la pantalla, y hay una sola. Pierde el
+               `px-6 py-2.5` que se había puesto de más: el relleno de un botón
+               primario es el mismo en las seis pantallas o no es un sistema. */
+            className={`${botonPrimario} shrink-0`}
           >
             {guardando ? "Guardando…" : "Guardar"}
           </button>
@@ -623,6 +825,20 @@ export function EditorNota({
   );
 }
 
+/** Los botones de 32×32 de la fila de un bloque: mover y eliminar.
+ *
+ *  El aspecto sale entero de `clasesDeBotonIcono()`: el cuadrado de 32px —por
+ *  encima del piso de 24×24 de la WCAG 2.5.8, y acá importa el doble porque son
+ *  tres botones pegados—, el `rounded-panel-3` y el filete de control
+ *  (`--panel-borde-campo`), que es lo único que dibuja un botón cuyo relleno
+ *  está casi al ras de la tarjeta.
+ *
+ *  Lo que queda de este componente es lo que NO entra en una cadena de clases y
+ *  es la mitad de la pieza: el `aria-label` obligatorio, el `title` y la marca
+ *  para devolverle el foco después de reordenar. Los cuatro estados de
+ *  `disabled:hover:` que había escritos a mano ya no hacen falta: la pieza trae
+ *  `disabled:pointer-events-none`, así que un botón apagado no tiene hover que
+ *  apagar. */
 function BotonIcono({
   titulo,
   dato,
@@ -645,7 +861,7 @@ function BotonIcono({
       data-mover={dato}
       aria-label={titulo}
       title={titulo}
-      className="pressable flex h-7 w-7 items-center justify-center border border-line text-ink-2 hover:border-ink hover:text-ink disabled:opacity-30 disabled:hover:border-line"
+      className={clasesDeBotonIcono()}
     >
       {children}
     </button>
@@ -653,12 +869,17 @@ function BotonIcono({
 }
 
 /** Los campos que cambian según el tipo. Vive aparte para que el `switch` esté
- *  en un solo lugar y no repartido por el render. */
+ *  en un solo lugar y no repartido por el render.
+ *
+ *  Recibe el `indice` sólo para nombrarse: sin él, un lector de pantalla oye
+ *  quince campos llamados "El texto" y ninguno dice de qué bloque es. */
 function CamposBloque({
   bloque,
+  indice,
   onCambio,
 }: {
   bloque: BloqueNota;
+  indice: number;
   onCambio: (cambios: Partial<BloqueNota>) => void;
 }) {
   if (bloque.tipo === "ficha") {
@@ -668,11 +889,20 @@ function CamposBloque({
           value={bloque.titulo}
           onChange={(e) => onCambio({ titulo: e.target.value })}
           {...sinEnviarConEnter}
+          aria-label={`Título del recuadro del bloque ${indice + 1}`}
           className={cn(campo, "font-semibold")}
           placeholder="Título del recuadro"
         />
         {bloque.entradas.map((entrada, j) => (
-          <div key={j} className="border-l-2 border-line pl-3">
+          // El filete de la izquierda es lo único que agrupa a la entrada: un
+          // recuadro completo dentro de la tarjeta del bloque sería una caja
+          // dentro de una caja dentro de una caja.
+          //
+          // Por eso mismo va con `--panel-borde-campo` y no con el filete de
+          // las tarjetas: si es lo único que agrupa, tiene que verse. El otro
+          // (1,23:1 sobre la tarjeta) dejaba la agrupación en el terreno de lo
+          // que se adivina.
+          <div key={j} className="border-l-2 border-panel-borde-campo pl-3">
             <div className="flex items-center gap-2">
               <input
                 value={entrada.lead}
@@ -684,21 +914,29 @@ function CamposBloque({
                   })
                 }
                 {...sinEnviarConEnter}
+                aria-label={`Encabezado de la entrada ${j + 1}`}
                 className={cn(campo, "font-semibold")}
                 placeholder="Encabezado de la entrada"
               />
               <button
                 type="button"
                 aria-label={`Quitar la entrada ${j + 1}`}
+                title={`Quitar la entrada ${j + 1}`}
                 onClick={() =>
                   onCambio({
                     entradas: bloque.entradas.filter((_, k) => k !== j),
                   })
                 }
                 disabled={bloque.entradas.length === 1}
-                className="pressable flex h-8 w-8 shrink-0 items-center justify-center border border-line text-ink-2 hover:border-ink disabled:opacity-30"
+                /* Mismo botón de icono que los de la fila del bloque, y ahora
+                   se ve igual porque es el mismo. Sigue siendo `secundario` y
+                   no `destructivo`: el tono destructivo avisa con el filete
+                   rojo Y con la palabra, y un botón de sólo icono no tiene
+                   palabra que poner. Lo que quita esto es una entrada de una
+                   ficha que todavía no se guardó, no una nota del diario. */
+                className={clasesDeBotonIcono()}
               >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
             <textarea
@@ -711,6 +949,7 @@ function CamposBloque({
                 })
               }
               rows={2}
+              aria-label={`Dato de la entrada ${j + 1}`}
               className={cn(campo, "mt-1.5 resize-y")}
               placeholder="El dato"
             />
@@ -723,9 +962,13 @@ function CamposBloque({
               entradas: [...bloque.entradas, { lead: "", texto: "" }],
             })
           }
-          className="pressable inline-flex items-center gap-1.5 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-accent hover:text-accent-strong"
+          className={botonFantasmaChico}
         >
-          <Plus className="h-3 w-3" aria-hidden="true" />
+          {/* `h-3.5` y no `h-4`: es el icono que le toca al botón chico, y por
+              eso el chico también achica el `gap`. Un icono de 16px con un aire
+              de 8px al lado de una palabra de 12,8px se lee como dos cosas
+              sueltas. */}
+          <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           Agregar entrada
         </button>
       </div>
@@ -738,6 +981,7 @@ function CamposBloque({
         value={bloque.texto}
         onChange={(e) => onCambio({ texto: e.target.value })}
         rows={bloque.tipo === "subtitulo" ? 1 : 4}
+        aria-label={`Texto del bloque ${indice + 1}`}
         className={cn(campo, "resize-y")}
         placeholder={
           bloque.tipo === "cita"
@@ -753,6 +997,7 @@ function CamposBloque({
             value={bloque.autor}
             onChange={(e) => onCambio({ autor: e.target.value })}
             {...sinEnviarConEnter}
+            aria-label={`Quién lo dijo, en el bloque ${indice + 1}`}
             className={campo}
             placeholder="Quién lo dijo"
           />
@@ -760,6 +1005,7 @@ function CamposBloque({
             value={bloque.cargo ?? ""}
             onChange={(e) => onCambio({ cargo: e.target.value })}
             {...sinEnviarConEnter}
+            aria-label={`Cargo de quien lo dijo, en el bloque ${indice + 1}`}
             className={campo}
             placeholder="Su cargo (opcional)"
           />

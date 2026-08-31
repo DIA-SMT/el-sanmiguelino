@@ -1,6 +1,7 @@
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, CalendarOff, Newspaper } from "lucide-react";
 import { FilaEdicion, type EdicionFila } from "@/components/admin/fila-edicion";
 import { NuevaEdicion } from "@/components/admin/nueva-edicion";
+import { Aviso, BannerPanel, TarjetaDato } from "@/components/admin/piezas";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { edicionEnFoco } from "@/lib/auth/vista-previa";
 import { db } from "@/lib/db";
@@ -20,6 +21,11 @@ export const metadata = { title: "Ediciones" };
  * muestra —tapa, notas, buscador, Migue—, con el mismo código que ve el lector.
  * Una vista previa dibujada aparte te muestra que todo está bien y el día que
  * sale aparece el problema igual.
+ *
+ * Los tres datos de arriba y el filete de cada tarjeta usan **los mismos tres
+ * colores para los mismos tres estados** —en la calle, programada, sin fecha—,
+ * y en los tres lugares el color va acompañado de su palabra. El color acá no
+ * informa: agrupa. Quien no lo distingue lee exactamente lo mismo.
  */
 export default async function AdminEdiciones() {
   await requerirAdmin();
@@ -58,44 +64,94 @@ export default async function AdminEdiciones() {
   const siguienteNumero =
     filas.reduce((max, e) => Math.max(max, e.numero), 0) + 1;
 
+  const programadas = ediciones.filter((e) => e.estado === "programada").length;
+  const sinFecha = ediciones.filter((e) => e.estado === "sin_fecha").length;
+
   return (
     <>
-      <div className="border-b border-ink pb-4">
-        <h1 className="font-sans text-[1.35rem] font-bold leading-tight text-ink">
-          Ediciones
-        </h1>
-        <p className="mt-1 font-sans text-[0.8rem] text-ink-3">
-          {ediciones.length}{" "}
-          {ediciones.length === 1 ? "edición" : "ediciones"} · en la calle:{" "}
-          {publicada?.mes ?? "ninguna"}
-        </p>
-      </div>
+      <BannerPanel
+        titulo="Ediciones"
+        bajada={
+          <>
+            {ediciones.length}{" "}
+            {ediciones.length === 1 ? "edición cargada" : "ediciones cargadas"},
+            de la más nueva a la más vieja.
+          </>
+        }
+      />
 
-      <p className="mt-5 flex items-start gap-2.5 border border-hairline bg-paper-2 px-4 py-3 font-sans text-[0.8rem] leading-relaxed text-ink-2">
-        <CalendarClock
-          className="mt-[0.15em] h-4 w-4 shrink-0 text-accent"
-          aria-hidden="true"
-        />
-        <span>
+      {/* La misma escalera vertical que las otras cuatro pantallas del panel:
+          la pila va en un `grid gap-6` y ningún hijo trae su propio `mt-`. */}
+      <div className="grid gap-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <TarjetaDato
+            icono={Newspaper}
+            color="azul"
+            titulo="En la calle"
+            valor={publicada ? `N.º ${publicada.numero}` : "Ninguna"}
+            nota={
+              publicada
+                ? `${publicada.mes}: es la que ve el lector ahora mismo.`
+                : "Ninguna edición tiene todavía una fecha ya cumplida."
+            }
+          />
+          <TarjetaDato
+            icono={CalendarClock}
+            color="celeste"
+            titulo={programadas === 1 ? "Programada" : "Programadas"}
+            valor={String(programadas)}
+            nota="Tienen fecha futura y salen solas cuando les llega."
+          />
+          <TarjetaDato
+            icono={CalendarOff}
+            color="oro"
+            titulo="Sin fecha"
+            valor={String(sinFecha)}
+            nota="No salen nunca solas: se están preparando."
+          />
+        </div>
+
+        {/* El mismo cartel que el de `/admin`, y ahora literalmente el mismo:
+            estaba copiado carácter por carácter —filete, cuadrado del icono y
+            la fórmula de `color-mix` incluida— y no había forma de cambiarlo en
+            un lado sin que los dos se separaran. */}
+        <Aviso icono={CalendarClock} tono="var(--grafico-nota)">
           El cambio de mes es automático y no lo dispara nada: el diario sirve
           la edición más reciente cuya fecha ya pasó. Poné la fecha con la
           anticipación que quieras y a esa hora sale sola. Las fechas se
-          escriben y se muestran en <strong>hora de Tucumán</strong>.
-        </span>
-      </p>
+          escriben y se muestran en{" "}
+          <strong className="font-semibold text-panel-tinta">
+            hora de Tucumán
+          </strong>
+          .
+        </Aviso>
 
-      <ul className="mt-4 divide-y divide-hairline border-y border-hairline">
-        {ediciones.map((e) => (
-          <FilaEdicion
-            key={e.slug}
-            edicion={e}
-            enFoco={enFoco === e.slug}
-            esLaPublicada={publicada?.slug === e.slug}
-          />
-        ))}
-      </ul>
+        {/* Las ediciones sí van como tarjetas sueltas flotando sobre el fondo,
+            al revés que las notas: cada una es una ficha con estado, tema,
+            fecha y su propio formulario adentro, no un renglón de una lista.
+            Por eso el título de la lista no arma tarjeta: si la armara, serían
+            tarjetas dentro de una tarjeta. */}
+        <section aria-labelledby="todas-las-ediciones">
+          <h2
+            id="todas-las-ediciones"
+            className="mb-3 text-panel-lg font-semibold tracking-[-0.01em] text-panel-tinta"
+          >
+            Todas las ediciones
+          </h2>
+          <ul className="grid gap-3">
+            {ediciones.map((e) => (
+              <FilaEdicion
+                key={e.slug}
+                edicion={e}
+                enFoco={enFoco === e.slug}
+                esLaPublicada={publicada?.slug === e.slug}
+              />
+            ))}
+          </ul>
+        </section>
 
-      <NuevaEdicion siguienteNumero={siguienteNumero} />
+        <NuevaEdicion siguienteNumero={siguienteNumero} />
+      </div>
     </>
   );
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { EditorNota } from "@/components/admin/editor-nota";
+import { BannerPanel, clasesDeBoton } from "@/components/admin/piezas";
 import { requerirAdmin } from "@/lib/auth/dal";
 import {
   getIndice,
@@ -17,6 +18,22 @@ import { db } from "@/lib/db";
  * Pide permiso por su cuenta aunque el layout ya lo haya hecho: acá hay datos,
  * y el componente que tiene los datos es el que pide permiso.
  */
+
+/**
+ * Los dos enlaces de la cabecera son el botón secundario del panel.
+ *
+ * Esta pantalla ya había llegado por su cuenta a `--panel-borde-campo` —un
+ * botón sin relleno propio es un borde y nada más, y ese filete es el único
+ * límite del control: WCAG 1.4.11 le pide 3:1 y `--panel-borde` da 1,23:1—.
+ * Ahora ese criterio vive una sola vez, en `clasesDeBoton`, y las otras cinco
+ * definiciones sueltas que no lo tenían lo heredan de arriba en vez de tener
+ * que enterarse.
+ *
+ * `sobre` queda en su valor por defecto (`"tarjeta"`) porque el banner es
+ * `--panel-tarjeta`: el relleno del control es el contrario del de abajo.
+ */
+const enlaceSecundario = clasesDeBoton();
+
 export default async function AdminEditarNota({
   params,
 }: PageProps<"/admin/nota/[slug]">) {
@@ -70,46 +87,34 @@ export default async function AdminEditarNota({
 
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink pb-4">
-        <div className="min-w-0">
-          <Link
-            href="/admin"
-            className="group inline-flex items-center gap-2 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink-3 transition-colors hover:text-accent"
-          >
-            <ArrowLeft
-              className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-1"
-              aria-hidden="true"
-            />
-            Notas de la edición
-          </Link>
-          <h1 className="mt-2 font-sans text-[1.35rem] font-bold leading-tight text-ink">
-            {esNueva ? "Nota nueva" : "Editar nota"}
-          </h1>
-          {nota && (
-            <p className="mt-1 font-sans text-[0.78rem] text-ink-3">
-              {nota.seccion} · {nota.minutosLectura} min de lectura
-            </p>
-          )}
-        </div>
+      {/* El <h1> de la pantalla lo pone el banner; adentro del editor no hay
+          otro, sólo los <h2> de cada tarjeta. */}
+      <BannerPanel
+        titulo={esNueva ? "Nota nueva" : "Editar nota"}
+        bajada={
+          nota
+            ? `${nota.seccion} · ${nota.minutosLectura} min de lectura`
+            : "Se crea recién cuando la guardes: hasta entonces no existe para nadie."
+        }
+      >
+        <Link href="/admin" className={enlaceSecundario}>
+          <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Notas de la edición
+        </Link>
         {nota && (
-          <Link
-            href={`/nota/${nota.slug}`}
-            className="pressable inline-flex items-center gap-2 border border-line px-4 py-2 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink-2 hover:border-ink hover:text-ink"
-          >
+          <Link href={`/nota/${nota.slug}`} className={enlaceSecundario}>
             Ver en el diario
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
           </Link>
         )}
-      </div>
+      </BannerPanel>
 
-      <div className="mt-6">
-        <EditorNota
+      <EditorNota
         nota={nota}
         secciones={secciones}
         ediciones={ediciones}
         edicionInicial={edicionInicial}
       />
-      </div>
     </>
   );
 }

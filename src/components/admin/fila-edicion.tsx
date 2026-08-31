@@ -3,11 +3,18 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Eye, Pencil, X } from "lucide-react";
+import { AlertTriangle, Check, Eye, Pencil, X } from "lucide-react";
 import {
   enfocarEdicionAction,
   guardarEdicionAction,
 } from "@/app/admin/acciones";
+import {
+  Aviso,
+  Pildora,
+  TarjetaPanel,
+  clasesDeBoton,
+  clasesDeCampo,
+} from "@/components/admin/piezas";
 import { cn } from "@/lib/utils";
 
 export interface EdicionFila {
@@ -26,13 +33,67 @@ export interface EdicionFila {
   estado: "publicada" | "programada" | "sin_fecha";
 }
 
-const campo =
-  "w-full border border-line bg-chrome px-2.5 py-1.5 font-sans text-[0.82rem] text-ink focus:border-accent focus:outline-none";
+/* El vocabulario de botones de la ficha, ahora el del panel entero.
+   Los cuatro eran definiciones locales de este archivo y los cuatro se
+   repetían, con matices, en otras cinco pantallas.
 
-const ETIQUETAS: Record<EdicionFila["estado"], string> = {
-  publicada: "En la calle",
-  programada: "Programada",
-  sin_fecha: "Sin fecha",
+   Todos `chico` (32px): se repiten en cada ficha de una lista de ediciones, y
+   ahí un botón de 36px empuja la fila.
+
+   `sobre="tarjeta"` en el secundario porque estos botones apoyan sobre la
+   `TarjetaPanel` blanca de la ficha, así que el relleno del control es el
+   contrario y se hunde. Antes traía `bg-panel-tarjeta` clavado sobre una
+   tarjeta que es `panel-tarjeta`: el botón era del mismo color que su fondo y
+   su único límite era `border-panel-borde` —1,23:1—, que es no tener límite
+   (WCAG 1.4.11). La pieza usa `--panel-borde-campo`, ≥3:1 en los dos temas.
+
+   El "Ir al diario" era un quinto tono local, `BOTON_ACENTO`
+   (`bg-panel-wash text-accent`), que no entra en los cuatro del contrato.
+   Pasa a secundario: lo que lo hacía distinto era el matiz, no la jerarquía
+   —al lado de "Dejar de verla" los dos son acciones del mismo peso— y un tono
+   más se pide, no se escribe a mano acá. */
+const BOTON_PRIMARIO = clasesDeBoton({ tono: "primario", tamano: "chico" });
+const BOTON_SECUNDARIO = clasesDeBoton({ tamano: "chico", sobre: "tarjeta" });
+const BOTON_QUIETO = clasesDeBoton({ tono: "fantasma", tamano: "chico" });
+
+/**
+ * Los estados, con su palabra y su color.
+ *
+ * `publicada` dice **"En el archivo"** y no "En la calle". No es un capricho de
+ * redacción: hay muchas ediciones con la fecha ya cumplida y una sola que el
+ * lector encuentra al abrir el diario —la más reciente—. Antes las dos decían
+ * lo mismo y se diferenciaban sólo por el relleno de la pastilla, así que la
+ * pregunta más importante de esta pantalla ("¿cuál está saliendo?") se
+ * contestaba mirando un matiz. Ahora se contesta leyendo.
+ *
+ * El color va SIEMPRE con su texto: acá arriba, en el filete de la tarjeta y en
+ * las tarjetas de dato de la pantalla. Nunca solo.
+ */
+const ESTADOS: Record<
+  EdicionFila["estado"],
+  { texto: string; tono: string; fuerte: boolean }
+> = {
+  publicada: {
+    texto: "En el archivo",
+    tono: "var(--panel-borde)",
+    fuerte: false,
+  },
+  programada: {
+    texto: "Programada",
+    tono: "var(--grafico-indice)",
+    fuerte: false,
+  },
+  sin_fecha: {
+    texto: "Sin fecha",
+    tono: "var(--grafico-diario)",
+    fuerte: false,
+  },
+};
+
+const EN_LA_CALLE = {
+  texto: "En la calle",
+  tono: "var(--grafico-nota)",
+  fuerte: true,
 };
 
 export function FilaEdicion({
@@ -52,6 +113,8 @@ export function FilaEdicion({
   const [error, setError] = useState<string | null>(null);
   const [fecha, setFecha] = useState(edicion.publicaEnLocal);
   const [tema, setTema] = useState(edicion.tema ?? "");
+
+  const estado = esLaPublicada ? EN_LA_CALLE : ESTADOS[edicion.estado];
 
   function guardarFecha() {
     setError(null);
@@ -96,161 +159,195 @@ export function FilaEdicion({
   }
 
   return (
-    <li className={cn("py-4", enFoco && "border-l-2 border-accent pl-4")}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-sans text-[0.95rem] font-semibold text-ink">
-          {edicion.mes}
-        </span>
-        <span className="font-sans text-[0.75rem] text-ink-3">
-          N.º {edicion.numero} · {edicion.notas}{" "}
-          {edicion.notas === 1 ? "nota" : "notas"} ·{" "}
-          <code className="font-mono text-[0.72rem]">{edicion.slug}</code>
-        </span>
-        <span
-          className={cn(
-            "border px-2 py-0.5 font-sans text-[0.62rem] font-semibold uppercase tracking-[0.12em]",
-            esLaPublicada
-              ? "border-ink bg-ink text-paper"
-              : "border-line text-ink-3",
-          )}
-        >
-          {esLaPublicada ? "En la calle" : ETIQUETAS[edicion.estado]}
-        </span>
-        {enFoco && (
-          <span className="inline-flex items-center gap-1.5 border border-accent px-2 py-0.5 font-sans text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-accent">
-            <Eye className="h-3 w-3" aria-hidden="true" />
-            Viéndola
-          </span>
+    <li>
+      {/* El filete va como barra absoluta y no como `border-l`: la tarjeta ya
+          tiene su borde de 1px y engordarle un lado le corre el radio de las
+          dos esquinas izquierdas. Con `overflow-hidden` la barra se recorta
+          contra el mismo radio y el borde queda parejo. */}
+      <TarjetaPanel
+        className={cn(
+          "relative overflow-hidden py-4 pr-5 pl-6",
+          enFoco && "ring-2 ring-accent",
         )}
-      </div>
+      >
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 w-1"
+          style={{ background: estado.tono }}
+        />
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h3 className="text-panel-lg font-semibold tracking-[-0.01em] text-panel-tinta">
+            {edicion.mes}
+          </h3>
+          {/* La píldora del sistema. Tenía una copia local (`Pastilla`) con su
+              propia altura y su propio 0.72rem; el eje que de verdad la
+              distinguía —"éste es EL estado que hay que encontrar"— es ahora
+              `enfasis`. Apoya sobre la tarjeta blanca, así que se hunde. */}
+          <Pildora tono={estado.tono} sobre="tarjeta" enfasis={estado.fuerte}>
+            {estado.texto}
+          </Pildora>
+          {enFoco && (
+            /* La única pastilla de acento sólido de la pantalla, y no es un
+               estado de la edición sino de quien está mirando: el diario le
+               está mostrando ésta a este usuario. Por eso no es `Pildora`: la
+               píldora dice estados con un punto de color y ésta es cromo, el
+               acento sólido de la casa. Darle a la píldora un modo "acento
+               relleno" sería inventarle un eje para un solo uso. */
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-panel-xs font-semibold text-accent-contrast">
+              <Eye className="h-3 w-3" aria-hidden="true" />
+              La estás viendo
+            </span>
+          )}
+          <span className="text-panel-xs text-panel-tinta-3">
+            N.º {edicion.numero} · {edicion.notas}{" "}
+            {edicion.notas === 1 ? "nota" : "notas"} ·{" "}
+            <code className="font-mono">{edicion.slug}</code>
+          </span>
+        </div>
+
         {editando ? (
-          <span className="flex flex-wrap items-center gap-2">
+          /* El formulario se hunde sobre la tarjeta en vez de flotar sobre
+             ella: es la misma ficha en modo edición, no una segunda cosa. */
+          <div className="mt-3 grid gap-3 rounded-panel-2 bg-panel-tarjeta-2 p-3.5">
             {/* De qué se trata el número. El Sanmiguelino no se divide en
                 secciones: cada edición es un tema, y esto es lo que el diario
                 muestra en la barra en lugar de las secciones. */}
-            <label className="flex min-w-0 flex-1 basis-full items-center gap-2">
-              <span className="shrink-0 font-sans text-[0.72rem] text-ink-3">
+            <label className="grid gap-1.5">
+              <span className="text-panel-sm font-medium text-panel-tinta-2">
                 Tema
               </span>
+              {/* `hundida` porque el bloque de edición ya es la superficie
+                  hundida: acá adentro el campo tiene que flotar. Es el mismo
+                  fondo que tenía escrito a mano, ahora dicho como regla. */}
               <input
                 value={tema}
                 onChange={(e) => setTema(e.target.value)}
-                className={cn(campo, "min-w-0 flex-1")}
+                className={clasesDeCampo("hundida")}
                 placeholder="Historia de San Miguel de Tucumán"
               />
             </label>
-            <label className="flex items-center gap-2">
-              <span className="font-sans text-[0.72rem] text-ink-3">
-                Sale el
+            <label className="grid gap-1.5">
+              <span className="text-panel-sm font-medium text-panel-tinta-2">
+                Sale el (hora de Tucumán)
               </span>
               <input
                 type="datetime-local"
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}
-                className={cn(campo, "w-auto")}
+                className={cn(
+                  clasesDeCampo("hundida"),
+                  "w-auto justify-self-start",
+                )}
               />
-              <span className="font-sans text-[0.7rem] text-ink-3">
-                hora de Tucumán
-              </span>
             </label>
-            <button
-              type="button"
-              onClick={guardarFecha}
-              disabled={enCurso}
-              className="pressable inline-flex items-center gap-1.5 border border-ink bg-ink px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-paper disabled:opacity-50"
-            >
-              <Check className="h-3 w-3" aria-hidden="true" />
-              {enCurso ? "Guardando…" : "Guardar"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditando(false);
-                setFecha(edicion.publicaEnLocal);
-                setTema(edicion.tema ?? "");
-                setError(null);
-              }}
-              className="pressable font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-3 hover:text-ink"
-            >
-              Cancelar
-            </button>
-          </span>
+            <div className="flex flex-wrap items-center gap-panel-controles">
+              <button
+                type="button"
+                onClick={guardarFecha}
+                disabled={enCurso}
+                className={BOTON_PRIMARIO}
+              >
+                <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                {enCurso ? "Guardando…" : "Guardar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditando(false);
+                  setFecha(edicion.publicaEnLocal);
+                  setTema(edicion.tema ?? "");
+                  setError(null);
+                }}
+                className={BOTON_QUIETO}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         ) : (
           <>
             {/* El tema, a la vista sin tener que abrir el editor: es lo que
                 el lector va a ver en la barra del diario. */}
-            <span className="basis-full font-serif text-[0.85rem] italic text-ink-2">
-              {edicion.tema ? (
-                edicion.tema
-              ) : (
-                <span className="not-italic text-ink-3">
+            <p className="mt-2 text-panel-base text-panel-tinta-2">
+              {edicion.tema ?? (
+                <span className="text-panel-tinta-3">
                   Sin tema: el diario muestra las secciones de las notas.
                 </span>
               )}
-            </span>
-            <span className="font-sans text-[0.8rem] text-ink-2">
+            </p>
+            <p className="mt-1 text-panel-sm text-panel-tinta-2">
               {edicion.publicaEnTexto ? (
                 <>Sale el {edicion.publicaEnTexto}</>
               ) : (
-                <span className="text-ink-3">
+                <span className="text-panel-tinta-3">
                   Sin fecha: no sale sola hasta que se le ponga una.
                 </span>
               )}
-            </span>
-            <button
-              type="button"
-              onClick={() => setEditando(true)}
-              className="pressable inline-flex items-center gap-1.5 border border-line px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-2 hover:border-ink hover:text-ink"
-            >
-              <Pencil className="h-3 w-3" aria-hidden="true" />
-              Tema y fecha
-            </button>
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-panel-controles">
+              <button
+                type="button"
+                onClick={() => setEditando(true)}
+                className={BOTON_SECUNDARIO}
+              >
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                Tema y fecha
+              </button>
+
+              {enFoco ? (
+                <>
+                  {/* Ya está en foco: lo que falta es poder ir a verla. */}
+                  <Link href="/diario" className={BOTON_SECUNDARIO}>
+                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                    Ir al diario
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => enfocar(null)}
+                    disabled={enCurso}
+                    className={BOTON_QUIETO}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    Dejar de verla
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => enfocar(edicion.slug, true)}
+                  disabled={enCurso}
+                  className={BOTON_SECUNDARIO}
+                >
+                  <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                  Verla en el diario
+                </button>
+              )}
+            </div>
           </>
         )}
 
-        {enFoco ? (
-          <>
-            {/* Ya está en foco: lo que falta es poder ir a verla. */}
-            <Link
-              href="/diario"
-              className="pressable inline-flex items-center gap-1.5 border border-accent bg-accent-wash px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-accent hover:bg-accent hover:text-accent-contrast"
+        {error && (
+          /* El tercer esqueleto de cartel de aviso que había en el panel,
+             ahora la pieza. Mantiene el criterio que ya tenía escrito acá —el
+             rojo tiñe el filete y el icono, la palabra va en tinta del panel,
+             que pasa AA en los dos temas— sólo que la fórmula de mezcla vive
+             una vez en `piezas.tsx` en lugar de copiada en tres archivos.
+             `sobre="tarjeta"` porque el aviso apoya dentro de la tarjeta de la
+             edición: ahí se hunde. */
+          <div className="mt-3">
+            <Aviso
+              icono={AlertTriangle}
+              tono="var(--grafico-alerta)"
+              sobre="tarjeta"
+              rol="alert"
             >
-              <Eye className="h-3 w-3" aria-hidden="true" />
-              Ir al diario
-            </Link>
-            <button
-              type="button"
-              onClick={() => enfocar(null)}
-              disabled={enCurso}
-              className="pressable inline-flex items-center gap-1.5 border border-line px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-2 hover:border-ink hover:text-ink disabled:opacity-50"
-            >
-              <X className="h-3 w-3" aria-hidden="true" />
-              Dejar de verla
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => enfocar(edicion.slug, true)}
-            disabled={enCurso}
-            className="pressable inline-flex items-center gap-1.5 border border-line px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-2 hover:border-ink hover:text-ink disabled:opacity-50"
-          >
-            <Eye className="h-3 w-3" aria-hidden="true" />
-            Verla en el diario
-          </button>
+              {error}
+            </Aviso>
+          </div>
         )}
-      </div>
-
-      {error && (
-        <p
-          role="alert"
-          className="mt-2 font-sans text-[0.75rem] text-red-700 dark:text-red-400"
-        >
-          {error}
-        </p>
-      )}
+      </TarjetaPanel>
     </li>
   );
 }

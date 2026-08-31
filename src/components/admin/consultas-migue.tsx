@@ -3,6 +3,16 @@
 import { useId, useMemo, useState } from "react";
 import { Info, Search, ShieldCheck } from "lucide-react";
 import type { ResultadoEnTablero, ResumenMigue } from "@/lib/repos/migue";
+import { cn } from "@/lib/utils";
+import {
+  Aviso,
+  ChipFiltro,
+  Pildora,
+  TABLA,
+  ZonaDeTabla,
+  clasesDeBoton,
+  clasesDeCampo,
+} from "@/components/admin/piezas";
 
 /**
  * Los nombres legibles de cada resultado. Están acá repetidos y no importados
@@ -238,72 +248,79 @@ export function ConsultasMigue({
 
   const hayFiltro = busqueda.trim() !== "" || filtro !== null;
 
+  /*
+   * Devuelve el cuerpo suelto y no un `<section>` con su título: vive adentro del
+   * `SeccionPanel` de `/admin/migue`, que es el que pone la tarjeta, el `<h2>`
+   * y el `aria-labelledby`. Antes acá había un segundo encabezado —"Todas las
+   * consultas"— pegado al de la página, que decía lo mismo; en una pantalla
+   * plana eso pasaba por redundancia, en una tarjeta serían dos títulos para
+   * una sola caja. El "Todas" no se perdió: sigue siendo el primer chip, que es
+   * donde de verdad significa algo.
+   */
   return (
-    <section aria-labelledby="consultas-migue">
-      <h2
-        id="consultas-migue"
-        className="font-sans text-[0.95rem] font-bold text-ink"
-      >
-        Todas las consultas
-      </h2>
-
+    /* Una sola escalera vertical para todo el cuerpo de la tarjeta, igual que
+       la de las pantallas: antes eran cuatro `mt-` distintos (3, 3, 3, 4 y un 6
+       para el vacío) elegidos de a uno, y cada bloque que se agregaba tenía que
+       adivinar cuál le tocaba. Con el `gap` la separación es una decisión sola y
+       los bloques condicionales —el aviso de recorte— no dejan hueco cuando no
+       están. */
+    <div className="grid gap-3">
       {/* Controles: una sola fila arriba de la tabla. Envuelve en pantallas
           angostas, pero es una fila. */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="relative min-w-[13rem] flex-1 sm:max-w-xs">
-          <label
-            htmlFor={idBuscador}
-            className="sr-only"
-          >
+          <label htmlFor={idBuscador} className="sr-only">
             Buscar en el texto de las preguntas
           </label>
           <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-3"
+            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-panel-tinta-3"
             aria-hidden="true"
           />
-          {/*
-           * Sin `focus:outline-none`. En Tailwind v4 esa utilidad emite
-           * `outline-style: none` —ya no el outline transparente de v3— y sale
-           * en la capa `utilities`, que le gana al
-           * `:focus-visible { outline: 2px solid var(--accent) }` de la capa
-           * `base` sin importar la especificidad: al tabular hasta acá no
-           * aparecía el anillo de acento que sí aparece en todos los demás
-           * controles del panel. El borde de acento se queda porque suma; el
-           * anillo lo pone la casa.
-           */}
+          {/* El aspecto lo pone `clasesDeCampo`, que es el mismo de todos los
+              campos del panel —incluido el borde de control de 3:1 y la regla
+              de nunca apagar el outline del foco—. Lo único propio es el
+              `pl-9`, que le hace lugar a la lupa. La superficie es "tarjeta"
+              porque el campo se apoya en la tarjeta blanca de la sección, así
+              que el relleno del campo va hundido. */}
           <input
             id={idBuscador}
             type="search"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar en las preguntas"
-            className="w-full border border-line bg-chrome py-1.5 pl-8 pr-2.5 font-sans text-[0.78rem] text-ink placeholder:text-ink-3 focus:border-accent"
+            className={cn(clasesDeCampo("tarjeta"), "pl-9")}
           />
         </div>
 
-        {/* gap-2 y no gap-1: el foco de la casa es un outline de 2px con 3px de
-            offset, o sea 5px de sangrado por lado. Con 4px de separación el
-            anillo del chip enfocado se metía adentro del vecino y, al envolver,
-            se superponía con la fila de abajo. */}
-        <div className="flex flex-wrap gap-2">
-          <Chip
-            nombre="Todas"
+        {/* La separación de una fila de controles es la del token: es lo que
+            necesita el anillo de foco para no dibujarse encima del vecino. */}
+        <div className="flex flex-wrap gap-panel-controles">
+          {/* Siguen siendo botones y no `como="enlace"`: este filtro NO vive en
+              la URL —es en memoria, sobre las filas que ya llegaron— así que lo
+              correcto es `aria-pressed`, no `aria-current`. La superficie es la
+              de la tarjeta, que es el valor por omisión.
+
+              "Todas" va sin `color` porque no identifica ningún resultado, así
+              que no lleva punto. */}
+          <ChipFiltro
             cuenta={porBusqueda.length}
-            color={null}
             activo={filtro === null}
             onClick={() => setFiltro(null)}
-          />
+          >
+            Todas
+          </ChipFiltro>
           {/* El cajón de lo desconocido sólo se muestra si hay alguna: un chip
               "Otro resultado 0" es una pregunta sin respuesta para quien mira. */}
           {ORDEN.filter((r) => r !== "otro" || cuentas.otro > 0).map((r) => (
-            <Chip
+            <ChipFiltro
               key={r}
-              nombre={NOMBRES[r]}
               cuenta={cuentas[r]}
               color={COLORES[r]}
               activo={filtro === r}
               onClick={() => setFiltro(filtro === r ? null : r)}
-            />
+            >
+              {NOMBRES[r]}
+            </ChipFiltro>
           ))}
         </div>
       </div>
@@ -322,7 +339,7 @@ export function ConsultasMigue({
        */}
       <p
         aria-live="polite"
-        className="mt-3 font-sans text-[0.72rem] tabular-nums text-ink-3"
+        className="font-sans text-panel-xs tabular-nums text-panel-tinta-3"
       >
         {recortada ? (
           <>
@@ -339,41 +356,42 @@ export function ConsultasMigue({
         {hayFiltro ? " · hay un filtro puesto" : ""}
       </p>
 
+      {/* Los dos carteles son el `Aviso` del panel —el mismo que usan el
+          tablero y ediciones—, hundidos dentro de la tarjeta (`sobre="tarjeta"`)
+          porque acá no flotan sobre el gris de la página. Ninguno lleva `rol`:
+          los dos ya estaban cuando cargó la pantalla, y anunciar todo es no
+          anunciar nada. El del recorte va en el tono de aviso y el de la
+          privacidad en el informativo, que es como los usan las otras
+          pantallas. */}
       {recortada && (
-        <p className="mt-3 flex items-start gap-2 border border-line bg-paper-2 px-3 py-2 font-sans text-[0.72rem] leading-relaxed text-ink-2">
-          <Info className="mt-px h-3.5 w-3.5 shrink-0 text-ink-3" aria-hidden="true" />
-          <span>
-            Las últimas{" "}
-            <strong className="tabular-nums text-ink">
-              {NUMERO.format(consultas.length)}
-            </strong>{" "}
-            de{" "}
-            <strong className="tabular-nums text-ink">
-              {NUMERO.format(total)}
-            </strong>{" "}
-            · los chips y el buscador trabajan sobre estas{" "}
-            <span className="tabular-nums">
-              {NUMERO.format(consultas.length)}
-            </span>
-            . Los números de arriba del tablero —el anillo y la cabecera— son de
-            las {NUMERO.format(total)}.
+        <Aviso icono={Info} tono="var(--grafico-diario)" sobre="tarjeta">
+          Las últimas{" "}
+          <strong className="tabular-nums text-panel-tinta">
+            {NUMERO.format(consultas.length)}
+          </strong>{" "}
+          de{" "}
+          <strong className="tabular-nums text-panel-tinta">
+            {NUMERO.format(total)}
+          </strong>{" "}
+          · los chips y el buscador trabajan sobre estas{" "}
+          <span className="tabular-nums">
+            {NUMERO.format(consultas.length)}
           </span>
-        </p>
+          . Los números de arriba del tablero —el anillo y la cabecera— son de
+          las {NUMERO.format(total)}.
+        </Aviso>
       )}
 
-      <p className="mt-3 flex items-start gap-2 border border-hairline bg-paper-2 px-3 py-2 font-sans text-[0.72rem] leading-relaxed text-ink-2">
-        <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 text-ink-3" aria-hidden="true" />
-        <span>
-          No hay columna de quién preguntó porque{" "}
-          <strong className="text-ink">el registro no lo guarda</strong>. Se
-          anota la pregunta, cómo terminó y dónde estaba el lector; nada que
-          permita armar el historial de consultas de una persona ante el
-          municipio.
-        </span>
-      </p>
+      <Aviso icono={ShieldCheck} tono="var(--grafico-nota)" sobre="tarjeta">
+        No hay columna de quién preguntó porque{" "}
+        <strong className="text-panel-tinta">el registro no lo guarda</strong>.
+        Se anota la pregunta, cómo terminó y dónde estaba el lector; nada que
+        permita armar el historial de consultas de una persona ante el
+        municipio.
+      </Aviso>
 
       {consultas.length === 0 ? (
-        <p className="mt-6 font-sans text-[0.85rem] text-ink-3">
+        <p className="font-sans text-panel-base text-panel-tinta-2">
           Todavía no hay consultas registradas en este período.
         </p>
       ) : filtradas.length === 0 ? (
@@ -381,61 +399,88 @@ export function ConsultasMigue({
         // cosas diferentes y confundirlas manda a buscar un error que no existe.
         // Y un tercero: "no hay nada que coincida ENTRE LAS QUE TRAJIMOS", que
         // no es lo mismo que "no hay nada que coincida en el mes".
-        <div className="mt-6">
-          <p className="font-sans text-[0.85rem] text-ink-3">
+        <div className="rounded-panel-2 border border-panel-borde bg-panel-tarjeta-2 px-4 py-5 text-center">
+          <p className="font-sans text-panel-base text-panel-tinta-2">
             {recortada
               ? `Ninguna de las ${NUMERO.format(consultas.length)} consultas que trae la tabla coincide con este filtro. Puede haber otras entre las ${NUMERO.format(total)} del período.`
               : `Ninguna de las ${NUMERO.format(total)} consultas coincide con este filtro.`}
           </p>
+          {/*
+           * **Es un botón y no un chip, y la diferencia no es de aspecto.** Acá
+           * había una segunda cáscara de `ChipFiltro` escrita a mano —misma
+           * píldora, mismo alto, mismo relleno— pero con otro hover
+           * (`hover:border-accent` en vez del `hover:bg-panel-wash` del chip),
+           * así que quieto se veía idéntico a los chips de tres centímetros más
+           * arriba y con el mouse encima se veía distinto. Copiar una pieza y
+           * cambiarle una cosa es peor que no copiarla: enseña que dos controles
+           * iguales hacen cosas parecidas cuando en realidad hacen cosas
+           * distintas.
+           *
+           * Y son distintas: un chip es un ESTADO —queda apretado, lleva
+           * `aria-pressed`, sigue ahí después de tocarlo—, y esto es una ACCIÓN
+           * que borra el estado de los otros y después desaparece con el cartel
+           * que la contiene. Por eso va con la forma del botón —`rounded-panel-2`
+           * en vez de la píldora— y no con la del chip. Que se distingan de un
+           * vistazo es la mitad del arreglo.
+           *
+           * `tamano="chico"` conserva los 32px que ya tenía (el piso de WCAG
+           * 2.5.8 es 24×24) y `sobre="hundida"` es el cartel del vacío, que es
+           * `panel-tarjeta-2`: el relleno del botón sale el contrario, o sea
+           * blanco, que es el que tenía. `secundario` y no `primario` porque es
+           * la salida de un callejón, no la acción principal de la pantalla
+           * —esa es "Actualizar", arriba—; el filete es el de control y no el de
+           * tarjeta, que es el 3:1 que pide WCAG 1.4.11 y que la pieza ya trae.
+           *
+           * Se concatena y NO se pasa por `cn()`: `cn` es `twMerge` sin
+           * configurar y se comería el `text-panel-sm` de la pieza (está
+           * explicado en `piezas.tsx`, arriba de `BOTON_BASE`).
+           */}
           <button
             type="button"
             onClick={() => {
               setBusqueda("");
               setFiltro(null);
             }}
-            className="pressable mt-3 border border-line px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-2 hover:border-ink hover:text-ink"
+            className={`${clasesDeBoton({
+              tono: "secundario",
+              tamano: "chico",
+              sobre: "hundida",
+            })} mt-3`}
           >
             Limpiar el filtro
           </button>
         </div>
       ) : (
-        // El desborde es de la tabla, no de la página: con el ancho suelto, en
-        // un teléfono se scrollea el documento entero al costado y se pierde la
-        // navegación del panel.
+        // La piel de la tabla sale entera de `TABLA`, que salió de acá: esta
+        // era la tabla con el patrón bueno y `suscripciones/page.tsx` la había
+        // copiado a mano (y ya se le había perdido el `text-left` del `<th>` en
+        // el camino). Lo único que no está en la pieza es el ancho mínimo, que
+        // es lo único que depende de cuántas columnas tiene cada tabla.
         //
-        // `tabIndex={0}` + `role="region"` con nombre: la tabla mide 54rem y
-        // adentro no hay un solo elemento enfocable —`Referencia` devuelve
-        // `span`, nunca `a`—, así que en un viewport angosto se ven dos
-        // columnas y no hay manera de llegar a las otras con el teclado.
-        // Chrome 127+ hace enfocables los scrollers sin hijos enfocables por su
-        // cuenta; Firefox y Safari no. Falla WCAG 2.1.1, y el arreglo del
-        // navegador no es el arreglo de la página. El nombre accesible va
-        // aparte y no en el `caption` porque describe la ZONA (que se
-        // desplaza), no la tabla.
-        <div
-          role="region"
-          aria-labelledby={idTabla}
-          // La regla no conoce este caso: prohíbe `tabIndex` en lo no
-          // interactivo para que nadie meta un `div` clickeable en el orden de
-          // tabulación. Acá el elemento no hace nada al enfocarse, se enfoca
-          // para poder DESPLAZARLO con las flechas, que es la excepción que la
-          // propia APG recomienda para un `region` con scroll. Sacarlo es
-          // cambiar un aviso de lint por una falla de WCAG 2.1.1 real.
-          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-          tabIndex={0}
-          className="mt-4 overflow-x-auto border-y border-hairline"
+        // `ZonaDeTabla` es el `<div>` que se desplaza con lo que lo hace
+        // alcanzable ya puesto: `role="region"`, el nombre accesible y el
+        // `tabIndex={0}`. Hace falta de verdad —la tabla mide 54rem y adentro no
+        // hay un solo elemento enfocable, `Referencia` devuelve `span` y nunca
+        // `a`, así que en un viewport angosto se ven dos columnas y sin foco no
+        // hay manera de llegar a las otras con el teclado; Chrome 127+ hace
+        // enfocables los scrollers sin hijos enfocables por su cuenta, Firefox y
+        // Safari no—, y ahora lo trae la pieza en vez de estar escrito acá con
+        // su `eslint-disable` al lado. El nombre describe la ZONA que se
+        // desplaza, no la tabla: por eso va aparte y el `caption` sigue siendo
+        // el de la tabla.
+        <ZonaDeTabla
+          id={idTabla}
+          nombre="Tabla de consultas, más ancha que la pantalla: se desplaza al costado con las flechas."
         >
-          <p id={idTabla} className="sr-only">
-            Tabla de consultas, más ancha que la pantalla: se desplaza al
-            costado con las flechas.
-          </p>
-          <table className="w-full min-w-[54rem] border-collapse">
+          <table className={`${TABLA.tabla} min-w-[54rem]`}>
             <caption className="sr-only">
               Consultas hechas a Migue, de la más reciente a la más vieja. Sin
               datos de quién preguntó: el registro no los guarda.
             </caption>
             <thead>
-              <tr className="border-b border-hairline">
+              {/* Sin clases: la banda de la cabecera vive en el `<th>`
+                  (`TABLA.cabecera`), que embaldosa la fila entera igual. */}
+              <tr>
                 <Encabezado>Fecha y hora</Encabezado>
                 <Encabezado>Resultado</Encabezado>
                 <Encabezado>Dónde estaba</Encabezado>
@@ -444,142 +489,102 @@ export function ConsultasMigue({
               </tr>
             </thead>
             <tbody>
+              {/* El resalte al pasar el mouse no es adorno: la tabla mide 54rem
+                  y se lee desplazándose al costado, así que sin una banda que
+                  siga al puntero es fácil saltar de fila a mitad de camino.
+                  Como no es un control, no hay cursor de mano ni click.
+                  `group` es lo único que se le agrega a la pieza, y es para que
+                  la tinta apagada de la fila pueda subir junto con el fondo:
+                  ver `Referencia` y la celda de la fecha, acá abajo. */}
               {filtradas.map((c) => (
-                <tr key={c.id} className="border-b border-hairline last:border-0">
-                  <td className="whitespace-nowrap px-3 py-2.5 align-top font-sans text-[0.72rem] tabular-nums text-ink-3">
+                <tr key={c.id} className={`${TABLA.fila} group`}>
+                  {/* La fecha es un metadato y va en la tinta más apagada, pero
+                      `panel-tinta-3` sobre el wash del hover mide 4,42:1 en
+                      claro y 4,18:1 en oscuro: se cae abajo de AA justo mientras
+                      el mouse está encima, que es cuando se la está leyendo. Es
+                      el mismo defecto que ya tenía la cuenta del chip y se
+                      arregla igual, subiendo un escalón con `group-hover`. Va
+                      con `group-hover` y no con un `hover:` propio para que el
+                      disparador sea la fila entera y no la celda. */}
+                  <td
+                    className={`${TABLA.celda} whitespace-nowrap text-panel-xs tabular-nums text-panel-tinta-3 group-hover:text-panel-tinta-2`}
+                  >
                     {fechaCorta(c.fecha)}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 align-top">
+                  <td className={`${TABLA.celda} whitespace-nowrap`}>
                     <Marca resultado={c.resultado} />
                   </td>
-                  <td className="px-3 py-2.5 align-top">
+                  <td className={TABLA.celda}>
                     <Referencia slug={c.contextoSlug} titulos={titulos} />
                   </td>
-                  <td className="px-3 py-2.5 align-top">
+                  <td className={TABLA.celda}>
                     <Referencia slug={c.notaSlug} titulos={titulos} />
                   </td>
-                  {/* Lo único que se lee corrido en toda la tabla, así que es lo
-                      único en serif. */}
-                  <td className="min-w-[18rem] px-3 py-2.5 align-top font-serif text-[0.9rem] leading-snug text-ink">
+                  {/* Acá la pregunta era lo único en serif de toda la tabla,
+                      porque era lo único que se lee corrido. En el panel deja
+                      de serlo: la serif es la voz del diario, y el layout dice
+                      con todas las letras que esta pantalla no puede parecerse
+                      a lo publicado. Sigue siendo lo más marcado de la fila,
+                      pero por tinta y tamaño, no por cambiar de tipografía.
+                      Pisar el tamaño y la tinta que la fila hereda de
+                      `TABLA.tabla` es agregar dos clases y nada más, que es
+                      justamente para lo que `TABLA.celda` es sólo geometría. */}
+                  <td
+                    className={`${TABLA.celda} min-w-[18rem] text-panel-base leading-snug text-panel-tinta`}
+                  >
                     “{c.pregunta}”
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </ZonaDeTabla>
       )}
-    </section>
+    </div>
   );
 }
 
+/** El encabezado de una columna. La piel es `TABLA.cabecera` —el peso, la
+ *  superficie hundida y el filete que separa el encabezado de los datos, más el
+ *  `text-left` que el `<th>` necesita sí o sí porque su centrado es una regla
+ *  del navegador y le gana a lo heredado—. Lo único que sigue viviendo acá es el
+ *  `scope="col"`, que es semántica y no piel. Sin versalitas ni tracking ancho:
+ *  eso es la voz del diario impreso y acá es una herramienta de trabajo. */
 function Encabezado({ children }: { children: React.ReactNode }) {
   return (
-    <th
-      scope="col"
-      className="whitespace-nowrap px-3 py-2 text-left font-sans text-[0.64rem] font-semibold uppercase tracking-[0.12em] text-ink-3"
-    >
+    <th scope="col" className={TABLA.cabecera}>
       {children}
     </th>
   );
 }
 
 /**
- * El chip de un filtro.
+ * La marca de resultado dentro de una fila: la `Pildora` del panel, con el
+ * mismo punto y el mismo nombre que el chip del filtro tres centímetros más
+ * arriba, para que la fila y el filtro se lean como lo mismo.
  *
- * Nunca es sólo color: el punto pinta, el texto dice. Un chip que se distinga
+ * Acá había una píldora escrita a mano, y tenía DOS formas para la misma marca:
+ * las de color iban sin recuadro y la neutra con recuadro y otro relleno, así
+ * que "Saludo" y "Sobre el diario" se leían como dos clases de cosa distintas.
+ * `Pildora` tiene una sola cáscara y el `tono` en null quita el punto, que es
+ * la diferencia que de verdad hay entre las dos.
+ *
+ * Nunca es sólo color: el punto pinta, el texto dice. Un dato que se distinga
  * únicamente por el color no lo lee ni alguien con daltonismo ni alguien
- * mirando en blanco y negro.
+ * mirando en blanco y negro. Y un resultado que la pantalla no conoce cae en
+ * "Otro resultado": el recuadro vacío no le decía a nadie que había un caso
+ * nuevo en la base.
  *
- * **En reposo el borde es `line` y no `hairline`.** El filete da 1,26:1 contra
- * el papel en claro y 1,19:1 en oscuro: a esa distancia el chip no se ve como
- * un control, se ve como texto gris suelto. WCAG 1.4.11 pide 3:1 para el borde
- * que identifica un control.
- *
- * **El seleccionado se marca por forma, no por color.** Antes el estado era
- * sólo el borde en el color del resultado, y el del "índice" —celeste— da
- * 2,54:1 contra el papel en claro: el indicador de estado más importante era el
- * que menos se veía. Ahora el activo suma un `inset` de 2px y un fondo del
- * mismo color al 12%, que son diferencias de grosor y de área: se leen igual en
- * blanco y negro, con el monitor al mínimo o con el color desaturado.
- *
- * El fondo se arma con `color-mix` sobre el color del resultado en vez de usar
- * `accent-wash`: el wash es azul, y un chip naranja seleccionado con un fondo
- * azul dice dos cosas a la vez. El texto queda siempre en tinta y no en el
- * color: los colores están calibrados para dibujar sobre el papel, no para
- * leerse en 11px sobre él.
+ * `sobre="tarjeta"` porque la fila se apoya en la tarjeta blanca de la sección
+ * —el resalte del hover es un wash, no una superficie—, así que a la píldora le
+ * toca el relleno hundido.
  */
-function Chip({
-  nombre,
-  cuenta,
-  color,
-  activo,
-  onClick,
-}: {
-  nombre: string;
-  cuenta: number;
-  color: string | null;
-  activo: boolean;
-  onClick: () => void;
-}) {
-  const trazo = color ?? "var(--ink)";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={activo}
-      className={
-        activo
-          ? "pressable inline-flex items-center gap-1.5 border px-2.5 py-1 font-sans text-[0.7rem] font-semibold text-ink"
-          : "pressable inline-flex items-center gap-1.5 border border-line px-2.5 py-1 font-sans text-[0.7rem] text-ink-2 hover:border-ink hover:text-ink"
-      }
-      style={
-        activo
-          ? {
-              borderColor: trazo,
-              boxShadow: `inset 0 0 0 2px ${trazo}`,
-              background: `color-mix(in srgb, ${trazo} 12%, transparent)`,
-            }
-          : undefined
-      }
-    >
-      {color && (
-        <span
-          aria-hidden="true"
-          className="h-2 w-2 shrink-0"
-          style={{ background: color }}
-        />
-      )}
-      {nombre}
-      <span className="tabular-nums text-ink-3">{cuenta}</span>
-    </button>
-  );
-}
-
-/** La marca de resultado dentro de una fila. Mismo punto y mismo nombre que el
- *  chip del filtro, para que la fila y el filtro se lean como lo mismo. Un
- *  resultado que la pantalla no conoce cae en "Otro resultado": el recuadro
- *  vacío no le decía a nadie que había un caso nuevo en la base. */
 function Marca({ resultado }: { resultado: ResultadoEnTablero }) {
   const clave = claveDe(resultado);
-  const color = COLORES[clave];
   return (
-    <span
-      className={
-        color
-          ? "inline-flex items-center gap-1.5 font-sans text-[0.72rem] text-ink-2"
-          : "inline-flex items-center gap-1.5 border border-hairline px-1.5 font-sans text-[0.72rem] text-ink-3"
-      }
-    >
-      {color && (
-        <span
-          aria-hidden="true"
-          className="h-2 w-2 shrink-0"
-          style={{ background: color }}
-        />
-      )}
+    <Pildora tono={COLORES[clave]} sobre="tarjeta">
       {NOMBRES[clave]}
-    </span>
+    </Pildora>
   );
 }
 
@@ -590,6 +595,11 @@ function Marca({ resultado }: { resultado: ResultadoEnTablero }) {
  * al lado: la consulta sobrevive a que la nota se borre —para eso sirve, para
  * revisar qué se preguntaba sobre ella— así que un slug huérfano es esperable y
  * no un error.
+ *
+ * Los dos textos apagados suben un escalón con `group-hover`, por lo mismo que
+ * la celda de la fecha: `panel-tinta-3` sobre el wash de la fila resaltada no
+ * llega a 4,5:1. Sólo se renderiza adentro de una fila de esta tabla, que es la
+ * que pone el `group`.
  */
 function Referencia({
   slug,
@@ -599,20 +609,23 @@ function Referencia({
   titulos: Record<string, string>;
 }) {
   if (!slug) {
-    return <span className="font-sans text-[0.75rem] text-ink-3">—</span>;
+    return (
+      <span className="font-sans text-panel-xs text-panel-tinta-3 group-hover:text-panel-tinta-2">
+        —
+      </span>
+    );
   }
   const titulo = titulos[slug];
   if (titulo) {
     return (
-      <span className="font-sans text-[0.78rem] leading-snug text-ink-2">
+      <span className="font-sans text-panel-sm leading-snug text-panel-tinta-2">
         {titulo}
       </span>
     );
   }
   return (
-    <span className="font-mono text-[0.7rem] leading-snug text-ink-3">
-      {slug}{" "}
-      <span className="font-sans">(ya no está en la edición)</span>
+    <span className="font-mono text-panel-xs leading-snug text-panel-tinta-3 group-hover:text-panel-tinta-2">
+      {slug} <span className="font-sans">(ya no está en la edición)</span>
     </span>
   );
 }
