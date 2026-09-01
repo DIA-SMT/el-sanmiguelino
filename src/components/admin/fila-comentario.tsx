@@ -10,6 +10,7 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import { moderarComentarioAction } from "@/app/admin/acciones";
+import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import {
   Aviso,
   Pildora,
@@ -106,8 +107,11 @@ export function FilaComentario({
       )}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {/* Acá el nombre se ve crudo, sin la versalita del diario que disimula
+            las mayúsculas. Es el lugar donde más se nota lo que quedó guardado
+            antes de que existiera `nombreDeDiario`. */}
         <span className="text-panel-base font-semibold text-panel-tinta">
-          {comentario.usuarioNombre}
+          {nombreDeDiario(comentario.usuarioNombre)}
         </span>
         <span className="text-panel-xs text-panel-tinta-3">
           {tiempoRelativo(comentario.fecha)}

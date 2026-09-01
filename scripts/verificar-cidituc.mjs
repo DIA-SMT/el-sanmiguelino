@@ -161,12 +161,29 @@ if (derivador) {
   // tocan.
   const casos = [
     ["ALFREDO AGUSTIN BRITO", "Alfredo Agustin Brito"],
+    // Las partículas que SÍ bajan, y "los"/"las" sólo detrás de "de".
     ["MARIA DE LOS ANGELES SUAREZ", "Maria de los Angeles Suarez"],
+    ["JUAN DE LA VEGA", "Juan de la Vega"],
+    ["MARIA DEL VALLE", "Maria del Valle"],
+    ["GARCIA Y LOPEZ", "Garcia y Lopez"],
+    ["DE LA VEGA", "De la Vega"],
+    // Las que NO bajan. Éstas salían mal con la primera lista de partículas y
+    // son la razón por la que se recortó: un apellido mal escrito es peor que
+    // uno gritado, y los de origen italiano y sirio-libanés son de acá.
+    ["JORGE DI STEFANO", "Jorge Di Stefano"],
+    ["ANTONIO DA SILVA", "Antonio Da Silva"],
+    ["JOSE EL HALABI", "Jose El Halabi"],
+    ["ANA LA ROSA", "Ana La Rosa"],
+    ["PIETER VAN DER BERG", "Pieter Van Der Berg"],
+    ["JUAN E LOPEZ", "Juan E Lopez"],
     ["JOSE SAN MARTIN", "Jose San Martin"],
+    // Separadores y acentos.
     ["D'AMICO", "D'Amico"],
     ["SUAREZ-MASON", "Suarez-Mason"],
+    ["BRITO,ALFREDO", "Brito,Alfredo"],
     ["MARÍA JOSÉ PEÑA", "María José Peña"],
     ["J. B. ALBERDI", "J. B. Alberdi"],
+    // Lo que ya viene escrito no se toca.
     ["de la Vega", "de la Vega"],
     ["McDonald Ana", "McDonald Ana"],
   ];

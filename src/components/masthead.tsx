@@ -65,10 +65,13 @@ export async function Masthead({
             que el nombre del diario. */}
         <div className="border-b border-hairline">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-2 sm:px-6">
-            <p className="font-sans text-[0.7rem] text-ink-3">
+            {/* `min-w-0` deja que el texto se angoste y envuelva; `shrink-0` en
+                los controles impide que sean ellos los que se aplasten. Sin las
+                dos cosas, a 360px la fila se iba de la pantalla. */}
+            <p className="min-w-0 font-sans text-[0.7rem] text-ink-3">
               Municipalidad de San Miguel de Tucumán
             </p>
-            <div className="flex items-center gap-2.5">
+            <div className="flex shrink-0 items-center gap-2.5">
               {puedeAdministrar && (
                 <Link
                   href="/admin"

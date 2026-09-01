@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { MessageSquare, RefreshCw, ThumbsDown, ThumbsUp } from "lucide-react";
+import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import type { Comentario, Usuario } from "@/lib/types";
 import { cn, tiempoRelativo } from "@/lib/utils";
 
@@ -157,7 +158,10 @@ export function ColumnaDelLector({
           Sumá tu opinión
         </label>
         <p className="mt-1.5 font-serif text-[0.85rem] italic text-ink-3">
-          Firmás como <strong className="not-italic text-ink">{usuario.nombre}</strong>
+          Firmás como{" "}
+          <strong className="not-italic text-ink">
+            {nombreDeDiario(usuario.nombre)}
+          </strong>
         </p>
         <textarea
           id="nueva-opinion"
@@ -236,8 +240,14 @@ export function ColumnaDelLector({
             {estado.comentarios.map((c) => (
               <li key={c.id} className="py-5">
                 <p className="flex flex-wrap items-baseline gap-x-2 font-sans text-[0.72rem]">
+                  {/* El `uppercase` es la versalita del diario, no un grito: es
+                      la misma tipografía que usan las volantas y los folios, y
+                      va en TODAS las firmas por igual. Lo que se normaliza es el
+                      texto real —lo que lee un lector de pantalla, lo que se ve
+                      en el panel y lo que quedó guardado antes de este cambio—,
+                      no cómo lo pinta el CSS. */}
                   <span className="font-semibold uppercase tracking-[0.1em] text-ink">
-                    {c.usuarioNombre}
+                    {nombreDeDiario(c.usuarioNombre)}
                   </span>
                   <span className="text-ink-3">· {tiempoRelativo(c.fecha)}</span>
                 </p>

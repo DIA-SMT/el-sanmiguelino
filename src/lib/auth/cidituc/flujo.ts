@@ -167,9 +167,16 @@ export async function callbackCidituc(
 
   const { persona } = validacion;
   const nombre = (
-    // Cidituc los manda en mayúsculas, y una firma en mayúsculas al pie de un
-    // comentario se lee como si gritara. Ver nombre.ts.
-    nombreDeDiario([persona.nombre, persona.apellido].filter(Boolean).join(" ")) ||
+    // Cidituc los manda en mayúsculas. Ver nombre.ts.
+    //
+    // Cada campo se normaliza POR SEPARADO y recién después se pegan, y eso no
+    // es cosmético: `nombreDeDiario` no toca lo que ya viene en caso mixto, así
+    // que pegando primero un `nombre_persona` en mayúsculas con un
+    // `apellido_persona` bien escrito daba una cadena mixta que salía intacta.
+    // Justo el registro peor cargado era el que la regla se negaba a arreglar.
+    [nombreDeDiario(persona.nombre), nombreDeDiario(persona.apellido)]
+      .filter(Boolean)
+      .join(" ") ||
     // Cidituc admite nombre y apellido vacíos. Antes que mostrar el documento de
     // alguien al pie de un comentario, el diario prefiere no nombrarlo.
     "Vecino/a"
