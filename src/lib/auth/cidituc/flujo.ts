@@ -32,6 +32,16 @@ import { crearToken } from "@/lib/auth/session";
 const COOKIE_FLUJO = "sm_cidituc";
 const VIDA_FLUJO_SEG = 10 * 60;
 
+/**
+ * Tope del nombre que entra al token de sesión.
+ *
+ * La cookie viaja en **cada** pedido, y los navegadores la tiran entera pasados
+ * los ~4 KB. El nombre es el único campo del payload que lo escribe otro sistema,
+ * así que es el único que puede crecer sin que nos enteremos. Setenta y dos
+ * caracteres alcanzan para cualquier nombre y apellido reales.
+ */
+const LARGO_MAXIMO_NOMBRE = 72;
+
 const OPCIONES_COOKIE = {
   httpOnly: true,
   sameSite: "lax" as const,
@@ -138,16 +148,31 @@ export async function callbackCidituc(
   if (!validacion.ok) return conError(request, validacion.motivo);
 
   const { persona } = validacion;
-  const nombre =
+  const nombre = (
     [persona.nombre, persona.apellido].filter(Boolean).join(" ").trim() ||
     // Cidituc admite nombre y apellido vacíos. Antes que mostrar el documento de
     // alguien al pie de un comentario, el diario prefiere no nombrarlo.
-    "Vecino/a";
+    "Vecino/a"
+  ).slice(0, LARGO_MAXIMO_NOMBRE);
+
+  // Lo único que puede tirar de acá para abajo, y tira por una sola razón:
+  // falta SESSION_SECRET o es corto. Sin este catch sale un 500 en blanco con la
+  // persona ya autenticada, que es el peor momento para no decir nada.
+  let sesion: string;
+  try {
+    sesion = crearToken({ id: persona.id, nombre });
+  } catch (error) {
+    console.error(
+      "Cidituc validó la identidad pero no se pudo firmar la sesión:",
+      error instanceof Error ? error.message : error,
+    );
+    return conError(request, "sesion-fallida");
+  }
 
   // A una URL limpia: el token no queda en la barra de direcciones, ni en el
   // historial, ni en el Referer de la próxima navegación.
   const res = NextResponse.redirect(interna(request, destino), 303);
-  res.cookies.set(SESSION_COOKIE, crearToken({ id: persona.id, nombre }), {
+  res.cookies.set(SESSION_COOKIE, sesion, {
     ...OPCIONES_COOKIE,
     maxAge: TTL_SESION_SEG,
   });

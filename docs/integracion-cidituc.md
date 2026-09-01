@@ -154,6 +154,7 @@ Vuelven como `/login?error=<código>` y se traducen en `errores.ts`.
 | `token-invalido` | el backend contestó 401/403 |
 | `cuenta-inactiva` | la persona figura dada de baja en Cidituc |
 | `no-disponible` | no se llegó al backend, o contestó algo raro — mirar los logs |
+| `sesion-fallida` | Cidituc validó pero no pudimos firmar la sesión: falta `SESSION_SECRET` o es corto |
 
 Que un intento dé `token-invalido` es, en una prueba con un token basura, el
 **resultado bueno**: distingue "no llegué al backend" de "el backend contestó".

@@ -30,7 +30,17 @@ export type ErrorIngreso =
   /** El derivador no nos devolvió el `state`. Es del lado de ellos. */
   | "state-ausente"
   /** Cookie y `state` no coinciden: dos pedidos pisándose (dos pestañas). */
-  | "state-distinto";
+  | "state-distinto"
+  /**
+   * Cidituc dijo que sí y nosotros no pudimos emitir la sesión.
+   *
+   * En los hechos significa una sola cosa: falta `SESSION_SECRET` o es más corto
+   * que 32 caracteres, y `crearToken()` tira. Es el error más fácil de cometer
+   * al cargar variables en un deploy nuevo, y sin este código sale como un 500 en
+   * blanco **después** de que la persona se autenticó bien — el peor momento
+   * posible para no explicar nada.
+   */
+  | "sesion-fallida";
 
 /** Qué ve la persona. El detalle técnico va al log del servidor, no a la pantalla. */
 export const TEXTO_ERROR: Record<ErrorIngreso, string> = {
@@ -48,6 +58,8 @@ export const TEXTO_ERROR: Record<ErrorIngreso, string> = {
   "state-ausente": "El ingreso volvió incompleto. Probá de nuevo.",
   "state-distinto":
     "Había otro ingreso en curso. Cerrá las demás pestañas y probá de nuevo.",
+  "sesion-fallida":
+    "Cidituc te reconoció, pero no pudimos abrir tu sesión. Avisale a la Dirección de IA.",
 };
 
 /**

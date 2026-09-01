@@ -12,8 +12,14 @@ function limpio(valor: string | undefined): string {
   return valor?.trim() ?? "";
 }
 
-/** La pantalla de ingreso del municipio. Lleva `#` adentro: en un `.env` va
- *  entre comillas, porque si no el `#` abre comentario y se come `/login`. */
+/**
+ * La pantalla de ingreso del municipio. Va el **origen solo**, sin `#`: el
+ * `#/login` lo agrega `urlDelDerivador()`.
+ *
+ * Y es a propósito. La URL completa lleva un `#`, que en un `.env` sin comillas
+ * abre comentario y se come `/login`: queda una URL que parece bien hasta que
+ * alguien la usa. Manteniendo el fragmento en el código, esa trampa no existe.
+ */
 export const CIDITUC_DERIVADOR = limpio(process.env.CIDITUC_DERIVADOR_URL);
 
 /** El backend contra el que se valida el token. Sin barra final. */

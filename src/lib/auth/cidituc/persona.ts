@@ -47,23 +47,67 @@ function texto(valor: unknown): string | null {
   return limpio === "" ? null : limpio;
 }
 
+/** Valores con los que Cidituc podría decir que sí, y con los que podría decir
+ *  que no. Se decide por valor conocido y no por conversión — ver `bandera()`. */
+const POSITIVOS = new Set([
+  "true", "1", "si", "sí", "s", "y", "yes",
+  "activo", "activa", "habilitado", "habilitada", "validado", "validada",
+]);
+const NEGATIVOS = new Set([
+  "false", "0", "no", "n",
+  "baja", "inactivo", "inactiva", "deshabilitado", "deshabilitada", "anulado", "anulada",
+]);
+
+/** Un valor raro se avisa una sola vez por proceso, no una por ingreso. */
+const desconocidosAvisados = new Set<string>();
+
+function avisarDesconocido(campo: string, valor: string): void {
+  const clave = `${campo}=${valor.slice(0, 20)}`;
+  if (desconocidosAvisados.has(clave)) return;
+  desconocidosAvisados.add(clave);
+  console.warn(
+    `Cidituc devolvió ${clave}, un valor que no sabemos leer. No se rechazó a nadie por eso. ` +
+      "Si aparece seguido, averiguar el tipo real de la columna y sumarlo a POSITIVOS o NEGATIVOS " +
+      "en src/lib/auth/cidituc/persona.ts.",
+  );
+}
+
 /**
- * `validado` y `habilita` pueden venir como booleano, número o texto. Devuelve
- * `null` cuando el campo directamente no vino, que no es lo mismo que venir en
- * cero: sólo la baja explícita rechaza.
+ * ¿`validado` / `habilita` dicen que sí, que no, o no dicen nada?
+ *
+ * **Nadie sabe con certeza el tipo real de esas columnas.** El backend hace
+ * `SELECT p.*` sobre MySQL y devuelve lo que haya, así que se decide por valor
+ * conocido y no por conversión. Lo desconocido devuelve `null` —"no sé"— y no
+ * rechaza, pero se loguea: un valor que no reconocemos es la única pista que
+ * vamos a tener del tipo real de la columna.
+ *
+ * Las dos formas de equivocarse acá ya están escritas en el municipio, y son
+ * opuestas. UrbanIA convierte con `Number()` y trata como baja todo lo que no
+ * parsee: contra una columna `ENUM('SI','NO')` dejaría afuera a **todas** las
+ * cuentas válidas. La primera versión de este archivo hacía lo contrario y
+ * dejaba pasar un `"baja"` —lo contrario de lo que decía cumplir—. Ninguna de
+ * las dos sabía; ésta admite que no sabe.
  */
-function bandera(valor: unknown): boolean | null {
+function bandera(campo: string, valor: unknown): boolean | null {
   if (valor == null) return null;
   if (typeof valor === "boolean") return valor;
-  if (typeof valor === "number") return valor > 0;
-  if (typeof valor !== "string") return null;
+  // NaN e Infinity no son un "no": son un valor que no entendemos.
+  if (typeof valor === "number") return Number.isFinite(valor) ? valor > 0 : null;
+  if (typeof valor !== "string") {
+    avisarDesconocido(campo, `(${Array.isArray(valor) ? "array" : typeof valor})`);
+    return null;
+  }
 
   const normal = valor.trim().toLowerCase();
   if (normal === "") return null;
-  if (normal === "true") return true;
-  if (normal === "false") return false;
+  if (POSITIVOS.has(normal)) return true;
+  if (NEGATIVOS.has(normal)) return false;
+
   const numero = Number(normal);
-  return Number.isFinite(numero) ? numero > 0 : null;
+  if (Number.isFinite(numero)) return numero > 0;
+
+  avisarDesconocido(campo, normal);
+  return null;
 }
 
 function soloDigitos(valor: string): string {
@@ -177,7 +221,10 @@ export async function validarToken(tokenCrudo: string): Promise<Validacion> {
   // El login de Cidituc ya impide emitir un token para una cuenta dada de baja.
   // Algunas cuentas históricas usan otros valores positivos y algunas respuestas
   // no traen estos campos: sólo rechazamos la baja explícita.
-  if (bandera(datos["validado"]) === false || bandera(datos["habilita"]) === false) {
+  if (
+    bandera("validado", datos["validado"]) === false ||
+    bandera("habilita", datos["habilita"]) === false
+  ) {
     return { ok: false, motivo: "cuenta-inactiva" };
   }
 

@@ -10,9 +10,18 @@
 
 export const SESSION_COOKIE = "sanmiguelino_session";
 
-/** Versión del formato del token. Subirla invalida todas las sesiones vivas,
- *  que es justamente lo que hay que poder hacer al cambiar el payload. */
-export const VERSION_TOKEN = 1;
+/**
+ * Versión del formato del token. Subirla invalida todas las sesiones vivas, que
+ * es justamente lo que hay que poder hacer al cambiar el payload.
+ *
+ * Subió a 2 el 2026-09-01, al entrar el ingreso real de Cidituc. El payload no
+ * cambió de forma, pero sí de significado: el `id` pasó de ser el
+ * `cidituc-demo-001` que repartía el mock a ser el `id_persona` de una persona
+ * real. Una sesión emitida por el mock, firmada con el mismo secreto y el mismo
+ * nombre de cookie, seguiría validando — y ahora `rolDe()` la mira contra la
+ * lista de administradores. Un renglón para que ninguna sobreviva.
+ */
+export const VERSION_TOKEN = 2;
 
 /** Ocho horas. Antes eran 30 días y sin `exp` adentro del token: el vencimiento
  *  vivía sólo en el `maxAge` de la cookie, o sea del lado del cliente, así que

@@ -46,6 +46,18 @@ cargarEnv({ path: ".env.local", quiet: true });
 const TOKEN_FALSO = "token-invalido-de-prueba-para-verificar-la-validacion";
 const TIMEOUT_MS = 10_000;
 
+/**
+ * La MISMA autoridad que va a usar la app, no siempre el intermedio embebido.
+ *
+ * Si no, el día de la rotación el script miente en las dos direcciones: da verde
+ * con una CIDITUC_CA_PEM rota, y da rojo cuando el embebido venció pero la del
+ * entorno anda. Es la línea equivalente de autoridadesConfiables() en
+ * src/lib/auth/cidituc/transporte.ts.
+ */
+const CA_DEL_ENTORNO = (process.env.CIDITUC_CA_PEM ?? "").trim();
+const CA_EN_USO = CA_DEL_ENTORNO || SECTIGO_CA_DV_R36;
+const AUTORIDADES = [...tls.rootCertificates, CA_EN_USO];
+
 let fallas = 0;
 
 function ok(nombre, condicion, detalle = "") {
@@ -67,13 +79,33 @@ const clave = (process.env.CIDITUC_CLAVE_APP ?? "").trim() || "sanmiguelino";
 // diario, tenerlo apagado es la configuración CORRECTA —un botón que manda a una
 // pantalla que no sabe volver es peor que ningún botón—. Todo lo demás se puede
 // verificar igual, y de hecho es lo que hay que verificar antes de prenderlo.
-const prendido = process.env.CIDITUC_HABILITADO === "1";
-console.log(
-  prendido
-    ? "  ok  CIDITUC_HABILITADO en 1"
-    : "  --  CIDITUC_HABILITADO apagado: el botón de /login no aparece todavía\n" +
+const habilitado = (process.env.CIDITUC_HABILITADO ?? "").trim();
+const prendido = habilitado === "1";
+if (prendido) {
+  console.log("  ok  CIDITUC_HABILITADO en 1");
+} else if (habilitado !== "" && habilitado !== "0") {
+  // Se exige exactamente "1", y eso falla callado: un `true` heredado de
+  // UrbanIA (que usa CIDITUC_ENABLED="true") deja el ingreso apagado sin
+  // decirlo. Es una falla de verdad, no una configuración a medias.
+  ok(`CIDITUC_HABILITADO tiene que ser "1", no "${habilitado}"`, false,
+    'Con cualquier otro valor el ingreso queda apagado y nada lo avisa. UrbanIA usa CIDITUC_ENABLED="true"; acá no.');
+} else {
+  console.log(
+    "  --  CIDITUC_HABILITADO apagado: el botón de /login no aparece todavía\n" +
       "        Es lo correcto hasta que el derivador tenga registrado al diario.",
-);
+  );
+}
+
+// El único camino del callback que puede tirar después de que Cidituc dijo que
+// sí. Sin secreto, la persona se autentica bien y recibe un cartel de
+// "sesion-fallida": el error más fácil de cometer al cargar variables nuevas.
+const secreto = (process.env.SESSION_SECRET ?? "").trim();
+ok("SESSION_SECRET de 32 caracteres o más", secreto.length >= 32,
+  secreto.length === 0
+    ? "falta: en produccion el callback no puede firmar la sesion y corta despues de autenticar"
+    : secreto.length < 32
+      ? `tiene ${secreto.length}; en produccion la app tira`
+      : "");
 ok("CIDITUC_API_URL cargada", Boolean(api), api || "falta en .env.local");
 ok("CIDITUC_DERIVADOR_URL cargada", Boolean(derivador), derivador || "falta en .env.local");
 ok("CIDITUC_CALLBACK_URL cargada", Boolean(callback), callback || "falta en .env.local");
@@ -82,7 +114,7 @@ if (derivador) {
   // El origen solo: el "#/login" lo agrega la app. Si acá viene con hash, el
   // flujo arma una URL con dos fragmentos y el derivador no entiende ninguno.
   ok("el derivador es el origen solo, sin #", !derivador.includes("#"),
-    derivador.includes("#") ? "sacale el #/login: eso lo agrega inicioCidituc()" : "");
+    derivador.includes("#") ? "sacale el #/login: eso lo agrega urlDelDerivador()" : "");
 }
 
 if (callback) {
@@ -149,7 +181,7 @@ if (esHttps) {
   console.log("\nLa cadena TLS\n");
 
   const comoVercel = await conectar(tls.rootCertificates);
-  const conNuestroIntermedio = await conectar([...tls.rootCertificates, SECTIGO_CA_DV_R36]);
+  const conNuestroIntermedio = await conectar(AUTORIDADES);
 
   if (comoVercel.ok) {
     // Puede pasar el día que infraestructura arregle el servidor. Es una buena
@@ -162,10 +194,10 @@ if (esHttps) {
       `sólo con las raíces de Node: ${comoVercel.code}`);
   }
 
-  ok("valida aportando el intermedio de Sectigo", conNuestroIntermedio.ok,
+  ok(CA_DEL_ENTORNO ? "valida con la CA de CIDITUC_CA_PEM" : "valida aportando el intermedio de Sectigo embebido", conNuestroIntermedio.ok,
     conNuestroIntermedio.ok
       ? `cadena de ${conNuestroIntermedio.largo} certificado(s)`
-      : `${conNuestroIntermedio.code} — el intermedio embebido ya no alcanza: revisá sectigo-ca.ts`);
+      : `${conNuestroIntermedio.code} — la CA en uso ya no alcanza: revisá ${CA_DEL_ENTORNO ? "CIDITUC_CA_PEM" : "sectigo-ca.ts"}`);
 }
 
 /* ------------------------------------------------------------- el endpoint */
@@ -180,7 +212,7 @@ function consultar(authorization) {
         path: ruta,
         method: "GET",
         headers: { Accept: "application/json", Authorization: authorization },
-        ca: [...tls.rootCertificates, SECTIGO_CA_DV_R36],
+        ca: AUTORIDADES,
       },
       (res) => {
         res.resume();
