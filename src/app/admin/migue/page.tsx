@@ -7,7 +7,11 @@ import {
   Target,
 } from "lucide-react";
 import { requerirAdmin } from "@/lib/auth/dal";
-import { resumenMigue, type ResultadoEnTablero } from "@/lib/repos/migue";
+import {
+  resumenMigue,
+  type ResultadoEnTablero,
+  type ResumenMigue,
+} from "@/lib/repos/migue";
 import { migueTieneModelo, modeloDeMigue } from "@/lib/migue/openrouter";
 import { consumoDeLaHora } from "@/lib/migue/tope";
 import { getIndice } from "@/lib/repos/edicion";
@@ -50,6 +54,25 @@ const NOMBRES: Record<ResultadoEnTablero, string> = {
 const NO_SON_PREGUNTAS: ResultadoEnTablero[] = ["saludo", "leer", "otro"];
 
 /**
+ * Cuántas preguntas sin respuesta se ven sin desplegar nada.
+ *
+ * La lista viene ordenada por repeticiones, así que las primeras son las que de
+ * verdad piden una nota; la cola son preguntas de una sola vez. Sin tope, con
+ * quinientas consultas la pantalla se volvía un scroll interminable y el resto
+ * del tablero —los gráficos, la tabla— quedaba a media hora de distancia.
+ *
+ * No se recorta el dato: la cola se pliega, no se tira. Son preguntas de vecinos
+ * reales y siguen estando a un clic.
+ */
+const TOPE_SIN_RESPUESTA = 10;
+
+/**
+ * Cuántas de más se toleran antes de plegar. Con once preguntas, un "ver la
+ * otra" es más ruido que ayuda: se muestran las once y listo.
+ */
+const GRACIA_SIN_RESPUESTA = 2;
+
+/**
  * Tablero de Migue.
  *
  * La pantalla que importa sigue siendo **"Lo que no supimos contestar"**: cada
@@ -89,6 +112,18 @@ export default async function AdminMigue() {
     0,
   );
   const respondidas = preguntasReales - sinRespuesta;
+
+  /* Se pliega sólo si sobran de verdad: con doce o menos se muestran todas,
+     porque un "ver las otras dos" ocupa casi lo mismo que las dos. */
+  const plegar =
+    resumen.sinRespuesta.length > TOPE_SIN_RESPUESTA + GRACIA_SIN_RESPUESTA;
+  const visiblesSinRespuesta = plegar
+    ? resumen.sinRespuesta.slice(0, TOPE_SIN_RESPUESTA)
+    : resumen.sinRespuesta;
+  const restoSinRespuesta = plegar
+    ? resumen.sinRespuesta.slice(TOPE_SIN_RESPUESTA)
+    : [];
+
   const cobertura =
     preguntasReales > 0
       ? Math.round((respondidas / preguntasReales) * 100)
@@ -263,27 +298,26 @@ export default async function AdminMigue() {
                   Migue supo contestar todo. Por ahora.
                 </p>
               ) : (
-                /* El negativo tiene que ser EXACTAMENTE el inset de la pieza, y
-                   el inset ahora cambia con el ancho (`p-4 sm:p-5`): con un
-                   `-mx-5` fijo, abajo de 640px los separadores se pasaban 4px
-                   de la tarjeta. Una lista con los filetes cortados —o
-                   asomándose— se lee como si le faltara algo al costado. */
-                <ul className="-mx-4 divide-y divide-panel-borde border-y border-panel-borde sm:-mx-5">
-                  {resumen.sinRespuesta.map((p) => (
-                    <li
-                      key={p.pregunta}
-                      className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-2.5 sm:px-5"
-                    >
-                      <Veces cuenta={p.veces} />
-                      <span className="min-w-0 flex-1 text-panel-base leading-snug text-panel-tinta">
-                        “{p.pregunta}”
-                      </span>
-                      <span className="text-panel-xs text-panel-tinta-3">
-                        {tiempoRelativo(p.ultima)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <ListaSinRespuesta preguntas={visiblesSinRespuesta} />
+                  {restoSinRespuesta.length > 0 && (
+                    /* La cola va plegada, no recortada: son preguntas de una
+                       sola vez, que es justamente lo que no ayuda a decidir la
+                       nota del mes que viene. Pero son datos de vecinos reales y
+                       no se esconden — se corren de en medio.
+                       `<details>` y no un botón con estado: es el mismo recurso
+                       que usa el gráfico de actividad para su gemelo en texto, y
+                       no necesita JavaScript ni convertir la pantalla en cliente. */
+                    <details className="mt-3 border-t border-panel-borde pt-2">
+                      <summary className="cursor-pointer font-sans text-panel-xs text-panel-tinta-3 hover:text-panel-tinta-2">
+                        Ver las otras {restoSinRespuesta.length}
+                      </summary>
+                      <div className="mt-2">
+                        <ListaSinRespuesta preguntas={restoSinRespuesta} />
+                      </div>
+                    </details>
+                  )}
+                </>
               )}
             </SeccionPanel>
 
@@ -419,6 +453,43 @@ export default async function AdminMigue() {
  * que le da a los tres dígitos un ancho fijo para que se apilen alineados; una
  * píldora que se estira con el texto no puede hacer eso.
  */
+/**
+ * La lista de preguntas sin respuesta.
+ *
+ * Es una pieza aparte porque se dibuja **dos veces** —las primeras y la cola
+ * plegada— y las dos tienen que verse exactamente igual: si la cola se viera
+ * distinta parecería otra cosa, y no la continuación de la misma lista.
+ *
+ * El negativo tiene que ser EXACTAMENTE el inset de la pieza, y el inset cambia
+ * con el ancho (`p-4 sm:p-5`): con un `-mx-5` fijo, abajo de 640px los
+ * separadores se pasaban 4px de la tarjeta. Una lista con los filetes cortados
+ * —o asomándose— se lee como si le faltara algo al costado.
+ */
+function ListaSinRespuesta({
+  preguntas,
+}: {
+  preguntas: ResumenMigue["sinRespuesta"];
+}) {
+  return (
+    <ul className="-mx-4 divide-y divide-panel-borde border-y border-panel-borde sm:-mx-5">
+      {preguntas.map((p) => (
+        <li
+          key={p.pregunta}
+          className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 px-4 py-2 sm:px-5"
+        >
+          <Veces cuenta={p.veces} />
+          <span className="min-w-0 flex-1 text-panel-base leading-snug text-panel-tinta">
+            “{p.pregunta}”
+          </span>
+          <span className="text-panel-xs text-panel-tinta-3">
+            {tiempoRelativo(p.ultima)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Veces({ cuenta }: { cuenta: number }) {
   return (
     <span className="inline-flex min-w-9 shrink-0 justify-center rounded-full bg-panel-tarjeta-2 px-2 py-0.5 text-panel-xs font-semibold tabular-nums text-panel-tinta-2">
