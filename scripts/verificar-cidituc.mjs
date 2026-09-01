@@ -33,6 +33,7 @@
 import { config as cargarEnv } from "dotenv";
 import tls from "node:tls";
 import https from "node:https";
+import http from "node:http";
 
 const { SECTIGO_CA_DV_R36 } = await import(
   new URL("../src/lib/auth/cidituc/sectigo-ca.ts", import.meta.url).href
@@ -198,21 +199,32 @@ if (esHttps) {
     conNuestroIntermedio.ok
       ? `cadena de ${conNuestroIntermedio.largo} certificado(s)`
       : `${conNuestroIntermedio.code} — la CA en uso ya no alcanza: revisá ${CA_DEL_ENTORNO ? "CIDITUC_CA_PEM" : "sectigo-ca.ts"}`);
+} else {
+  // Saltear en silencio sería peor que no correr: quedaría un "Todo en orden"
+  // que justamente no probó lo que más caro sale descubrir tarde.
+  console.log("\nLa cadena TLS\n");
+  console.log(
+    `  --  NO se probó: CIDITUC_API_URL es ${destino.protocol}//, no https.\n` +
+      "        Contra el backend de producción ésta es la prueba que importa.",
+  );
 }
 
 /* ------------------------------------------------------------- el endpoint */
 
 function consultar(authorization) {
   const ruta = `${destino.pathname.replace(/\/+$/, "")}/usuarios/authStatus`;
+  const cliente = esHttps ? https : http;
   return new Promise((resolve) => {
-    const pedido = https.request(
+    const pedido = cliente.request(
       {
         hostname: destino.hostname,
         port: puerto,
         path: ruta,
         method: "GET",
         headers: { Accept: "application/json", Authorization: authorization },
-        ca: AUTORIDADES,
+        // El 401 con token falso se puede comprobar igual sobre http, contra el
+        // backend local. Lo unico que no aplica es la cadena de confianza.
+        ...(esHttps ? { ca: AUTORIDADES } : {}),
       },
       (res) => {
         res.resume();
@@ -228,7 +240,9 @@ function consultar(authorization) {
   });
 }
 
-if (esHttps) {
+{
+  // Sin `if (esHttps)`: el 401 con token falso se comprueba igual contra el
+  // backend local por http. Lo único que no aplica ahí es la cadena de confianza.
   console.log("\nEl backend\n");
 
   const crudo = await consultar(TOKEN_FALSO);

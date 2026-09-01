@@ -57,9 +57,11 @@ const OPCIONES_COOKIE = {
  * y bastaría un enlace preparado para mandar a alguien afuera desde nuestro
  * dominio.
  */
+const DESTINO_POR_DEFECTO = "/diario";
+
 function destinoSeguro(valor: string | null | undefined): string {
-  if (!valor || !valor.startsWith("/")) return "/diario";
-  if (valor.startsWith("//") || valor.startsWith("/\\")) return "/diario";
+  if (!valor || !valor.startsWith("/")) return DESTINO_POR_DEFECTO;
+  if (valor.startsWith("//") || valor.startsWith("/\\")) return DESTINO_POR_DEFECTO;
   return valor;
 }
 
@@ -72,12 +74,30 @@ function interna(request: NextRequest, pathname: string, search = "") {
 }
 
 function conError(request: NextRequest, error: ErrorIngreso) {
+  // El destino se rescata de la cookie ANTES de borrarla. Las tres formas de
+  // fallar el state son fallas de *primer* intento, así que sin esto alguien que
+  // fue interceptado leyendo una nota reintenta y aterriza en la tapa: perdió el
+  // lugar donde estaba justo por culpa del error.
+  const { destino } = leerFlujo(request);
+  const parametros = new URLSearchParams({ error });
+  if (destino !== DESTINO_POR_DEFECTO) parametros.set("volverA", destino);
+
   const res = NextResponse.redirect(
-    interna(request, "/login", `?error=${error}`),
+    interna(request, "/login", `?${parametros}`),
     303,
   );
   res.cookies.set(COOKIE_FLUJO, "", { ...OPCIONES_COOKIE, maxAge: 0 });
   return res;
+}
+
+/** Lo que guardamos en la cookie del flujo: el nonce y a dónde volver. */
+function leerFlujo(request: NextRequest): { nonce: string; destino: string } {
+  const guardado = request.cookies.get(COOKIE_FLUJO)?.value ?? "";
+  const corte = guardado.indexOf("|");
+  return {
+    nonce: corte === -1 ? guardado : guardado.slice(0, corte),
+    destino: destinoSeguro(corte === -1 ? null : guardado.slice(corte + 1)),
+  };
 }
 
 /**
@@ -121,10 +141,7 @@ export async function callbackCidituc(
   const token = parametros.get("auth") ?? "";
   const estadoDevuelto = parametros.get("state") ?? "";
 
-  const guardado = request.cookies.get(COOKIE_FLUJO)?.value ?? "";
-  const corte = guardado.indexOf("|");
-  const nonce = corte === -1 ? guardado : guardado.slice(0, corte);
-  const destino = destinoSeguro(corte === -1 ? null : guardado.slice(corte + 1));
+  const { nonce, destino } = leerFlujo(request);
 
   if (!nonce || !estadoDevuelto || nonce !== estadoDevuelto) {
     const causa: ErrorIngreso = !estadoDevuelto

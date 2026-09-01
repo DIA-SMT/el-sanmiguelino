@@ -45,6 +45,32 @@ el rol sale de `CIDITUC_ADMINS`, no del token.
 | Las rutas | `src/app/auth/cidituc/{inicio,callback}/route.ts` |
 | Configuración | [`src/lib/auth/config.ts`](../src/lib/auth/config.ts) |
 
+## Variables
+
+| Variable | Para qué |
+|---|---|
+| `CIDITUC_HABILITADO` | `"1"` prende el ingreso. Cualquier otro valor lo deja apagado |
+| `CIDITUC_DERIVADOR_URL` | el **origen solo**; el `#/login` lo agrega `urlDelDerivador()` |
+| `CIDITUC_API_URL` | contra qué se valida el token |
+| `CIDITUC_CALLBACK_URL` | la URL de retorno, idéntica a la registrada en el derivador |
+| `CIDITUC_CLAVE_APP` | la clave del `?next=`; por defecto `sanmiguelino` |
+| `CIDITUC_CA_PEM` | **la válvula de escape del certificado** — ver abajo |
+| `CIDITUC_ADMINS` | los `id_persona` que administran el diario, separados por coma |
+| `SESSION_SECRET` | firma nuestra sesión. Sin él, el callback corta con `sesion-fallida` |
+
+Detalle completo en `.env.example`.
+
+### Si el backend cambia el certificado y el ingreso se cae
+
+Ese es el momento para el que existe `CIDITUC_CA_PEM`: se le carga el intermedio
+nuevo en PEM y **reemplaza al embebido sin necesidad de un deploy**. La app lo
+prefiere sobre el de `sectigo-ca.ts` cuando está cargada, y
+`npm run verificar:cidituc` prueba exactamente la CA que va a usar la app, así
+que se puede confirmar el arreglo antes de tocar producción.
+
+Es la única variable que sirve bajo presión y nadie recuerda que existe. Está acá
+para que aparezca en una búsqueda.
+
 ## Verificar
 
 ```bash
