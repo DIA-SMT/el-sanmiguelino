@@ -16,7 +16,11 @@ import { sesionActual } from "@/lib/auth/dal";
  * producción, y no porque filtre algo —tu propia identidad no es un secreto para
  * vos— sino porque una ruta que allá no hace falta no se despliega.
  *
- * Cuando exista /admin/usuarios esto queda redundante y se puede borrar.
+ * **No queda redundante cuando exista /admin/usuarios**, aunque la primera
+ * versión de este comentario decía que sí. La tabla de roles va a nacer vacía y
+ * el primer administrador se va a seguir poniendo en `CIDITUC_ADMINS`, así que
+ * necesitar el propio `id_persona` sigue siendo igual de cierto. Se borra el día
+ * que el panel pueda promover a alguien buscándolo por nombre.
  */
 export async function GET() {
   if (process.env.NODE_ENV === "production") {

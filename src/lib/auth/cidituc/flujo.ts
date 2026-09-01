@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/config";
 import { validarToken } from "@/lib/auth/cidituc/persona";
 import { urlDelDerivador } from "@/lib/auth/cidituc/derivador";
+import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import type { ErrorIngreso } from "@/lib/auth/cidituc/errores";
 import { SESSION_COOKIE, TTL_SESION_SEG } from "@/lib/auth/cookie";
 import { crearToken } from "@/lib/auth/session";
@@ -166,7 +167,9 @@ export async function callbackCidituc(
 
   const { persona } = validacion;
   const nombre = (
-    [persona.nombre, persona.apellido].filter(Boolean).join(" ").trim() ||
+    // Cidituc los manda en mayúsculas, y una firma en mayúsculas al pie de un
+    // comentario se lee como si gritara. Ver nombre.ts.
+    nombreDeDiario([persona.nombre, persona.apellido].filter(Boolean).join(" ")) ||
     // Cidituc admite nombre y apellido vacíos. Antes que mostrar el documento de
     // alguien al pie de un comentario, el diario prefiere no nombrarlo.
     "Vecino/a"

@@ -41,6 +41,9 @@ const { SECTIGO_CA_DV_R36 } = await import(
 const { urlDelDerivador } = await import(
   new URL("../src/lib/auth/cidituc/derivador.ts", import.meta.url).href
 );
+const { nombreDeDiario } = await import(
+  new URL("../src/lib/auth/cidituc/nombre.ts", import.meta.url).href
+);
 
 cargarEnv({ path: ".env.local", quiet: true });
 
@@ -144,6 +147,34 @@ if (derivador) {
     ok("lleva el fragmento #/login", armada.includes("#/login?"));
     ok(`identifica al diario como "${clave}"`, armada.includes(`next=${clave}`));
     ok("manda el state", armada.includes("state=nonce-de-prueba"));
+  }
+}
+
+/* ------------------------------------------------------- el nombre que firma */
+
+{
+  console.log("\nCómo queda el nombre que devuelve Cidituc\n");
+
+  // Cidituc los manda en MAYÚSCULAS. Estos casos son los que no se pueden
+  // romper: las partículas en minúscula, "San" que NO es partícula, el apóstrofo
+  // y el guion adentro del apellido, y los nombres ya bien escritos que no se
+  // tocan.
+  const casos = [
+    ["ALFREDO AGUSTIN BRITO", "Alfredo Agustin Brito"],
+    ["MARIA DE LOS ANGELES SUAREZ", "Maria de los Angeles Suarez"],
+    ["JOSE SAN MARTIN", "Jose San Martin"],
+    ["D'AMICO", "D'Amico"],
+    ["SUAREZ-MASON", "Suarez-Mason"],
+    ["MARÍA JOSÉ PEÑA", "María José Peña"],
+    ["J. B. ALBERDI", "J. B. Alberdi"],
+    ["de la Vega", "de la Vega"],
+    ["McDonald Ana", "McDonald Ana"],
+  ];
+
+  for (const [entrada, esperado] of casos) {
+    const salida = nombreDeDiario(entrada);
+    ok(`${entrada} → ${salida}`, salida === esperado,
+      salida === esperado ? "" : `se esperaba ${esperado}`);
   }
 }
 

@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { LayoutDashboard } from "lucide-react";
 import { LogoHoja } from "@/components/brand/logos";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
 import { SeccionesNav } from "@/components/secciones-nav";
+import { esAdmin } from "@/lib/auth/dal";
 import type { SeccionInfo } from "@/lib/data/secciones";
 import type { EdicionResumen, Usuario } from "@/lib/types";
 
@@ -23,8 +25,19 @@ import type { EdicionResumen, Usuario } from "@/lib/types";
  * hermana de la cabecera, su bloque contenedor es la hoja entera y el
  * `position: sticky` funciona en todo el largo de la página. Dentro del
  * header solo podría pegarse hasta donde termina el header, o sea nada.
+ *
+ * **Por qué pregunta el permiso acá y no lo recibe como prop.** La cabecera la
+ * renderizan las cuatro páginas del diario, no el layout, así que cada una
+ * tendría que acordarse de pasar el dato — y una que se olvide no muestra un
+ * error, muestra un diario sin la puerta al panel. Preguntando acá no hay nada
+ * que olvidarse. `esAdmin()` está memoizado con `cache()`, así que si el layout
+ * ya lo resolvió en este mismo render, esto no cuesta nada.
+ *
+ * Que el botón no se dibuje no es lo que protege el panel: `/admin` responde 404
+ * por su cuenta a quien no corresponde. Esto es para no anunciar una puerta que
+ * la mayoría no puede abrir.
  */
-export function Masthead({
+export async function Masthead({
   edicion,
   secciones,
   usuario,
@@ -39,6 +52,7 @@ export function Masthead({
   pagina?: number;
 }) {
   const esInterior = typeof pagina === "number";
+  const puedeAdministrar = await esAdmin();
   // El folio va al borde EXTERIOR de la hoja, como en cualquier impreso: en
   // una página par —que en un pliego cae a la izquierda— el exterior es la
   // izquierda; en una impar, la derecha.
@@ -55,6 +69,19 @@ export function Masthead({
               Municipalidad de San Miguel de Tucumán
             </p>
             <div className="flex items-center gap-2.5">
+              {puedeAdministrar && (
+                <Link
+                  href="/admin"
+                  /* El texto está siempre en el DOM: en pantalla chica se
+                     esconde con `sr-only`, que lo saca de la vista sin sacarlo
+                     del lector de pantalla. Con `hidden` el botón se quedaría
+                     sin nombre accesible justo en el teléfono. */
+                  className="pressable inline-flex items-center gap-1.5 border border-line bg-chrome px-2 py-[0.42rem] font-sans text-[0.66rem] font-semibold uppercase tracking-[0.1em] text-ink-2 hover:border-ink hover:text-ink sm:px-2.5"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">Administración</span>
+                </Link>
+              )}
               <ThemeToggle />
               <UserChip usuario={usuario} />
             </div>
