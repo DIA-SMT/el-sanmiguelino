@@ -186,6 +186,22 @@ export async function callbackCidituc(
     return conError(request, "sesion-fallida");
   }
 
+  // Sólo fuera de producción, y por una razón práctica: el rol de administrador
+  // se otorga poniendo un `id_persona` en CIDITUC_ADMINS, y hasta acá la única
+  // forma de averiguar el propio era abrir las herramientas del navegador,
+  // copiar una cookie httpOnly y decodificarla a mano. Con esto, entrar una vez
+  // alcanza.
+  //
+  // No va en producción: ahí el id de cada lector que ingresa no tiene por qué
+  // quedar en los registros del hosting. Y el token de Cidituc no se loguea acá
+  // ni en ningún otro lado.
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `[cidituc] ingresó ${nombre} — id_persona=${persona.id}\n` +
+        `          para entrar a /admin: CIDITUC_ADMINS=${persona.id} y ADMIN_HABILITADO=1 en .env.local`,
+    );
+  }
+
   // A una URL limpia: el token no queda en la barra de direcciones, ni en el
   // historial, ni en el Referer de la próxima navegación.
   const res = NextResponse.redirect(interna(request, destino), 303);
