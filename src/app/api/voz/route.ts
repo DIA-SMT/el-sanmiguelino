@@ -105,10 +105,11 @@ import {
  * mucho, pero es contaminación real y el arreglo es de un renglón por consulta:
  * `clave: { not: "voz" }`. Va en `tope.ts`, que esta tanda no toca.
  *
- * El tope por persona no se copia: el adapter mock de Cidituc le da a todo el
- * mundo el id `cidituc-demo-001`, así que cualquier tope "por persona" es hoy un
- * tope global disfrazado y un solo lector insistente le apagaría la voz a todos.
- * Para algo que ya tiene respaldo gratis, es mucho castigo para muy poco ahorro.
+ * El tope por persona tampoco se copia, aunque desde el ingreso real de Cidituc
+ * ya sería posible —cada sesión trae su `id_persona`, no la identidad única que
+ * repartía el mock—. Es una decisión, no una limitación: la voz tiene respaldo
+ * gratis en el navegador, así que cortarle el audio a alguien por insistir es
+ * mucho castigo para muy poco ahorro. El fusible global alcanza.
  */
 
 /**

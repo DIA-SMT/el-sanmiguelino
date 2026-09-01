@@ -32,19 +32,13 @@ export const sesionActual = cache(async (): Promise<Sesion | null> => {
 });
 
 /**
- * ¿El panel puede pedir rol de administrador de verdad?
- *
- * Sólo en producción. Fuera de ella no tiene sentido: el login es un mock que
- * devuelve la misma identidad a cualquiera que apriete el botón, así que
- * exigir un rol sería teatro —la única forma de tenerlo sería inventárselo, y
- * un rol inventado no distingue a nadie de nadie—.
- *
- * La consecuencia deliberada es que **en desarrollo cualquier sesión válida
- * entra al panel**, y en producción **el panel no existe** hasta que haya SSO
- * real. Las dos mitades son la misma decisión: mientras la identidad no se
- * pueda verificar, o el panel es local o no es.
+ * Nota sobre desarrollo: acá hubo una excepción que dejaba entrar al panel a
+ * cualquier sesión fuera de producción. Tenía sentido mientras el login era un
+ * mock que le daba la misma identidad a todo el mundo —pedir un rol habría sido
+ * teatro—. Con el ingreso real de Cidituc la identidad es verificable también en
+ * desarrollo, así que la excepción se borró: la regla es una sola en los dos
+ * lados. Para trabajar en el panel, poné tu `id_persona` en `CIDITUC_ADMINS`.
  */
-const EXIGE_ROL = process.env.NODE_ENV === "production";
 
 /**
  * ¿Quien está del otro lado puede entrar al panel? Sin cortar nada.
@@ -57,7 +51,6 @@ const EXIGE_ROL = process.env.NODE_ENV === "production";
 export async function esAdmin(): Promise<boolean> {
   const sesion = await sesionActual();
   if (!sesion) return false;
-  if (!EXIGE_ROL) return true;
   return ADMIN_HABILITADO && sesion.rol === "admin";
 }
 
@@ -76,7 +69,6 @@ export async function esAdmin(): Promise<boolean> {
 export async function requerirAdmin(): Promise<Sesion> {
   const sesion = await sesionActual();
   if (!sesion) notFound();
-  if (!EXIGE_ROL) return sesion;
   if (!ADMIN_HABILITADO) notFound();
   if (sesion.rol !== "admin") notFound();
   return sesion;
@@ -96,10 +88,8 @@ export function conAdmin<T extends unknown[]>(
   return async (...args: T) => {
     const sesion = await sesionActual();
     if (!sesion) return new Response(null, { status: 404 });
-    if (EXIGE_ROL) {
-      if (!ADMIN_HABILITADO) return new Response(null, { status: 404 });
-      if (sesion.rol !== "admin") return new Response(null, { status: 404 });
-    }
+    if (!ADMIN_HABILITADO) return new Response(null, { status: 404 });
+    if (sesion.rol !== "admin") return new Response(null, { status: 404 });
     return handler(sesion, ...args);
   };
 }

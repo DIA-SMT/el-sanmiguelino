@@ -2,14 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LogoDireccionIA, LogoHoja } from "@/components/brand/logos";
+import { textoDeError } from "@/lib/auth/cidituc/errores";
 import { getResumenEdicion } from "@/lib/repos/edicion";
 import { BotonIngresar } from "./boton-ingresar";
 
 export const metadata: Metadata = { title: "Ingresar" };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const { volverA } = await searchParams;
+  const { volverA, error } = await searchParams;
   const destino = typeof volverA === "string" ? volverA : "/diario";
+  // Un intento que volvió mal desde Cidituc. Se nombra el motivo: "no se pudo
+  // ingresar" a secas deja a la persona sin saber si reintentar o avisar.
+  const aviso = textoDeError(error);
   const edicion = await getResumenEdicion();
 
   return (
@@ -33,6 +37,15 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           </strong>
           . Ingresá con tu cuenta para leer el diario del mes.
         </p>
+
+        {aviso && (
+          <p
+            role="alert"
+            className="mt-7 border-l-2 border-accent bg-accent-wash px-4 py-3 text-left font-sans text-[0.8rem] leading-relaxed text-ink-2"
+          >
+            {aviso}
+          </p>
+        )}
 
         <BotonIngresar destino={destino} />
 

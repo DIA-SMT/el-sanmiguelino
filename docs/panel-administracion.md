@@ -9,7 +9,7 @@ qué no supo contestar Migue.
 | Tema | Decisión |
 |---|---|
 | Base de datos | Supabase (Postgres) |
-| Rol de admin | Viene de Cidituc |
+| Rol de admin | Lista de `id_persona` en `CIDITUC_ADMINS` — Cidituc autentica pero no da roles (2026-09-01) |
 | Deploy | Vercel |
 | Imágenes | Supabase Storage (decidido el 2026-08-26) |
 | Moderación | Los comentarios publican directo; el admin los da de baja |
@@ -34,27 +34,34 @@ el motor.
 
 ## Postura de seguridad del admin
 
-Tres llaves independientes, todas cerradas por default, en AND:
+Actualizado el 2026-09-01, con el ingreso real de Cidituc. Tres llaves
+independientes, todas cerradas por default, en AND:
 
 | Llave | Default | Efecto si falta |
 |---|---|---|
 | `SESSION_SECRET` | ninguno | en producción la app **tira**: nada se firma |
-| `AUTH_CIDITUC_MODO` | mock | `rolDe()` devuelve `"lector"` sin mirar nada más |
+| `CIDITUC_ADMINS` | vacía | `rolDe()` devuelve `"lector"` para todo el mundo |
 | `ADMIN_HABILITADO` | sin setear | `/admin/**` responde 404, no redirect |
 
 Desplegar el repo tal cual, sin tocar variables: `/admin` es 404 para todos.
-**Ninguna combinación de variables abre el panel mientras el login sea el mock**,
-porque `AUTH_CIDITUC_MODO=sso` exige además un `CIDITUC_CLIENT_SECRET` real que
-sólo emite el equipo de Cidituc. Un interruptor que cualquiera puede prender no
-es un control de seguridad; una credencial que no se tiene, sí.
+
+Lo que cambió respecto de la vuelta anterior: la llave del medio ya no es un
+interruptor de "mock o SSO" con un `CIDITUC_CLIENT_SECRET` que lo respaldara.
+**Cidituc no emite ningún secreto de cliente** — el protocolo real es un token
+que valida el backend municipal—, así que esa llave nunca habría existido. La
+reemplaza algo que sí se sostiene solo: la sesión únicamente puede nacer del
+callback, el callback exige un token que valida `estadisticas.smt.gob.ar`, y el
+`id_persona` que devuelve ese backend tiene que estar en la lista. Ninguna de las
+tres partes la puede escribir el navegador.
+
+`POST /api/auth/login` **se borró**, junto con el adapter mock. No se dejó "por
+las dudas": un POST sin credenciales que devuelve una sesión válida era
+exactamente el agujero a cerrar.
 
 Además: **`/admin` no se despliega a producción en esta primera vuelta**, ni con
 feature flag. Y conviene Vercel Deployment Protection con contraseña sobre
 Preview hasta el lanzamiento — es el único control que no depende de que nadie
 se olvide de una variable.
-
-El día que exista el SSO, `POST /api/auth/login` **se borra**, no se deja "por
-las dudas".
 
 ### Por qué el rol NO va adentro del token
 
@@ -75,13 +82,19 @@ servidor en cada request, memoizada con `cache()`.
 antes del próximo deploy. La `service_role` **nunca** con prefijo
 `NEXT_PUBLIC_`.
 
-**Bloqueante externo**: la spec del SSO de Cidituc. Sin ella no se sabe si el rol
-viene como claim, como grupo, o si hay que consultarlo aparte — y de eso depende
-si "el rol viene de Cidituc" es cumplible tal cual.
+**Resuelto el 2026-09-01**: era la spec del SSO de Cidituc. Ya está integrada —ver
+[integracion-cidituc.md](integracion-cidituc.md)—, y la respuesta a la pregunta
+que bloqueaba es que **el rol no viene de Cidituc**: el backend devuelve la
+identidad de la persona y nada más. Así que "el rol viene de Cidituc" no era
+cumplible tal cual. Lo reemplaza `CIDITUC_ADMINS`, la lista de `id_persona` que
+carga el municipio en el entorno, hasta que haya una tabla propia.
+
+**Lo que sigue pendiente del lado del municipio**: registrar el diario en el repo
+`derivador` y cargar las variables en Vercel.
 
 ## Fuera de alcance en esta primera vuelta
 
-SSO real · `/admin` en producción · multi-edición y archivo histórico ·
+`/admin` en producción · multi-edición y archivo histórico ·
 búsqueda con `tsvector` (el resaltado actual depende de índices carácter a
 carácter y habría que rehacerlo) · agrupación semántica de preguntas de Migue ·
 drag & drop para reordenar (WCAG 2.2 SC 2.5.7 exige igual la alternativa de un
@@ -282,23 +295,28 @@ bajar a Prisma 6, que revierte todo el modelo de configuración de la 7. Se deja
 como está, sabiendo por qué.
 
 
-## Cómo se entra al panel (decidido el 2026-08-26)
+## Cómo se entra al panel (decidido el 2026-08-26, revisado el 2026-09-01)
 
-**En desarrollo el panel está abierto**: cualquier sesión válida entra a
-`/admin`, sin roles. **En producción el panel no existe**: responde 404 y
-ninguna variable lo abre mientras el login siga siendo el mock.
+**Una sola regla, igual en desarrollo y en producción**: entra quien tenga sesión
+de Cidituc, esté en `CIDITUC_ADMINS` y con `ADMIN_HABILITADO=1`. Si falta
+cualquiera de las tres, `/admin` responde 404.
 
-Las dos mitades son la misma decisión, y reemplazan al plan anterior de exigir
-rol de administrador desde el principio. El motivo: el login de hoy es un POST
-sin credenciales que devuelve la misma identidad a todo el que aprieta el
-botón, así que pedir un rol sería teatro —la única forma de tener uno sería
-inventárselo, y un rol inventado no distingue a nadie de nadie—. Mientras la
-identidad no se pueda verificar, o el panel es local o no es.
+Hasta el 2026-09-01 había una excepción: fuera de producción cualquier sesión
+válida entraba sin rol. Estaba bien fundada mientras existió el mock —un login
+que le daba la misma identidad a todo el que apretaba el botón, así que pedir un
+rol habría sido teatro; la única forma de tener uno era inventárselo, y un rol
+inventado no distingue a nadie de nadie—. Con el ingreso real de Cidituc esa
+premisa se cayó: la identidad ahora es verificable **también en desarrollo**,
+porque en los dos lados sale del mismo backend municipal.
 
-La excepción vive en **un solo lugar**, `requerirAdmin()` en
-`src/lib/auth/dal.ts`, y se borra de un renglón el día que haya SSO real.
-`rolDe()` no se tocó: sigue devolviendo siempre "lector", que es la verdad. No
-se le enseñó a mentir.
+Así que la excepción se borró de `requerirAdmin()`, `esAdmin()` y `conAdmin()`, y
+con ella la constante `EXIGE_ROL`. Queda una regla sola, sin una rama que sólo
+corre en la máquina de alguien. Para trabajar en el panel en local hay que poner
+el `id_persona` propio en `CIDITUC_ADMINS`, que es una línea en `.env.local`.
+
+`rolDe()` sí se tocó, y ahora hace su trabajo: consulta `CIDITUC_ADMINS` en vez
+de devolver `"lector"` siempre. Sigue sin mentir — lo que cambió es que ahora hay
+una verdad que consultar.
 
 ### Dos cosas que aparecieron al verificar
 

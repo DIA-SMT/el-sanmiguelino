@@ -20,7 +20,12 @@ export function proxy(request: NextRequest) {
   const muerta = Boolean(bruta) && cookieMuerta(bruta);
   const tieneSesion = Boolean(bruta) && !muerta;
 
-  const esAuth = pathname.startsWith("/api/auth/");
+  // `/auth/cidituc/*` es el ingreso en sí —el que manda al derivador municipal y
+  // el que recibe la vuelta con el token—. Tiene que ser público por definición:
+  // quien pasa por ahí todavía no tiene sesión, y si el gate lo mandara a /login
+  // el ingreso no podría completarse nunca.
+  const esAuth =
+    pathname.startsWith("/api/auth/") || pathname.startsWith("/auth/cidituc/");
   const esPublica = pathname === "/" || pathname === "/login" || esAuth;
 
   // Las API responden su propio 401 (un redirect HTML no le sirve a un fetch).

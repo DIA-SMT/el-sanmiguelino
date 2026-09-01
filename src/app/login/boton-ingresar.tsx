@@ -1,43 +1,40 @@
-"use client";
+import { CIDITUC_CONFIGURADO } from "@/lib/auth/config";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
-
+/**
+ * El botón de ingreso. Un enlace común, no un `fetch`: lo que sigue es una
+ * navegación de verdad que sale del sitio hacia el derivador municipal, y volver
+ * de ahí con un token no es algo que pueda resolver el cliente.
+ *
+ * Deliberadamente **no** es un `<Link>` de Next. `Link` precarga el destino al
+ * pasarle el mouse por encima, y el destino de acá no es una página: es el
+ * arranque del ingreso, que deja una cookie con un nonce. Precargarlo emitiría
+ * nonces que nadie va a usar y pisaría el del intento en curso.
+ */
 export function BotonIngresar({ destino }: { destino: string }) {
-  const router = useRouter();
-  const [estado, setEstado] = useState<"idle" | "cargando" | "error">("idle");
-
-  async function ingresar() {
-    setEstado("cargando");
-    try {
-      const res = await fetch("/api/auth/login", { method: "POST" });
-      if (!res.ok) throw new Error();
-      router.push(destino.startsWith("/") ? destino : "/diario");
-      router.refresh();
-    } catch {
-      setEstado("error");
-    }
+  if (!CIDITUC_CONFIGURADO) {
+    return (
+      <p
+        role="status"
+        className="mt-8 border border-line px-4 py-3 font-sans text-[0.78rem] leading-relaxed text-ink-3"
+      >
+        El ingreso con Cidituc todavía no está habilitado en este sitio.
+      </p>
+    );
   }
+
+  const href =
+    destino === "/diario"
+      ? "/auth/cidituc/inicio"
+      : `/auth/cidituc/inicio?volverA=${encodeURIComponent(destino)}`;
 
   return (
     <div className="mt-8">
-      <button
-        type="button"
-        onClick={ingresar}
-        disabled={estado === "cargando"}
-        className="pressable inline-flex w-full items-center justify-center gap-2.5 bg-accent px-5 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-accent-contrast shadow-control hover:bg-accent-strong disabled:opacity-60"
+      <a
+        href={href}
+        className="pressable inline-flex w-full items-center justify-center gap-2.5 bg-accent px-5 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-accent-contrast shadow-control hover:bg-accent-strong"
       >
-        {estado === "cargando" && (
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-        )}
-        {estado === "cargando" ? "Conectando con Cidituc…" : "Ingresar con Cidituc"}
-      </button>
-      {estado === "error" && (
-        <p role="alert" className="mt-3 font-sans text-xs text-red-700 dark:text-red-400">
-          No pudimos conectar con Cidituc. Revisá tu conexión y volvé a intentar.
-        </p>
-      )}
+        Ingresar con Cidituc
+      </a>
     </div>
   );
 }
