@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink } from "lucide-react";
-import type { RenderTask } from "pdfjs-dist";
-import { abrirPdf, claseCapaTexto } from "@/lib/pdf/visor";
+import {
+  abrirPdf,
+  claseCapaTexto,
+  dibujarPagina,
+  olvidarHojasLejanas,
+} from "@/lib/pdf/visor";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,9 +29,11 @@ import { cn } from "@/lib/utils";
  * escaneo: ahí no hay texto que sacar, y por eso la página siempre ofrece
  * además el archivo entero para abrirlo con las herramientas de cada uno.
  *
- * El PDF **no se vuelve a bajar en cada hoja**: `abrirPdf()` guarda el
- * documento abierto por dirección y el caché vive en el módulo, así que
- * sobrevive a la navegación del cliente.
+ * **La hoja no se dibuja acá: se pide dibujada.** `dibujarPagina()` la tiene
+ * lista de antes —este mismo componente pidió las vecinas mientras el lector
+ * leía la anterior— y lo único que queda es copiarla. Ahí está la diferencia
+ * entre un giro de página fluido y uno que se arrastra; el porqué, con los
+ * tiempos medidos, está en `src/lib/pdf/visor.ts`.
  */
 export function PaginaPdf({
   url,
@@ -60,6 +66,10 @@ export function PaginaPdf({
    * cada píxel: pdf.js rasteriza una página entera cada vez y el navegador se
    * arrodilla. Con saltos de 16 el resultado es indistinguible —la página se
    * reescala por CSS en el medio— y se dibuja una vez cada tanto.
+   *
+   * Y además es lo que hace que el caché de dibujos sirva: la clave lleva el
+   * ancho, así que sin redondear, dos hojas del mismo diario casi nunca
+   * compartirían medida.
    */
   useEffect(() => {
     const elemento = caja.current;
@@ -76,51 +86,37 @@ export function PaginaPdf({
     if (ancho === 0) return;
 
     let cancelado = false;
-    let tarea: RenderTask | null = null;
+    let ocio: number | null = null;
+
+    /*
+     * El canvas se dibuja a la resolución de la pantalla, no a la del diseño:
+     * en un teléfono con dpr 3 un canvas de 360px de ancho se ve borroso al
+     * lado del texto del diario, que es vectorial.
+     *
+     * Con tope en 2 igual: de 2 a 3 la diferencia no se ve y el área del canvas
+     * —y con ella la memoria— crece con el cuadrado. Una página de diario a dpr
+     * 3 son 40 millones de píxeles, que en iOS directamente no se asigna y el
+     * canvas sale en blanco.
+     */
+    const densidad = Math.min(window.devicePixelRatio || 1, 2);
 
     (async () => {
       try {
-        const documento = await abrirPdf(url);
-        if (cancelado) return;
-        const hoja = await documento.getPage(pagina);
+        // Si la hoja ya estaba dibujada —el caso normal al pasar de página—
+        // esto resuelve en el acto y lo único que cuesta es la copia.
+        const dibujo = await dibujarPagina(url, pagina, ancho, densidad);
         if (cancelado) return;
 
-        const natural = hoja.getViewport({ scale: 1 });
-        setProporcion(natural.height / natural.width);
-
-        const escala = ancho / natural.width;
-        /*
-         * El canvas se dibuja a la resolución de la pantalla, no a la del
-         * diseño: en un teléfono con dpr 3 un canvas de 360px de ancho se ve
-         * borroso al lado del texto del diario, que es vectorial.
-         *
-         * Con tope en 2 igual: de 2 a 3 la diferencia no se ve y el área del
-         * canvas —y con ella la memoria— crece con el cuadrado. Una página de
-         * diario a dpr 3 son 40 millones de píxeles, que en iOS directamente
-         * no se asigna y el canvas sale en blanco.
-         */
-        const densidad = Math.min(window.devicePixelRatio || 1, 2);
-        const vista = hoja.getViewport({ scale: escala * densidad });
+        setProporcion(dibujo.height / dibujo.width);
 
         const canvas = lienzo.current;
-        if (!canvas) return;
-
-        canvas.width = Math.floor(vista.width);
-        canvas.height = Math.floor(vista.height);
+        const pincel = canvas?.getContext("2d");
+        if (!canvas || !pincel) return;
+        canvas.width = dibujo.width;
+        canvas.height = dibujo.height;
         canvas.style.width = "100%";
         canvas.style.height = "auto";
-
-        /*
-         * Se le pasa el CANVAS, no su contexto 2D.
-         *
-         * pdf.js 6 acepta las dos formas pero la del contexto es la vieja, y
-         * exige además mandar `canvas: null`: pasar los dos —que es lo que
-         * parece más completo— deja la promesa colgada para siempre, sin error
-         * y con la mitad de la página dibujada. Pasó exactamente eso.
-         */
-        tarea = hoja.render({ canvas, viewport: vista });
-        await tarea.promise;
-        if (cancelado) return;
+        pincel.drawImage(dibujo, 0, 0);
 
         /*
          * La capa de texto va en unidades CSS, no en las del canvas: son los
@@ -128,9 +124,19 @@ export function PaginaPdf({
          * cada span con `calc(var(--total-scale-factor) * …px)`, así que la
          * variable tiene que estar puesta en el contenedor o todo se apila en
          * la esquina.
+         *
+         * Cuesta 33-43 ms medidos, así que va en el camino directo y no
+         * adelantada: adelantarla obligaría a guardar nodos del DOM en el
+         * caché para ahorrar cuarenta milisegundos.
          */
+        const documento = await abrirPdf(url);
+        if (cancelado) return;
+        const hoja = await documento.getPage(pagina);
+        if (cancelado) return;
         const contenedor = capa.current;
         if (contenedor) {
+          const natural = hoja.getViewport({ scale: 1 });
+          const escala = ancho / natural.width;
           const vistaCss = hoja.getViewport({ scale: escala });
           contenedor.replaceChildren();
           contenedor.style.setProperty("--total-scale-factor", String(escala));
@@ -146,6 +152,34 @@ export function PaginaPdf({
         if (cancelado) return;
         setError(null);
         setListo(true);
+
+        /*
+         * Y ahora las vecinas, mientras el lector lee ésta.
+         *
+         * Va en `requestIdleCallback` para no pelearle el hilo a la hoja que se
+         * está terminando de mostrar —ni al giro de página, si todavía está
+         * corriendo—. Safari no lo tiene, así que hay respaldo con un
+         * temporizador de 1200 ms: apenas más que el giro, o sea el primer
+         * momento en que se sabe que la animación no está animando.
+         *
+         * Los errores se comen en silencio a propósito: esto es trabajo
+         * especulativo sobre una página que el lector todavía no pidió, y si
+         * falla se va a volver a intentar cuando la pida de verdad.
+         */
+        const adelantarVecinas = () => {
+          if (cancelado) return;
+          for (const vecina of [pagina + 1, pagina - 1]) {
+            if (vecina < 1 || vecina > documento.numPages) continue;
+            void dibujarPagina(url, vecina, ancho, densidad).catch(() => {});
+          }
+          olvidarHojasLejanas(url, pagina, ancho);
+        };
+
+        if (typeof requestIdleCallback === "function") {
+          ocio = requestIdleCallback(adelantarVecinas, { timeout: 3000 });
+        } else {
+          ocio = window.setTimeout(adelantarVecinas, 1200);
+        }
       } catch (e) {
         // Cancelar un dibujado en curso —al pasar de página, al reescalar— tira
         // por diseño. No es un error que el lector tenga que ver.
@@ -162,7 +196,16 @@ export function PaginaPdf({
 
     return () => {
       cancelado = true;
-      tarea?.cancel();
+      /*
+       * El dibujado NO se cancela, y es a propósito: vive en el módulo, así que
+       * si el lector pasa de hoja mientras ésta se dibuja, el trabajo termina y
+       * queda en el caché. Volver atrás es entonces instantáneo. Antes se
+       * cancelaba y se tiraba a la basura.
+       */
+      if (ocio !== null) {
+        if (typeof cancelIdleCallback === "function") cancelIdleCallback(ocio);
+        window.clearTimeout(ocio);
+      }
     };
   }, [url, pagina, ancho]);
 

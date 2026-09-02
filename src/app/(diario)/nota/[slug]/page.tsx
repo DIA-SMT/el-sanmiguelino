@@ -166,12 +166,16 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
             numeroPagina={numeroPagina}
             edicionSlug={nota.edicionSlug}
           >
+            {/* Sin bandera ni folio: la hoja del PDF los trae impresos, y
+                dibujar los nuestros encima los mostraba dos veces. El foliado
+                nuestro sigue al pie, en el pasador de páginas. */}
             <Masthead
               edicion={edicion}
               secciones={seccionesDeEdicion(indice)}
               usuario={usuario}
               seccionActiva={slugificarSeccion(nota.seccion)}
               pagina={numeroPagina}
+              facsimil
             />
 
             <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">

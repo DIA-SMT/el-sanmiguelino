@@ -29,38 +29,82 @@ export const metadata = { title: "Ediciones" };
  */
 export default async function AdminEdiciones() {
   await requerirAdmin();
-  const [filas, escritasPorEdicion, enFoco] = await Promise.all([
+  const [filas, notasDelSistema, enFoco] = await Promise.all([
     db().edicion.findMany({
       orderBy: [{ anio: "desc" }, { numero: "desc" }],
       include: { _count: { select: { notas: true } } },
     }),
     /*
-     * Cuántas notas ESCRITAS tiene cada edición, aparte del total.
+     * Cada fila de `notas` del sistema, con su edición, si es página de un PDF
+     * y cuántos comentarios tiene. De acá salen las cuatro cuentas que la ficha
+     * necesita, en UNA consulta.
      *
-     * Las dos cuentas hacen falta y no son la misma: en una edición publicada
-     * como facsímil, cada página del PDF es una fila de `notas` (ver
-     * `Nota.pdfPagina`), así que el total diría "12 notas" sobre un número
-     * que no tiene ninguna escrita. Y la carga del PDF necesita saber si hay
-     * notas escritas para no dejar mezclar las dos formas.
+     * Hacen falta las cuatro y ninguna se deriva de otra:
+     *
+     * - **notas escritas** aparte del total, porque en un número publicado como
+     *   facsímil cada página del PDF también es una fila de `notas` (ver
+     *   `Nota.pdfPagina`): el total diría "12 notas" sobre una edición que no
+     *   tiene ninguna escrita;
+     * - **comentarios de toda la edición**, que es lo que se pierde al borrarla;
+     * - **comentarios de las notas escritas**, que es lo que se pierde si el
+     *   número pasa a publicarse como PDF.
+     *
+     * Sin el cuerpo ni el texto plano: son cuentas, no contenido.
      */
-    db().nota.groupBy({
-      by: ["edicionId"],
-      where: { pdfPagina: null },
-      _count: { _all: true },
+    db().nota.findMany({
+      select: {
+        edicionId: true,
+        pdfPagina: true,
+        _count: { select: { comentarios: true } },
+      },
     }),
     edicionEnFoco(),
   ]);
 
-  const escritas = new Map(
-    escritasPorEdicion.map((e) => [e.edicionId, e._count._all]),
-  );
+  const escritas = new Map<string, number>();
+  const comentarios = new Map<string, number>();
+  const comentariosEscritos = new Map<string, number>();
+  for (const nota of notasDelSistema) {
+    const suma = (mapa: Map<string, number>, cuanto: number) =>
+      mapa.set(nota.edicionId, (mapa.get(nota.edicionId) ?? 0) + cuanto);
+    suma(comentarios, nota._count.comentarios);
+    if (nota.pdfPagina === null) {
+      suma(escritas, 1);
+      suma(comentariosEscritos, nota._count.comentarios);
+    }
+  }
 
   const ahora = new Date();
-  // La que el lector ve: la más reciente ya publicada. Se calcula igual que en
-  // el repo, a propósito — si las dos formas se separan, el panel miente.
-  const publicada = filas
-    .filter((e) => e.publicaEn && e.publicaEn <= ahora)
-    .sort((a, b) => b.publicaEn!.getTime() - a.publicaEn!.getTime())[0];
+
+  /*
+   * Las ediciones que el diario PUEDE servir: fecha ya cumplida y algo que
+   * mostrar. De la más nueva a la más vieja.
+   *
+   * Es la misma regla que usa el repo para elegir la edición que sale
+   * —`publicaEn <= ahora` más `TIENE_CONTENIDO`—, y ahora sí: antes esta
+   * pantalla filtraba **sólo por fecha** aunque el comentario dijera que se
+   * calculaba igual. La diferencia se veía: una edición con fecha cumplida y sin
+   * notas quedaba marcada "En la calle" en el panel, mientras el diario se la
+   * salteaba y servía la anterior. El panel decía una cosa y el lector veía
+   * otra.
+   *
+   * De acá salen las dos cosas que hacen falta, así no hay dos reglas que se
+   * puedan separar de nuevo:
+   * - `publicada`, la que ve el lector: la primera;
+   * - si queda UNA sola, borrarla dejaría el sitio sin ningún número y la
+   *   portada tiraría error, así que la ficha apaga el botón (y la acción lo
+   *   vuelve a comprobar por su cuenta, que es donde de verdad importa).
+   */
+  const servibles = filas
+    .filter(
+      (e) =>
+        e.publicaEn &&
+        e.publicaEn <= ahora &&
+        (e._count.notas > 0 || e.pdfUrl !== null),
+    )
+    .sort((a, b) => b.publicaEn!.getTime() - a.publicaEn!.getTime());
+
+  const publicada = servibles[0];
 
   const ediciones: EdicionFila[] = filas.map((e) => ({
     slug: e.slug,
@@ -73,6 +117,10 @@ export default async function AdminEdiciones() {
     tema: e.tema,
     notas: e._count.notas,
     notasEscritas: escritas.get(e.id) ?? 0,
+    comentarios: comentarios.get(e.id) ?? 0,
+    comentariosEscritos: comentariosEscritos.get(e.id) ?? 0,
+    laUnicaServible:
+      servibles.length === 1 && servibles[0].id === e.id,
     pdf:
       e.pdfUrl && e.pdfPaginas
         ? { url: e.pdfUrl, paginas: e.pdfPaginas }

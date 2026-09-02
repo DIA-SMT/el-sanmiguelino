@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, Eye, Pencil, X } from "lucide-react";
+import { AlertTriangle, Check, Eye, Pencil, Trash2, X } from "lucide-react";
 import {
+  borrarEdicionAction,
   enfocarEdicionAction,
   guardarEdicionAction,
 } from "@/app/admin/acciones";
@@ -34,6 +35,15 @@ export interface EdicionFila {
   notas: number;
   /** De ésas, cuántas son notas escritas a mano. */
   notasEscritas: number;
+  /** Comentarios de vecinos en toda la edición. Es lo que se pierde al
+   *  borrarla, y lo que hace que borrar no pueda ser un solo click. */
+  comentarios: number;
+  /** Comentarios que cuelgan de las notas ESCRITAS: los que se van si el
+   *  número pasa a publicarse como facsímil. */
+  comentariosEscritos: number;
+  /** Es la única edición que el diario puede servir. Borrarla dejaría el sitio
+   *  sin ningún número, así que no se permite. */
+  laUnicaServible: boolean;
   /** El facsímil del impreso, si el número se publica así. */
   pdf: { url: string; paginas: number } | null;
   estado: "publicada" | "programada" | "sin_fecha";
@@ -61,6 +71,11 @@ export interface EdicionFila {
 const BOTON_PRIMARIO = clasesDeBoton({ tono: "primario", tamano: "chico" });
 const BOTON_SECUNDARIO = clasesDeBoton({ tamano: "chico", sobre: "tarjeta" });
 const BOTON_QUIETO = clasesDeBoton({ tono: "fantasma", tamano: "chico" });
+const BOTON_DESTRUCTIVO = clasesDeBoton({
+  tono: "destructivo",
+  tamano: "chico",
+  sobre: "tarjeta",
+});
 
 /**
  * Los estados, con su palabra y su color.
@@ -119,6 +134,21 @@ export function FilaEdicion({
   const [error, setError] = useState<string | null>(null);
   const [fecha, setFecha] = useState(edicion.publicaEnLocal);
   const [tema, setTema] = useState(edicion.tema ?? "");
+  const [borrando, setBorrando] = useState(false);
+  const [tipeado, setTipeado] = useState("");
+
+  /*
+   * Qué hay adentro de la edición, para saber cuánta ceremonia pedir.
+   *
+   * Vacía —el caso que motivó el borrado, la que se cargó por error— se va con
+   * un click. Con algo adentro hay que escribir el slug: un botón de borrar al
+   * lado de uno de editar, en una lista de fichas parecidas, se aprieta por
+   * accidente, y acá el accidente se lleva los comentarios de vecinos.
+   *
+   * La cuenta que manda es la del servidor; ésta sólo decide qué se dibuja.
+   */
+  const tieneAlgo =
+    edicion.notas > 0 || edicion.comentarios > 0 || Boolean(edicion.pdf);
 
   const estado = esLaPublicada ? EN_LA_CALLE : ESTADOS[edicion.estado];
 
@@ -140,6 +170,27 @@ export function FilaEdicion({
           return;
         }
         setEditando(false);
+        router.refresh();
+      } catch {
+        setError("No se pudo hablar con el servidor.");
+      }
+    });
+  }
+
+  function borrar() {
+    setError(null);
+    iniciar(async () => {
+      try {
+        const res = await borrarEdicionAction({
+          slug: edicion.slug,
+          confirmacion: tipeado,
+        });
+        if (!res.ok) {
+          setError(res.error ?? "No se pudo borrar.");
+          return;
+        }
+        // No hace falta cerrar nada ni limpiar el estado: la fila entera
+        // desaparece con el refresh.
         router.refresh();
       } catch {
         setError("No se pudo hablar con el servidor.");
@@ -314,6 +365,15 @@ export function FilaEdicion({
               mes={edicion.mes}
               pdf={edicion.pdf}
               notasEscritas={edicion.notasEscritas}
+              comentariosEscritos={edicion.comentariosEscritos}
+              /* Los de las páginas son los de la edición menos los de las notas
+                 escritas: en un facsímil no hay notas escritas, así que son
+                 todos, y en una edición de notas no hay páginas, así que son
+                 cero. Una resta en lugar de una quinta consulta. */
+              comentariosPaginas={
+                edicion.comentarios - edicion.comentariosEscritos
+              }
+              laUnicaServible={edicion.laUnicaServible}
             />
 
             <div className="mt-3 flex flex-wrap items-center gap-panel-controles">
@@ -354,7 +414,132 @@ export function FilaEdicion({
                   Verla en el diario
                 </button>
               )}
+
+              {/* Último de la fila y empujado al otro extremo: es la única
+                  acción de la ficha que no se puede deshacer. No se esconde
+                  detrás de un menú —una edición cargada por error hay que poder
+                  tirarla sin buscarla— pero tampoco toca a "Tema y fecha". */}
+              <span className="grow" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => {
+                  setBorrando(true);
+                  setTipeado("");
+                  setError(null);
+                }}
+                disabled={enCurso || edicion.laUnicaServible}
+                title={
+                  edicion.laUnicaServible
+                    ? "Es la única edición que el diario puede servir: borrarla dejaría el sitio sin ningún número."
+                    : undefined
+                }
+                className={BOTON_DESTRUCTIVO}
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                Borrar
+              </button>
             </div>
+
+            {borrando && (
+              <div className="mt-3 grid gap-2.5 rounded-panel-2 bg-panel-tarjeta-2 p-3.5">
+                <Aviso
+                  icono={AlertTriangle}
+                  tono="var(--grafico-alerta)"
+                  sobre="tarjeta"
+                  rol="alert"
+                >
+                  {/* Se dice QUÉ se pierde y CUÁNTO. Un "¿estás seguro?" no
+                      informa nada: quien apretó ya cree que sí. */}
+                  Borrar {edicion.mes} se lleva{" "}
+                  {tieneAlgo ? (
+                    <>
+                      <strong className="font-semibold text-panel-tinta">
+                        {edicion.pdf
+                          ? "el PDF de " +
+                            edicion.pdf.paginas +
+                            (edicion.pdf.paginas === 1
+                              ? " página"
+                              : " páginas")
+                          : edicion.notas +
+                            (edicion.notas === 1 ? " nota" : " notas")}
+                      </strong>
+                      {edicion.comentarios > 0 ? (
+                        <>
+                          {" y "}
+                          <strong className="font-semibold text-panel-tinta">
+                            {edicion.comentarios}{" "}
+                            {edicion.comentarios === 1
+                              ? "comentario de un vecino"
+                              : "comentarios de vecinos"}
+                          </strong>
+                        </>
+                      ) : null}
+                      . No hay papelera: no se puede deshacer.
+                    </>
+                  ) : (
+                    <>nada: está vacía. Igual no se puede deshacer.</>
+                  )}
+                  {esLaPublicada && (
+                    <>
+                      {" Y es la que está "}
+                      <strong className="font-semibold text-panel-tinta">
+                        en la calle
+                      </strong>
+                      : el diario va a pasar a servir la anterior.
+                    </>
+                  )}
+                </Aviso>
+
+                {tieneAlgo && (
+                  <label className="grid gap-1.5">
+                    <span className="text-panel-sm font-medium text-panel-tinta-2">
+                      Escribí <code className="font-mono">{edicion.slug}</code>{" "}
+                      para confirmar
+                    </span>
+                    <input
+                      value={tipeado}
+                      onChange={(e) => setTipeado(e.target.value)}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className={cn(
+                        clasesDeCampo("hundida"),
+                        "w-auto justify-self-start font-mono",
+                      )}
+                      placeholder={edicion.slug}
+                    />
+                  </label>
+                )}
+
+                <div className="flex flex-wrap items-center gap-panel-controles">
+                  <button
+                    type="button"
+                    onClick={borrar}
+                    /* Apagado hasta que el slug coincida. El servidor lo exige
+                       igual —una Server Action es su propio endpoint— pero
+                       apagarlo acá evita el viaje y el cartel de error por algo
+                       que ya se sabe. */
+                    disabled={
+                      enCurso || (tieneAlgo && tipeado !== edicion.slug)
+                    }
+                    className={BOTON_DESTRUCTIVO}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    {enCurso ? "Borrando…" : "Borrar " + edicion.mes}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBorrando(false);
+                      setTipeado("");
+                      setError(null);
+                    }}
+                    className={BOTON_QUIETO}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
 

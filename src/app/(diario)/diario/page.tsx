@@ -56,10 +56,13 @@ export default async function Portada() {
     return (
       <ViewTransition {...transicionPagina}>
         <HojaDiario numeroPagina={1}>
+          {/* Sin bandera: la página 1 del PDF ya es la tapa del diario, con su
+              logotipo impreso. Ver el porqué en `Masthead`. */}
           <Masthead
             edicion={edicion}
             secciones={seccionesDeEdicion(indice)}
             usuario={usuario}
+            facsimil
           />
           <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
             <PaginaPdf

@@ -18,6 +18,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { esLaUnicaServible } from "@/lib/repos/edicion-servibles";
 
 /** Lo que puede tener un PDF de diario. Un número de más acá casi seguro es un
  *  error de conteo, y cada página cuesta una fila y un slug. */
@@ -45,7 +46,19 @@ export async function guardarPdfDeEdicion(
   edicionSlug: string,
   url: string,
   paginas: number,
-): Promise<{ paginas: number; borradas: number }> {
+  opciones: {
+    /**
+     * Borrar las notas escritas que tenga la edición, para publicarla como
+     * facsímil.
+     *
+     * Va como bandera explícita y por default en `false` porque **se lleva
+     * texto que alguien escribió, y los comentarios que tenga**. Quien la
+     * prende tiene que haber visto cuántas notas y cuántos comentarios son: el
+     * panel lo cuenta y lo pregunta antes.
+     */
+    reemplazarNotasEscritas?: boolean;
+  } = {},
+): Promise<{ paginas: number; borradas: number; notasBorradas: number }> {
   if (!Number.isInteger(paginas) || paginas < 1 || paginas > MAXIMO_PAGINAS) {
     throw new Error(
       `El PDF dice tener ${paginas} páginas, y eso no es un diario. ` +
@@ -69,11 +82,11 @@ export async function guardarPdfDeEdicion(
   const escritas = await db().nota.count({
     where: { edicionId: edicion.id, pdfPagina: null },
   });
-  if (escritas > 0) {
+  if (escritas > 0 && !opciones.reemplazarNotasEscritas) {
     throw new Error(
-      `Esta edición ya tiene ${escritas} ${escritas === 1 ? "nota escrita" : "notas escritas"}. ` +
+      `Esta edición tiene ${escritas} ${escritas === 1 ? "nota escrita" : "notas escritas"}. ` +
         "Una edición se publica con notas o con el PDF del impreso, no con las " +
-        "dos cosas: borrá las notas o cargá el PDF en otra edición.",
+        "dos cosas: hay que confirmar que las notas se reemplazan por el PDF.",
     );
   }
 
@@ -100,8 +113,21 @@ export async function guardarPdfDeEdicion(
   }
 
   return db().$transaction(async (tx) => {
-    // Primero las que sobran: un PDF más corto que el anterior deja páginas
-    // colgadas que ya no existen en el archivo nuevo.
+    /*
+     * Las notas escritas, si se pidió reemplazarlas.
+     *
+     * Va PRIMERO y dentro de la transacción por `@@unique([edicionId, orden])`:
+     * las notas escritas ocupan los mismos `orden` que van a necesitar las
+     * páginas, así que si no se van antes, el upsert de la página 2 choca.
+     */
+    const { count: notasBorradas } = opciones.reemplazarNotasEscritas
+      ? await tx.nota.deleteMany({
+          where: { edicionId: edicion.id, pdfPagina: null },
+        })
+      : { count: 0 };
+
+    // Después las páginas que sobran: un PDF más corto que el anterior deja
+    // páginas colgadas que ya no existen en el archivo nuevo.
     const { count: borradas } = await tx.nota.deleteMany({
       where: { edicionId: edicion.id, pdfPagina: { gt: paginas } },
     });
@@ -135,7 +161,7 @@ export async function guardarPdfDeEdicion(
       data: { pdfUrl: url, pdfPaginas: paginas },
     });
 
-    return { paginas, borradas };
+    return { paginas, borradas, notasBorradas };
   });
 }
 
@@ -145,18 +171,62 @@ export async function guardarPdfDeEdicion(
  * Borra las páginas —y sus comentarios, por la cascada— porque sin PDF no hay
  * nada que dibujar en ellas: quedarían como páginas en blanco con foliado.
  *
+ * **Es tan destructivo como borrar la edición entera, y por un tiempo no lo
+ * parecía.** En un número publicado como facsímil las páginas son TODO su
+ * contenido: al salir de la transacción la edición queda sin notas y sin
+ * `pdfUrl`, o sea que deja de cumplir `TIENE_CONTENIDO` y el diario ya no puede
+ * servirla. Si era la única servible, `edicionActualFila()` no encuentra
+ * ninguna y tira — y eso sale como un 500 en la landing pública y en el diario,
+ * para todos los lectores. `borrarEdicion()` se protegía de exactamente eso y
+ * esta función no, así que había un camino de UN CLICK al mismo desastre, sin
+ * confirmar nada y sin contar los comentarios que se llevaba.
+ *
+ * De ahí las dos guardas, las mismas que borrar y por las mismas razones:
+ * - no se puede dejar al diario sin número;
+ * - no se pierde la palabra de un vecino sin que alguien lo confirme.
+ *
  * El objeto del bucket **no se borra**. Es barato, y un lector con la página
  * abierta o una caché intermedia lo puede estar pidiendo todavía; borrarlo le
  * daría un error en lugar de una página vieja.
  */
 export async function quitarPdfDeEdicion(
   edicionSlug: string,
-): Promise<{ borradas: number }> {
+  opciones: {
+    /**
+     * Confirmación de que se pierden los comentarios de las páginas.
+     *
+     * Se exige **sólo si hay comentarios**: quitar un PDF que nadie comentó no
+     * pierde nada de nadie —el archivo sigue en el bucket— y pedir ceremonia
+     * para eso es fricción sobre una corrección de rutina.
+     */
+    confirmarComentarios?: boolean;
+  } = {},
+): Promise<{ borradas: number; comentariosBorrados: number }> {
   const edicion = await db().edicion.findUnique({
     where: { slug: edicionSlug },
-    select: { id: true },
+    select: { id: true, mes: true },
   });
   if (!edicion) throw new Error(`No existe la edición "${edicionSlug}".`);
+
+  if (await esLaUnicaServible(edicionSlug)) {
+    throw new Error(
+      `"${edicion.mes}" es la única edición que el diario puede servir, y sin ` +
+        "el PDF se queda sin contenido: el sitio quedaría sin ningún número que " +
+        "mostrar. Publicá otra —o dale una fecha ya cumplida— y después quitá " +
+        "este PDF. Para cambiar el archivo por otro, usá Reemplazar el PDF.",
+    );
+  }
+
+  const comentariosBorrados = await db().comentario.count({
+    where: { nota: { edicionId: edicion.id, pdfPagina: { not: null } } },
+  });
+  if (comentariosBorrados > 0 && !opciones.confirmarComentarios) {
+    throw new Error(
+      `Las páginas de este PDF tienen ${comentariosBorrados} ` +
+        `${comentariosBorrados === 1 ? "comentario" : "comentarios"} de ` +
+        "vecinos, y quitarlo los borra. Hay que confirmarlo.",
+    );
+  }
 
   return db().$transaction(async (tx) => {
     const { count: borradas } = await tx.nota.deleteMany({
@@ -166,6 +236,6 @@ export async function quitarPdfDeEdicion(
       where: { id: edicion.id },
       data: { pdfUrl: null, pdfPaginas: null },
     });
-    return { borradas };
+    return { borradas, comentariosBorrados };
   });
 }

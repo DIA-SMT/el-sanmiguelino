@@ -27,8 +27,19 @@ export async function DiarioEnPerspectiva() {
     getResumenEdicion(),
     getIndice(),
   ]);
-  const [principal] = await getCompletas([indice[0].slug]);
-  const secundarias = indice.slice(1, 4);
+  /*
+   * Igual que `VistaPrevia`: nada de esto se sostiene sobre un facsímil ni
+   * sobre un índice vacío —un PDF de una sola página no crea ninguna fila en
+   * `notas`— y acá se leía `indice[0].slug` sin guarda, o sea un 500 en la
+   * landing pública. Ver el comentario largo en `vista-previa.tsx`.
+   *
+   * La pieza es la miniatura del diario en ángulo del encabezado, así que no
+   * puede desaparecer: se dibuja la hoja con su bandera y sus secciones, y se
+   * saltea el bloque de la nota protagonista.
+   */
+  const primera = edicion.pdf ? undefined : indice[0];
+  const [principal] = primera ? await getCompletas([primera.slug]) : [];
+  const secundarias = principal ? indice.slice(1, 4) : [];
   const secciones = seccionesDeEdicion(indice)
     .slice(0, 6)
     .map((s) => s.nombre);
@@ -84,34 +95,38 @@ export async function DiarioEnPerspectiva() {
               ))}
             </div>
 
-            {/* Nota de tapa */}
-            <div className="mt-3 grid grid-cols-[1.15fr_1fr] gap-3">
-              <div className="min-w-0">
-                <p className="font-sans text-[0.4rem] font-semibold uppercase tracking-[0.18em] text-accent">
-                  {principal.seccion}
-                </p>
-                <p className="titular mt-1 text-[0.82rem] leading-[1.1] text-ink sm:text-[0.95rem]">
-                  {principal.titulo}
-                </p>
-                <p className="mt-1.5 font-serif text-[0.44rem] leading-[1.5] text-ink-2">
-                  {principal.bajada.slice(0, 150)}…
-                </p>
-                <p className="mt-1.5 font-sans text-[0.4rem] uppercase tracking-[0.12em] text-ink-3">
-                  Redacción · {principal.minutosLectura} min de lectura
-                </p>
-              </div>
-              {principal.imagen && imagenDisponible(principal.imagen.src) && (
-                <div className="foto-editorial relative aspect-[4/5] w-full">
-                  <Image
-                    src={principal.imagen.src}
-                    alt=""
-                    fill
-                    sizes="220px"
-                    className="object-cover"
-                  />
+            {/* Nota de tapa. Sin ella —facsímil, o edición sin notas
+                escritas— la miniatura se queda con su bandera y sus secciones,
+                que es lo que la hace reconocible como diario. */}
+            {principal && (
+              <div className="mt-3 grid grid-cols-[1.15fr_1fr] gap-3">
+                <div className="min-w-0">
+                  <p className="font-sans text-[0.4rem] font-semibold uppercase tracking-[0.18em] text-accent">
+                    {principal.seccion}
+                  </p>
+                  <p className="titular mt-1 text-[0.82rem] leading-[1.1] text-ink sm:text-[0.95rem]">
+                    {principal.titulo}
+                  </p>
+                  <p className="mt-1.5 font-serif text-[0.44rem] leading-[1.5] text-ink-2">
+                    {principal.bajada.slice(0, 150)}…
+                  </p>
+                  <p className="mt-1.5 font-sans text-[0.4rem] uppercase tracking-[0.12em] text-ink-3">
+                    Redacción · {principal.minutosLectura} min de lectura
+                  </p>
                 </div>
-              )}
-            </div>
+                {principal.imagen && imagenDisponible(principal.imagen.src) && (
+                  <div className="foto-editorial relative aspect-[4/5] w-full">
+                    <Image
+                      src={principal.imagen.src}
+                      alt=""
+                      fill
+                      sizes="220px"
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Las que siguen, a tres columnas */}
             <div className="mt-3 grid grid-cols-3 gap-2.5 border-t border-ink pt-2">

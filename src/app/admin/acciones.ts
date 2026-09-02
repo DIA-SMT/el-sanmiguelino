@@ -14,6 +14,7 @@ import {
   guardarPdfDeEdicion,
   quitarPdfDeEdicion,
 } from "@/lib/repos/edicion-pdf";
+import { borrarEdicion } from "@/lib/repos/edicion-borrar";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
 import { comentariosRepo } from "@/lib/repos/comentarios";
@@ -524,12 +525,13 @@ export async function guardarPdfEdicionAction(datos: unknown): Promise<{
   error?: string;
   paginas?: number;
   borradas?: number;
+  notasBorradas?: number;
 }> {
   await requerirAdmin();
 
   try {
     if (!esObjeto(datos)) throw new Error("Faltan los datos del PDF.");
-    const { slug, url, paginas } = datos;
+    const { slug, url, paginas, reemplazarNotasEscritas } = datos;
 
     if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
       throw new Error("Falta la edición.");
@@ -540,7 +542,12 @@ export async function guardarPdfEdicionAction(datos: unknown): Promise<{
     // mensaje que dice qué pasó.
     await verificarPdfSubido(url);
 
-    const resultado = await guardarPdfDeEdicion(slug, url, Number(paginas));
+    const resultado = await guardarPdfDeEdicion(slug, url, Number(paginas), {
+      // `=== true` y no un truthy: esta bandera borra notas escritas, así que
+      // un `"false"`, un `1` o un `{}` que llegue por la URL de la acción no
+      // puede valer por un sí.
+      reemplazarNotasEscritas: reemplazarNotasEscritas === true,
+    });
 
     // El diario entero cambia: la tapa, cada página, el archivo y el índice que
     // el layout baja al mando de paso de página.
@@ -562,18 +569,30 @@ export async function guardarPdfEdicionAction(datos: unknown): Promise<{
 
 /** Saca el PDF de la edición. Borra las páginas y sus comentarios; el objeto
  *  del bucket queda donde está (ver `quitarPdfDeEdicion`). */
-export async function quitarPdfEdicionAction(slug: unknown): Promise<{
+export async function quitarPdfEdicionAction(datos: unknown): Promise<{
   ok: boolean;
   error?: string;
   borradas?: number;
+  comentariosBorrados?: number;
 }> {
   await requerirAdmin();
 
   try {
+    // Antes recibía el slug pelado. Pasa a recibir un objeto porque ahora hay
+    // una confirmación que viaja con él, y porque las otras tres acciones del
+    // PDF ya son así.
+    if (!esObjeto(datos)) throw new Error("Faltan los datos del PDF.");
+    const { slug, confirmarComentarios } = datos;
+
     if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
       throw new Error("Falta la edición.");
     }
-    const { borradas } = await quitarPdfDeEdicion(slug);
+    const { borradas, comentariosBorrados } = await quitarPdfDeEdicion(slug, {
+      // `=== true` y no un truthy, igual que `reemplazarNotasEscritas`: esta
+      // bandera borra comentarios de vecinos, así que un `"false"` o un `1`
+      // que llegue por la URL de la acción no puede valer por un sí.
+      confirmarComentarios: confirmarComentarios === true,
+    });
 
     revalidatePath("/diario");
     revalidatePath("/archivo");
@@ -582,11 +601,82 @@ export async function quitarPdfEdicionAction(slug: unknown): Promise<{
     revalidatePath("/admin");
     revalidatePath("/", "layout");
 
-    return { ok: true, borradas };
+    return { ok: true, borradas, comentariosBorrados };
   } catch (e) {
     return {
       ok: false,
       error: e instanceof Error ? e.message : "No se pudo quitar el PDF.",
+    };
+  }
+}
+
+
+/**
+ * Borra una edición, con todo lo que tenga adentro.
+ *
+ * La única acción del panel que pierde datos de un vecino: la cascada del
+ * esquema se lleva las notas —o las páginas del facsímil—, sus comentarios y sus
+ * votos. Las comprobaciones viven en `borrarEdicion()`, del lado del servidor, y
+ * son las que mandan: lo que dibuja la pantalla es una cortesía.
+ *
+ * Devuelve qué se llevó puesto, para que el panel pueda decirlo en lugar de un
+ * "listo" que no deja rastro de lo que pasó.
+ */
+export async function borrarEdicionAction(datos: unknown): Promise<{
+  ok: boolean;
+  error?: string;
+  borrado?: { mes: string; notas: number; paginas: number; comentarios: number };
+}> {
+  await requerirAdmin();
+
+  try {
+    if (!esObjeto(datos)) throw new Error("Faltan los datos de la edición.");
+    const { slug, confirmacion } = datos;
+
+    if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
+      throw new Error("Falta la edición.");
+    }
+
+    const perdido = await borrarEdicion(
+      slug,
+      textoNoVacio(confirmacion) ? confirmacion.trim() : undefined,
+    );
+
+    /*
+     * Si el administrador estaba PREVISUALIZANDO justo esta, la cookie queda
+     * apuntando a una edición que ya no existe.
+     *
+     * El diario no se rompe —`edicionActualFila()` se cae a la publicada cuando
+     * el slug de la cookie no está— pero la barra de vista previa seguiría
+     * diciendo que está mirando un número que borró. Se limpia acá.
+     */
+    const jar = await cookies();
+    if (jar.get(COOKIE_EDICION)?.value === slug) {
+      jar.delete(COOKIE_EDICION);
+    }
+
+    // El diario entero puede haber cambiado de número: si la borrada era la que
+    // estaba en la calle, ahora sirve la anterior.
+    revalidatePath("/diario");
+    revalidatePath("/archivo");
+    revalidatePath("/buscar");
+    revalidatePath("/admin/ediciones");
+    revalidatePath("/admin");
+    revalidatePath("/", "layout");
+
+    return {
+      ok: true,
+      borrado: {
+        mes: perdido.mes,
+        notas: perdido.notas,
+        paginas: perdido.paginas,
+        comentarios: perdido.comentarios,
+      },
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo borrar la edición.",
     };
   }
 }

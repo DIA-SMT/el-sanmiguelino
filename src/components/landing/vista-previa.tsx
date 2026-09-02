@@ -1,7 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { getCompletas, getIndice } from "@/lib/repos/edicion";
+import {
+  getCompletas,
+  getIndice,
+  getResumenEdicion,
+} from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import type { NotaCompleta } from "@/lib/types";
 
@@ -20,9 +24,33 @@ function arranqueDe(nota: NotaCompleta): string | undefined {
  * mandar a ingresar y de volver después a la nota que se quiso leer.
  */
 export async function VistaPrevia() {
-  const indice = await getIndice();
+  const [edicion, indice] = await Promise.all([
+    getResumenEdicion(),
+    getIndice(),
+  ]);
+
+  /*
+   * Esta pieza no se dibuja si no hay notas escritas que mostrar, y son dos
+   * casos distintos:
+   *
+   * - **La edición se publica como facsímil.** Sus "notas" son las páginas del
+   *   PDF: sin cuerpo, sin foto y con títulos "Página 2". Dibujarlas acá ponía
+   *   "Página 2" como titular de la vista previa del diario.
+   * - **El índice está vacío.** Un facsímil de UNA página no crea ninguna fila
+   *   en `notas` —la página 1 es la tapa y se sirve en /diario— y sin embargo
+   *   la edición sí se puede servir, porque tiene `pdfUrl`. Antes acá se leía
+   *   `indice[0].slug` sin guarda: era un TypeError, o sea un 500 en la puerta
+   *   pública del sitio, con el diario funcionando perfecto por dentro. La
+   *   portada tiene este guard y su comentario dice justamente "un guard que se
+   *   saltea no es un guard"; estas dos piezas de la landing se habían quedado
+   *   afuera.
+   */
+  const primera = edicion.pdf ? undefined : indice[0];
+  if (!primera) return null;
+
   // Sólo la protagonista necesita el cuerpo, para su párrafo de arranque.
-  const [principal] = await getCompletas([indice[0].slug]);
+  const [principal] = await getCompletas([primera.slug]);
+  if (!principal) return null;
   const secundarias = indice.slice(1, 4);
   const arranque = arranqueDe(principal);
 

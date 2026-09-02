@@ -35,9 +35,11 @@ const MAXIMO_BYTES = 50 * 1024 * 1024;
 type Paso =
   | { que: "quieto" }
   | { que: "leyendo" }
-  /** Ya se sabe cuántas páginas tiene, y borra páginas que existen: hay que
-   *  preguntar antes. */
+  /** Ya se sabe cuántas páginas tiene y hay algo que se va a borrar: páginas
+   *  que existen, notas escritas, o las dos cosas. Se pregunta antes. */
   | { que: "confirmar"; archivo: File; paginas: number; sePierden: number }
+  /** Quitar el PDF también borra páginas y comentarios: se pregunta igual. */
+  | { que: "confirmar-quitar" }
   | { que: "subiendo"; porcentaje: number }
   | { que: "guardando" };
 
@@ -59,21 +61,35 @@ export function PdfEdicion({
   mes,
   pdf,
   notasEscritas,
+  comentariosEscritos,
+  comentariosPaginas,
+  laUnicaServible,
 }: {
   slug: string;
   mes: string;
   /** Lo que ya está cargado, si hay algo. */
   pdf: { url: string; paginas: number } | null;
-  /** Notas escritas a mano en esta edición. Con una sola, el PDF no se puede
-   *  cargar: una edición se publica de una forma o de la otra. */
+  /** Notas escritas a mano en esta edición. Cargar el PDF las reemplaza, y por
+   *  eso se cuentan: hay que poder decir cuántas se van. */
   notasEscritas: number;
+  /** Comentarios que cuelgan de esas notas escritas. Se van con ellas. */
+  comentariosEscritos: number;
+  /** Comentarios que cuelgan de las PÁGINAS del PDF: los que se pierden al
+   *  quitarlo. */
+  comentariosPaginas: number;
+  /** Es la única edición que el diario puede servir. Quitarle el PDF la deja
+   *  sin contenido, así que dejaría el sitio sin ningún número. */
+  laUnicaServible: boolean;
 }) {
   const router = useRouter();
   const campo = useRef<HTMLInputElement>(null);
   const [paso, setPaso] = useState<Paso>({ que: "quieto" });
   const [error, setError] = useState<string | null>(null);
 
-  const ocupado = paso.que !== "quieto" && paso.que !== "confirmar";
+  const ocupado =
+    paso.que !== "quieto" &&
+    paso.que !== "confirmar" &&
+    paso.que !== "confirmar-quitar";
 
   function limpiarCampo() {
     // Sin esto, elegir el MISMO archivo dos veces seguidas —después de un
@@ -110,10 +126,18 @@ export function PdfEdicion({
       }
 
       const paginas = await contarPaginas(archivo);
-      // Un PDF más corto que el anterior deja páginas colgadas, y borrarlas
-      // borra sus comentarios. Eso se pregunta antes, no se informa después.
+      /*
+       * Se pregunta antes de subir cuando hay algo que se va a borrar, y hay
+       * dos motivos posibles:
+       *
+       * - **notas escritas**: publicar el número como facsímil las reemplaza;
+       * - **un PDF más largo que el nuevo**: las páginas de más quedan colgadas.
+       *
+       * Los dos se llevan comentarios de vecinos por la cascada, así que
+       * ninguno puede pasar en silencio.
+       */
       const sePierden = pdf ? Math.max(pdf.paginas - paginas, 0) : 0;
-      if (sePierden > 0) {
+      if (sePierden > 0 || notasEscritas > 0) {
         setPaso({ que: "confirmar", archivo, paginas, sePierden });
         return;
       }
@@ -176,6 +200,10 @@ export function PdfEdicion({
         slug,
         url: firma.urlPublica,
         paginas,
+        // Sólo cuando de verdad hay notas escritas. La bandera existe porque el
+        // servidor se niega a mezclar las dos formas de publicar un número, y
+        // acá ya se preguntó cuántas notas y cuántos comentarios se van.
+        reemplazarNotasEscritas: notasEscritas > 0,
       });
       if (!guardado.ok) throw new Error(guardado.error ?? "No se pudo guardar.");
 
@@ -191,7 +219,12 @@ export function PdfEdicion({
     setError(null);
     setPaso({ que: "guardando" });
     try {
-      const res = await quitarPdfEdicionAction(slug);
+      const res = await quitarPdfEdicionAction({
+        slug,
+        // Sólo cuando de verdad hay comentarios que perder. El servidor lo
+        // exige en ese caso y acá ya se preguntó, contándolos.
+        confirmarComentarios: comentariosPaginas > 0,
+      });
       if (!res.ok) throw new Error(res.error ?? "No se pudo quitar el PDF.");
       setPaso({ que: "quieto" });
       router.refresh();
@@ -224,12 +257,57 @@ export function PdfEdicion({
         )}
       </div>
 
-      {notasEscritas > 0 && !pdf ? (
-        <Aviso icono={AlertTriangle} tono="var(--grafico-diario)" sobre="tarjeta">
-          Esta edición tiene {notasEscritas}{" "}
-          {notasEscritas === 1 ? "nota escrita" : "notas escritas"}. Una edición
-          se publica con notas o con el PDF del impreso, no con las dos cosas.
-        </Aviso>
+      {paso.que === "confirmar-quitar" ? (
+        <>
+          <Aviso
+            icono={AlertTriangle}
+            tono="var(--grafico-alerta)"
+            sobre="tarjeta"
+            rol="alert"
+          >
+            Quitar el PDF de {mes} borra sus{" "}
+            <strong className="font-semibold text-panel-tinta">
+              {pdf ? pdf.paginas - 1 : 0}{" "}
+              {pdf && pdf.paginas - 1 === 1 ? "página" : "páginas"} del diario
+            </strong>
+            {comentariosPaginas > 0 ? (
+              <>
+                {" y los "}
+                <strong className="font-semibold text-panel-tinta">
+                  {comentariosPaginas}{" "}
+                  {comentariosPaginas === 1
+                    ? "comentario de un vecino"
+                    : "comentarios de vecinos"}
+                </strong>
+                {" que tienen"}
+              </>
+            ) : null}
+            . El archivo queda en el storage, pero el número se queda sin
+            contenido.{" "}
+            <strong className="font-semibold text-panel-tinta">
+              Si lo que querés es cambiar el archivo por otro, no hace falta
+              quitarlo
+            </strong>
+            : usá Reemplazar el PDF.
+          </Aviso>
+          <div className="flex flex-wrap items-center gap-panel-controles">
+            <button
+              type="button"
+              onClick={() => void quitar()}
+              className={BOTON_DESTRUCTIVO}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Quitar el PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaso({ que: "quieto" })}
+              className={BOTON_QUIETO}
+            >
+              Cancelar
+            </button>
+          </div>
+        </>
       ) : paso.que === "confirmar" ? (
         <>
           <Aviso
@@ -238,14 +316,41 @@ export function PdfEdicion({
             sobre="tarjeta"
             rol="alert"
           >
-            El PDF nuevo tiene {paso.paginas}{" "}
-            {paso.paginas === 1 ? "página" : "páginas"} y el que está cargado
-            tiene {pdf?.paginas}. Se van a borrar {paso.sePierden}{" "}
-            {paso.sePierden === 1 ? "página" : "páginas"} del diario{" "}
-            <strong className="font-semibold text-panel-tinta">
-              y los comentarios que tengan
-            </strong>
-            .
+            {/* Se enumera lo que se pierde, contado. "Se van a borrar datos"
+                obliga a adivinar cuántos, y adivinando nadie decide bien. */}
+            El PDF tiene {paso.paginas}{" "}
+            {paso.paginas === 1 ? "página" : "páginas"}. Al cargarlo se borra:
+            <ul className="mt-1.5 grid gap-0.5">
+              {notasEscritas > 0 && (
+                <li>
+                  las{" "}
+                  <strong className="font-semibold text-panel-tinta">
+                    {notasEscritas}{" "}
+                    {notasEscritas === 1 ? "nota escrita" : "notas escritas"}
+                  </strong>{" "}
+                  de {mes}
+                  {comentariosEscritos > 0 ? (
+                    <>
+                      {" "}
+                      y sus {comentariosEscritos}{" "}
+                      {comentariosEscritos === 1
+                        ? "comentario"
+                        : "comentarios"}
+                    </>
+                  ) : null}
+                </li>
+              )}
+              {paso.sePierden > 0 && (
+                <li>
+                  <strong className="font-semibold text-panel-tinta">
+                    {paso.sePierden}{" "}
+                    {paso.sePierden === 1 ? "página" : "páginas"}
+                  </strong>{" "}
+                  del PDF anterior, que tenía {pdf?.paginas}, y los comentarios
+                  que tengan
+                </li>
+              )}
+            </ul>
           </Aviso>
           <div className="flex flex-wrap items-center gap-panel-controles">
             <button
@@ -254,7 +359,9 @@ export function PdfEdicion({
               className={BOTON_PRIMARIO}
             >
               <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-              Subir igual
+              {notasEscritas > 0
+                ? "Publicar el número como PDF"
+                : "Subir igual"}
             </button>
             <button
               type="button"
@@ -266,51 +373,80 @@ export function PdfEdicion({
           </div>
         </>
       ) : (
-        <div className="flex flex-wrap items-center gap-panel-controles">
-          {/* El input va escondido y lo dispara el botón: un `input[type=file]`
-              suelto se dibuja distinto en cada navegador y no hay forma de que
-              entre en el vocabulario de botones del panel. `sr-only` y no
-              `hidden` para que siga siendo alcanzable por teclado y lo anuncie
-              un lector de pantalla. */}
-          <label className={BOTON_SECUNDARIO}>
-            <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-            {pdf ? "Reemplazar el PDF" : "Cargar el PDF"}
-            <input
-              ref={campo}
-              type="file"
-              accept="application/pdf,.pdf"
-              disabled={ocupado}
-              className="sr-only"
-              onChange={(e) => {
-                const archivo = e.target.files?.[0];
-                if (archivo) void alElegir(archivo);
-              }}
-            />
-          </label>
-
-          {pdf && (
-            <>
-              <a
-                href={pdf.url}
-                target="_blank"
-                rel="noopener"
-                className={BOTON_SECUNDARIO}
-              >
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                Ver el archivo
-              </a>
-              <button
-                type="button"
-                onClick={() => void quitar()}
-                disabled={ocupado}
-                className={BOTON_DESTRUCTIVO}
-              >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                Quitar
-              </button>
-            </>
+        <>
+          {/* El aviso está, pero ya NO reemplaza al botón.
+              Antes sí, y era un callejón: las dos ediciones que existían tenían
+              notas escritas, así que en las dos la única cosa que se veía era
+              este cartel — la carga del PDF quedaba invisible justo donde se la
+              buscaba, y encima no había forma de borrar una nota desde el panel.
+              Ahora el botón se ve siempre y el conflicto se resuelve en la
+              confirmación, contando lo que se va. */}
+          {notasEscritas > 0 && (
+            <Aviso
+              icono={AlertTriangle}
+              tono="var(--grafico-diario)"
+              sobre="tarjeta"
+            >
+              {mes} está armada con {notasEscritas}{" "}
+              {notasEscritas === 1 ? "nota escrita" : "notas escritas"}. Un
+              número se publica con notas o con el PDF del impreso, no con las
+              dos cosas: cargar el PDF las reemplaza.
+            </Aviso>
           )}
-        </div>
+          <div className="flex flex-wrap items-center gap-panel-controles">
+            {/* El input va escondido y lo dispara el botón: un `input[type=file]`
+                suelto se dibuja distinto en cada navegador y no hay forma de que
+                entre en el vocabulario de botones del panel. `sr-only` y no
+                `hidden` para que siga siendo alcanzable por teclado y lo anuncie
+                un lector de pantalla. */}
+            <label className={BOTON_SECUNDARIO}>
+              <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+              {pdf ? "Reemplazar el PDF" : "Cargar el PDF"}
+              <input
+                ref={campo}
+                type="file"
+                accept="application/pdf,.pdf"
+                disabled={ocupado}
+                className="sr-only"
+                onChange={(e) => {
+                  const archivo = e.target.files?.[0];
+                  if (archivo) void alElegir(archivo);
+                }}
+              />
+            </label>
+
+            {pdf && (
+              <>
+                <a
+                  href={pdf.url}
+                  target="_blank"
+                  rel="noopener"
+                  className={BOTON_SECUNDARIO}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  Ver el archivo
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setPaso({ que: "confirmar-quitar" });
+                  }}
+                  disabled={ocupado || laUnicaServible}
+                  title={
+                    laUnicaServible
+                      ? "Es la única edición que el diario puede servir: sin el PDF se queda sin contenido y el sitio sin ningún número."
+                      : undefined
+                  }
+                  className={BOTON_DESTRUCTIVO}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  Quitar
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
 
       {ocupado && (

@@ -43,6 +43,7 @@ export async function Masthead({
   usuario,
   seccionActiva,
   pagina,
+  facsimil = false,
 }: {
   edicion: EdicionResumen;
   secciones: SeccionInfo[];
@@ -50,7 +51,25 @@ export async function Masthead({
   seccionActiva?: string;
   /** Folio de la página. Presente = cabecera interior chica; ausente = tapa. */
   pagina?: number;
+  /**
+   * Lo que se muestra debajo es una página del PDF del impreso.
+   *
+   * **Entonces la bandera no se dibuja, y el folio tampoco.** No es una
+   * decisión estética: el facsímil ES el diario, y trae impresa su propia
+   * bandera y su propio número de página. Dibujar los nuestros encima los
+   * mostraba DOS VECES, uno arriba del otro —"EL SANMIGUELINO" en nuestra
+   * cabecera y "EL SANMIGUELINO" en la hoja, "Pág. 3" y "Pág. 3"— y lo primero
+   * que se lee es un error de maquetación.
+   *
+   * Lo que sí queda es todo lo que el papel no puede tener: la franja
+   * institucional con el tema, el usuario y la puerta al panel, y la barra de
+   * secciones con el buscador y Migue. Eso es cromo de la web, y el foliado
+   * nuestro sigue estando al pie de la hoja, en el pasador de páginas.
+   */
+  facsimil?: boolean;
 }) {
+  // El folio interior es lo único que `pagina` decide, así que en un facsímil
+  // —donde no se dibuja— la distinción tapa/interior no aplica.
   const esInterior = typeof pagina === "number";
   const puedeAdministrar = await esAdmin();
   // El folio va al borde EXTERIOR de la hoja, como en cualquier impreso: en
@@ -91,7 +110,7 @@ export async function Masthead({
           </div>
         </div>
 
-        {esInterior ? (
+        {facsimil ? null : esInterior ? (
           /* Cabecera de página interior: dos filetes finos con el logotipo
              chico en el medio, y debajo el folio y la fecha en los extremos.
              En el papel la tapa es lo único que lleva la bandera grande. */

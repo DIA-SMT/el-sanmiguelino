@@ -67,7 +67,7 @@ const CAMPOS_RESUMEN = {
  * `notas` —la página 1 es la tapa y se sirve en /diario— así que la edición
  * quedaría con el número entero cargado y sin salir nunca, en silencio.
  */
-const TIENE_CONTENIDO = {
+export const TIENE_CONTENIDO = {
   OR: [{ notas: { some: {} } }, { pdfUrl: { not: null } }],
 };
 

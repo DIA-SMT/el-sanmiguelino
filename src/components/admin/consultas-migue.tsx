@@ -1,7 +1,13 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { Info, Search, ShieldCheck } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  Search,
+  ShieldCheck,
+} from "lucide-react";
 import type { ResultadoEnTablero, ResumenMigue } from "@/lib/repos/migue";
 import { cn } from "@/lib/utils";
 import {
@@ -11,6 +17,7 @@ import {
   TABLA,
   ZonaDeTabla,
   clasesDeBoton,
+  clasesDeBotonIcono,
   clasesDeCampo,
 } from "@/components/admin/piezas";
 
@@ -184,6 +191,44 @@ function normalizar(texto: string): string {
  * haga falta buscar sobre las 1.348**, o mirar más de un mes, o compartir un
  * filtro por link, hay que paginar en el servidor con el filtro en la URL.
  */
+/**
+ * Cuántas filas se dibujan de entrada, y cuántas se suman cada vez.
+ *
+ * Existe porque la tabla dibujaba TODAS las filas que llegaban del servidor
+ * —hasta 200— y eso es una tarjeta de diez mil píxeles de alto: el resto del
+ * tablero quedaba abajo de un scroll interminable, que es exactamente el
+ * problema que ya se había resuelto para "Lo que no supimos contestar".
+ *
+ * Treinta entra en una pantalla y media y es el tramo pedido.
+ *
+ * **Esto NO recorta el dato ni la búsqueda.** El buscador y los chips siguen
+ * trabajando sobre las filas enteras que mandó el servidor, así que sus cuentas
+ * siguen siendo exactas; lo único paginado es qué se pinta. Si esto filtrara
+ * sobre lo dibujado, un chip diría 12 y al apretarlo aparecerían 40.
+ */
+const POR_PAGINA = 30;
+
+/**
+ * Qué números dibuja el paginado: los bordes, los vecinos de la actual, y un
+ * hueco donde falten.
+ *
+ * Con dos páginas es "1 2" y sobra la ceremonia, pero con veinte es
+ * "1 … 9 10 11 … 20" y no una fila de veinte botones que se va de la tarjeta.
+ * Se escribe una vez acá y la pantalla no tiene que decidir nada.
+ */
+function tramosDePaginado(actual: number, total: number): (number | "hueco")[] {
+  const cerca = [1, total, actual - 1, actual, actual + 1]
+    .filter((n) => n >= 1 && n <= total)
+    .sort((a, b) => a - b);
+  const unicos = [...new Set(cerca)];
+  const salida: (number | "hueco")[] = [];
+  unicos.forEach((n, i) => {
+    if (i > 0 && n - unicos[i - 1] > 1) salida.push("hueco");
+    salida.push(n);
+  });
+  return salida;
+}
+
 export function ConsultasMigue({
   consultas,
   titulos,
@@ -199,6 +244,31 @@ export function ConsultasMigue({
   const idTabla = useId();
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState<ResultadoEnTablero | null>(null);
+  const [pagina, setPagina] = useState(1);
+
+  /*
+   * Buscar o cambiar de chip vuelve la ventana al principio.
+   *
+   * Sin esto, alguien que bajó hasta la fila 150 y después escribe en el
+   * buscador se queda mirando un resultado de tres filas con la ventana en 150:
+   * no se rompe nada, pero el botón de "mostrar más" desaparece y reaparece sin
+   * motivo aparente. Una búsqueda nueva empieza arriba.
+   *
+   * Va acá y **no en un efecto que mire `busqueda` y `filtro`**: eso es
+   * reaccionar a un cambio que este mismo componente provocó, o sea un render
+   * de más y un estado a medias en el medio. La regla
+   * `react-hooks/set-state-in-effect` lo marca, y tiene razón — el reset es
+   * parte del evento, no una consecuencia que haya que observar.
+   */
+  function buscar(texto: string) {
+    setBusqueda(texto);
+    setPagina(1);
+  }
+
+  function filtrarPor(resultado: ResultadoEnTablero | null) {
+    setFiltro(resultado);
+    setPagina(1);
+  }
 
   /* `>` y no `!==`: si algún día el total llegara mal y fuera menor que lo que
    * hay en la mano, el cartel diría "las últimas 200 de 3", que es peor que no
@@ -257,6 +327,50 @@ export function ConsultasMigue({
    * una sola caja. El "Todas" no se perdió: sigue siendo el primer chip, que es
    * donde de verdad significa algo.
    */
+  const totalPaginas = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
+
+  /*
+   * La página que se muestra es DERIVADA, no el estado crudo.
+   *
+   * El estado guarda en qué página estás, pero la lista de abajo cambia de
+   * tamaño con el buscador: si estabas en la 3 y escribís algo que deja seis
+   * filas, la 3 no existe y la tabla saldría vacía con el paginado diciendo que
+   * hay una sola página. Acotarlo acá lo resuelve sin un efecto que corrija el
+   * estado después de haber dibujado mal.
+   */
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const primeraFila = (paginaActual - 1) * POR_PAGINA;
+
+  const enPantalla = useMemo(
+    () => filtradas.slice(primeraFila, primeraFila + POR_PAGINA),
+    [filtradas, primeraFila],
+  );
+
+  /*
+   * **Páginas numeradas, que REEMPLAZAN las filas.**
+   *
+   * Antes esto fue dos cosas peores, y las dos fallaron por lo mismo. Primero un
+   * scroll infinito con IntersectionObserver: la tanda siguiente llegaba justo
+   * cuando terminabas la anterior, así que bajando de corrido siempre acababas
+   * con la lista entera dibujada. Después un botón de "mostrar más" que había que
+   * apretar: el corte se veía, pero las filas se ACUMULABAN, o sea que a la
+   * tercera vuelta volvías a tener un scroll interminable.
+   *
+   * Un paginado numerado no tiene ninguno de los dos problemas: la tarjeta mide
+   * siempre lo mismo, se sabe cuántas páginas hay, y se puede volver a la 2 sin
+   * recorrer la 1. Es lo que el usuario pidió después de ver las otras dos.
+   *
+   * Al cambiar de página se sube al principio de la tabla: sin eso, apretar "2"
+   * desde el pie deja al lector parado en el final de una página nueva, mirando
+   * las filas más viejas de un tramo que no vio empezar. Va sin desplazamiento
+   * suave a propósito —un salto instantáneo no compite con `prefers-reduced-motion`
+   * ni marea a nadie— y se ubica por el id que la tabla ya tiene.
+   */
+  function irA(destino: number) {
+    setPagina(Math.min(Math.max(destino, 1), totalPaginas));
+    document.getElementById(idTabla)?.scrollIntoView({ block: "start" });
+  }
+
   return (
     /* Una sola escalera vertical para todo el cuerpo de la tarjeta, igual que
        la de las pantallas: antes eran cuatro `mt-` distintos (3, 3, 3, 4 y un 6
@@ -286,7 +400,7 @@ export function ConsultasMigue({
             id={idBuscador}
             type="search"
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => buscar(e.target.value)}
             placeholder="Buscar en las preguntas"
             className={cn(clasesDeCampo("tarjeta"), "pl-9")}
           />
@@ -305,7 +419,7 @@ export function ConsultasMigue({
           <ChipFiltro
             cuenta={porBusqueda.length}
             activo={filtro === null}
-            onClick={() => setFiltro(null)}
+            onClick={() => filtrarPor(null)}
           >
             Todas
           </ChipFiltro>
@@ -317,7 +431,7 @@ export function ConsultasMigue({
               cuenta={cuentas[r]}
               color={COLORES[r]}
               activo={filtro === r}
-              onClick={() => setFiltro(filtro === r ? null : r)}
+              onClick={() => filtrarPor(filtro === r ? null : r)}
             >
               {NOMBRES[r]}
             </ChipFiltro>
@@ -438,8 +552,8 @@ export function ConsultasMigue({
           <button
             type="button"
             onClick={() => {
-              setBusqueda("");
-              setFiltro(null);
+              buscar("");
+              filtrarPor(null);
             }}
             className={`${clasesDeBoton({
               tono: "secundario",
@@ -496,7 +610,7 @@ export function ConsultasMigue({
                   `group` es lo único que se le agrega a la pieza, y es para que
                   la tinta apagada de la fila pueda subir junto con el fondo:
                   ver `Referencia` y la celda de la fecha, acá abajo. */}
-              {filtradas.map((c) => (
+              {enPantalla.map((c) => (
                 <tr key={c.id} className={`${TABLA.fila} group`}>
                   {/* La fecha es un metadato y va en la tinta más apagada, pero
                       `panel-tinta-3` sobre el wash del hover mide 4,42:1 en
@@ -540,6 +654,88 @@ export function ConsultasMigue({
           </table>
         </ZonaDeTabla>
       )}
+
+      {totalPaginas > 1 && (
+        <nav
+          aria-label="Páginas de consultas"
+          className="flex flex-wrap items-center gap-x-2 gap-y-2"
+        >
+          <button
+            type="button"
+            onClick={() => irA(paginaActual - 1)}
+            disabled={paginaActual === 1}
+            className={clasesDeBotonIcono({ sobre: "tarjeta" })}
+            aria-label="Página anterior"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          </button>
+
+          {tramosDePaginado(paginaActual, totalPaginas).map((tramo, i) =>
+            tramo === "hueco" ? (
+              /* El hueco es decorativo: lo que un lector de pantalla necesita
+                 saber es en qué página está y cuántas hay, y eso lo dice el
+                 aria-label de cada número y el anuncio de abajo. */
+              <span
+                key={"hueco-" + i}
+                aria-hidden="true"
+                className="px-1 text-panel-sm text-panel-tinta-3"
+              >
+                …
+              </span>
+            ) : (
+              /* Es el chip del panel, el control que ya existe para "uno de un
+                 conjunto está elegido", así que el paginado no inventa un
+                 estilo. Lo único que se le pisa es la semántica: el chip pone
+                 aria-pressed —que es de interruptor— y una página no se
+                 aprieta, se está en ella. De ahí aria-current="page", que es lo
+                 que un lector de pantalla anuncia como "página actual". */
+              <ChipFiltro
+                key={tramo}
+                activo={tramo === paginaActual}
+                superficie="tarjeta"
+                onClick={() => irA(tramo)}
+                aria-pressed={undefined}
+                aria-current={tramo === paginaActual ? "page" : undefined}
+                aria-label={"Página " + tramo}
+                className="tabular-nums"
+              >
+                {tramo}
+              </ChipFiltro>
+            ),
+          )}
+
+          <button
+            type="button"
+            onClick={() => irA(paginaActual + 1)}
+            disabled={paginaActual === totalPaginas}
+            className={clasesDeBotonIcono({ sobre: "tarjeta" })}
+            aria-label="Página siguiente"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+
+          {/* Qué tramo se está viendo, en números. El paginado dice en qué
+              página estás; esto dice de qué filas se trata, que es lo que hace
+              falta para citarle una consulta a alguien. */}
+          <p className="ml-auto text-panel-xs text-panel-tinta-3 tabular-nums">
+            {primeraFila + 1}–{primeraFila + enPantalla.length} de{" "}
+            {NUMERO.format(filtradas.length)}
+          </p>
+        </nav>
+      )}
+
+      {/*
+        El anuncio de cuántas filas hay a la vista.
+        Va SIEMPRE en el DOM, incluso cuando no quedan más: una región viva que
+        aparece junto con su primer mensaje no se anuncia, porque el lector de
+        pantalla no la tenía vigilada. Y va `polite` para que no interrumpa la
+        lectura de una fila a mitad de camino.
+      */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {filtradas.length === 0
+          ? "Ninguna consulta coincide."
+          : `Página ${paginaActual} de ${totalPaginas}. Consultas ${primeraFila + 1} a ${primeraFila + enPantalla.length} de ${filtradas.length}.`}
+      </p>
     </div>
   );
 }
