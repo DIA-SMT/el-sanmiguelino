@@ -12,6 +12,7 @@ qué no supo contestar Migue.
 | Rol de admin | Tabla `usuarios` desde /admin/usuarios; `CIDITUC_ADMINS` como red anti-lockout (2026-09-01) |
 | Deploy | Vercel |
 | Imágenes | Supabase Storage (decidido el 2026-08-26) |
+| Edición en PDF | Un PDF por edición; cada página del PDF es una hoja del diario (2026-09-01) |
 | Moderación | Los comentarios publican directo; el admin los da de baja |
 
 ## Etapas
@@ -91,6 +92,50 @@ carga el municipio en el entorno, hasta que haya una tabla propia.
 
 **Lo que sigue pendiente del lado del municipio**: registrar el diario en el repo
 `derivador` y cargar las variables en Vercel.
+
+## El diario en PDF (2026-09-01)
+
+Una edición se publica de una de dos formas, nunca de las dos: con **notas
+escritas** —agosto y septiembre— o con el **PDF del impreso**, donde cada página
+del archivo es una hoja del diario. Se carga desde la ficha de la edición, en
+`/admin/ediciones`.
+
+Las dos formas conviven: el diario mira `Edicion.pdfUrl` para decidir qué sirve,
+así que un número viejo se sigue viendo exactamente como salió.
+
+| Tema | Decisión |
+|---|---|
+| Modelo | Cada página del PDF es una fila de `notas` con `pdfPagina`. La página 1 es la tapa y se sirve en `/diario`; las demás en `/nota/<edicion>-p<N>` |
+| Comentarios | Funcionan por página, con el mismo código que una nota: es lo que se gana de que una página SEA una nota |
+| Buscador, Migue y voz | No alcanzan al facsímil: no se extrae texto del PDF |
+| Visor | pdf.js en un canvas, con capa de texto para poder seleccionar y leer con lector de pantalla, más el archivo entero para descargar |
+| Subida | **Del navegador directo a Storage**, con URL firmada de un solo uso |
+
+**Por qué la subida no pasa por el servidor.** En Vercel el cuerpo de un request
+tiene un tope duro de 4,5 MB (y una Server Action, 1 MB por default). El PDF de
+un diario mensual son 10-30 MB: subirlo por una acción andaría en la máquina de
+quien lo programó y fallaría en producción con el primer número de verdad. El
+servidor firma antes y confirma después; la `service_role` no sale de ahí.
+
+**Configuración del bucket, cambiada el 2026-09-01.** El bucket `diario` se había
+creado para fotos y audio, y rechazaba los PDF con un 415 (`invalid_mime_type`).
+Ahora tiene:
+
+- `allowed_mime_types`: se le sumó `application/pdf` a las tres imágenes y al mp3.
+- `file_size_limit`: de 8 MB a **50 MB**.
+
+Los 50 MB son el mismo número que `MAXIMO_BYTES_PDF` en `src/lib/storage.ts` y
+que el tope del panel, y tienen que seguir siendo el mismo: el del bucket es el
+único que no se puede saltear desde el navegador. Las fotos siguen limitadas a
+8 MB por código.
+
+**Verificar**: `npm run verificar:pdf` firma, sube, vuelve a leer los primeros
+cinco bytes y borra. Toca el Storage de verdad y deja el bucket como lo encontró.
+Es lo que encontró el 415 antes de que llegara a producción.
+
+**Lo que falta del lado del municipio**: nada nuevo — las mismas variables de
+Supabase que ya hacían falta. Si el bucket se vuelve a crear alguna vez, hay que
+repetir los dos ajustes de arriba.
 
 ## Fuera de alcance en esta primera vuelta
 
