@@ -13,6 +13,7 @@
     "verificar:cidituc": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-cidituc.mjs",
     "verificar:migue": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-migue.mjs",
     "verificar:voz": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-voz.mjs",
+    "verificar:pdf": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-pdf.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

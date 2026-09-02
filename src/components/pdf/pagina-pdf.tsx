@@ -103,15 +103,22 @@ export function PaginaPdf({
         const vista = hoja.getViewport({ scale: escala * densidad });
 
         const canvas = lienzo.current;
-        const contexto = canvas?.getContext("2d");
-        if (!canvas || !contexto) return;
+        if (!canvas) return;
 
         canvas.width = Math.floor(vista.width);
         canvas.height = Math.floor(vista.height);
         canvas.style.width = "100%";
         canvas.style.height = "auto";
 
-        tarea = hoja.render({ canvas, canvasContext: contexto, viewport: vista });
+        /*
+         * Se le pasa el CANVAS, no su contexto 2D.
+         *
+         * pdf.js 6 acepta las dos formas pero la del contexto es la vieja, y
+         * exige además mandar `canvas: null`: pasar los dos —que es lo que
+         * parece más completo— deja la promesa colgada para siempre, sin error
+         * y con la mitad de la página dibujada. Pasó exactamente eso.
+         */
+        tarea = hoja.render({ canvas, viewport: vista });
         await tarea.promise;
         if (cancelado) return;
 

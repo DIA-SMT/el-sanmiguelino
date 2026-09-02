@@ -26,10 +26,11 @@ const BOTON_DESTRUCTIVO = clasesDeBoton({
 });
 const BOTON_QUIETO = clasesDeBoton({ tono: "fantasma", tamano: "chico" });
 
-/** El mismo tope que valida el servidor en `verificarPdfSubido()`. Acá está
- *  para avisar ANTES de esperar una subida entera, no para reemplazarlo: la
- *  validación que cuenta es la del servidor. */
-const MAXIMO_BYTES = 60 * 1024 * 1024;
+/** El mismo tope que valida el servidor en `verificarPdfSubido()` y el mismo
+ *  que tiene el bucket. Acá está para avisar ANTES de esperar una subida
+ *  entera, no para reemplazarlo: la validación que cuenta es la del bucket, que
+ *  es la única que no se puede saltear desde acá. */
+const MAXIMO_BYTES = 50 * 1024 * 1024;
 
 type Paso =
   | { que: "quieto" }

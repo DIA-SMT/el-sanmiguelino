@@ -621,22 +621,39 @@
      con Ctrl+F y —sobre todo— leer la página con un lector de pantalla, que
      sobre un canvas pelado no tendría absolutamente nada.
 
-     Las reglas son las mínimas del visor de pdf.js. Se escriben acá en lugar de
-     importar "pdfjs-dist/web/pdf_viewer.css" porque ese archivo trae además las
-     capas de anotaciones, formularios y dibujo, que el diario no usa y que
-     traen sus propios colores de sistema. */
+     Son las reglas mínimas del visor de pdf.js, transcriptas. Se escriben acá
+     en lugar de importar "pdfjs-dist/web/pdf_viewer.css" porque ese archivo
+     trae además las capas de anotaciones, formularios y dibujo, que el diario
+     no usa y que traen sus propios colores de sistema.
+
+     **Las tres variables de escala no son opcionales.** pdf.js no le escribe a
+     cada span un `font-size` en píxeles: le escribe `--font-height` y deja que
+     el CSS lo multiplique por `--text-scale-factor`. Sin ellas declaradas, esa
+     multiplicación es inválida, el navegador descarta la regla y cada palabra
+     sale del tamaño por defecto: la capa deja de coincidir con el dibujo y
+     seleccionar una línea marca cualquier otra cosa. Se vio así antes de
+     copiarlas —un titular de 34pt medía 146px en lugar de 550—. */
   .capa-texto {
     position: absolute;
     inset: 0;
     overflow: clip;
     line-height: 1;
+    letter-spacing: normal;
+    word-spacing: normal;
     text-align: initial;
+    text-size-adjust: none;
     transform-origin: 0 0;
     forced-color-adjust: none;
+    z-index: 0;
     /* El texto es transparente y la selección la pinta el navegador: con un
        esquema de color forzado, dejarlo al sistema lo volvería visible encima
        de su propio dibujo. */
     color-scheme: only light;
+    caret-color: CanvasText;
+
+    --min-font-size: 1;
+    --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+    --min-font-size-inv: calc(1 / var(--min-font-size));
   }
 
   .capa-texto :is(span, br) {
@@ -645,6 +662,30 @@
     white-space: pre;
     cursor: text;
     transform-origin: 0% 0%;
+    user-select: text;
+  }
+
+  .capa-texto > :not(.markedContent),
+  .capa-texto .markedContent span:not(.markedContent) {
+    z-index: 1;
+    --font-height: 0;
+    font-size: calc(var(--text-scale-factor) * var(--font-height));
+    --scale-x: 1;
+    --rotate: 0deg;
+    transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+      scale(var(--min-font-size-inv));
+  }
+
+  /* Los envoltorios de contenido marcado no ocupan lugar: sólo agrupan. */
+  .capa-texto .markedContent {
+    display: contents;
+  }
+
+  /* Una figura del PDF con texto alternativo. Se anuncia, pero no se
+     selecciona: no es texto que se pueda copiar. */
+  .capa-texto span[role="img"] {
+    user-select: none;
+    cursor: default;
   }
 
   .capa-texto ::selection {

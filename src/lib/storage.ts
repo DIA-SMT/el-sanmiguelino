@@ -440,12 +440,19 @@ export async function subirAudio(
 /**
  * Tope del PDF que aceptamos.
  *
- * Un diario mensual de 12 a 24 páginas con fotos ronda los 10-30 MB. Sesenta
- * es holgado sin ser cualquier cosa, y sobre todo es un número que el editor
- * ve ANTES de esperar diez minutos de subida: el navegador mide el archivo y
- * avisa en el acto.
+ * Un diario mensual de 12 a 24 páginas con fotos ronda los 10-30 MB, así que
+ * cincuenta es holgado sin ser cualquier cosa.
+ *
+ * **Es el mismo número que el `file_size_limit` del bucket**, y tiene que
+ * seguir siéndolo. Si acá dijera más, el editor esperaría la subida entera de
+ * un archivo que Storage va a rechazar con un 413 al final; si dijera menos,
+ * estaríamos rechazando algo que el bucket acepta. El bucket es el que manda:
+ * es el único tope que no se puede saltear desde el navegador.
+ *
+ * El navegador mide el archivo y avisa en el acto, así que el editor se entera
+ * ANTES de esperar diez minutos de subida.
  */
-const MAXIMO_BYTES_PDF = 60 * 1024 * 1024;
+const MAXIMO_BYTES_PDF = 50 * 1024 * 1024;
 
 /** Debajo de esto no hay diario que valga: es un PDF trunco o un cuerpo de
  *  error guardado con nombre de PDF. */
