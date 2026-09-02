@@ -111,8 +111,19 @@ export async function borrarEdicion(
     );
   }
 
+  /*
+   * `tienePdf` cuenta, y no es un detalle: **un facsímil de una sola página no
+   * tiene ninguna fila en `notas`** —la página 1 es la tapa y se sirve en
+   * /diario— así que sin esto un número entero, cargado y publicable, se borraba
+   * de un click como si estuviera vacío. Apareció probando exactamente ese caso:
+   * la ficha del panel sí pedía el slug (mira `edicion.pdf`) y el servidor no,
+   * o sea que las dos mitades del mismo control no decían lo mismo.
+   */
   const tieneAlgo =
-    estado.notas > 0 || estado.paginas > 0 || estado.comentarios > 0;
+    estado.notas > 0 ||
+    estado.paginas > 0 ||
+    estado.comentarios > 0 ||
+    estado.tienePdf;
   if (tieneAlgo && confirmacion !== estado.slug) {
     throw new Error(
       `Para borrar "${estado.mes}" hay que escribir su slug (${estado.slug}) ` +
