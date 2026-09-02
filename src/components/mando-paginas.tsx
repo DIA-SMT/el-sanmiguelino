@@ -47,6 +47,12 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
 
   // Mantener apretada la flecha (o encadenar gestos) dejaba giros a medio hacer
   const enCurso = useRef(false);
+  // Adónde va el scroll suave que el teclado ya pidió. Sin esto, pulsaciones
+  // encadenadas leen `scrollY` a mitad de la animación: cada una avanza medio
+  // paso, y la decisión de "ya estoy al final" se toma con la posición vieja.
+  // Lleva fecha porque el rumbo caduca: pasada la animación vale `scrollY`,
+  // que además cubre al lector que se movió por otro medio.
+  const rumboTeclado = useRef<{ hacia: number; en: number } | null>(null);
   const pistaAtras = useRef<HTMLDivElement>(null);
   const pistaAdelante = useRef<HTMLDivElement>(null);
 
@@ -100,6 +106,8 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
   // esa cara está en opacity 0 hasta la mitad del giro: no se ve el cambio.
   useEffect(() => {
     anclarEje("nueva");
+    // La hoja nueva aterriza arriba de todo: el rumbo de la vieja no vale acá.
+    rumboTeclado.current = null;
   }, [pathname]);
 
   // El eje de la cara que SALE. `pasar()` cubre el teclado y el gesto, pero las
@@ -127,6 +135,12 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
     return () => document.removeEventListener("pointerdown", alApoyar, true);
   }, []);
 
+  // Las flechas del teclado hacen doble trabajo: desplazan la hoja de a una
+  // pantalla y, recién en el borde, pasan de página. Es lo que pide un mando
+  // de dos botones —el puntero de las gafas de realidad aumentada no tiene
+  // rueda—: con "adelante" solo se recorre la página entera y después se pasa
+  // a la siguiente. Una hoja que entra completa en la pantalla pasa directo,
+  // como antes.
   useEffect(() => {
     function alPresionar(e: KeyboardEvent) {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -143,11 +157,46 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
         return;
       }
 
+      e.preventDefault();
+      // Mientras la hoja gira no se scrollea: la captura de la cara que entra
+      // es en vivo y el desplazamiento se vería adentro del giro.
+      if (enCurso.current) return;
+
       const direccion: DireccionPagina =
         e.key === "ArrowRight" ? "adelante" : "atras";
-      if (!hayDestino(direccion)) return;
-      e.preventDefault();
-      pasar(direccion);
+
+      const tope = Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight,
+      );
+      const rumbo = rumboTeclado.current;
+      const desde =
+        rumbo && performance.now() - rumbo.en < 800
+          ? rumbo.hacia
+          : window.scrollY;
+
+      // El margen de 2px absorbe el redondeo de scrollY en pantallas con zoom
+      const alBorde = direccion === "adelante" ? desde >= tope - 2 : desde <= 2;
+      if (alBorde) {
+        rumboTeclado.current = null;
+        if (hayDestino(direccion)) pasar(direccion);
+        return;
+      }
+
+      // 85% de la pantalla y no 100: el solape deja a la vista el último
+      // renglón leído, como el Av Pág de toda la vida.
+      const paso = window.innerHeight * 0.85;
+      const hacia =
+        direccion === "adelante"
+          ? Math.min(desde + paso, tope)
+          : Math.max(desde - paso, 0);
+      rumboTeclado.current = { hacia, en: performance.now() };
+      window.scrollTo({
+        top: hacia,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
     }
 
     window.addEventListener("keydown", alPresionar);
