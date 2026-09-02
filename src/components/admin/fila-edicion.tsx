@@ -15,6 +15,7 @@ import {
   clasesDeBoton,
   clasesDeCampo,
 } from "@/components/admin/piezas";
+import { PdfEdicion } from "@/components/admin/pdf-edicion";
 import { cn } from "@/lib/utils";
 
 export interface EdicionFila {
@@ -29,7 +30,12 @@ export interface EdicionFila {
   publicaEnTexto: string | null;
   /** De qué se trata el número. null en las ediciones viejas. */
   tema: string | null;
+  /** Filas de `notas`: en una edición con PDF son sus páginas. */
   notas: number;
+  /** De ésas, cuántas son notas escritas a mano. */
+  notasEscritas: number;
+  /** El facsímil del impreso, si el número se publica así. */
+  pdf: { url: string; paginas: number } | null;
   estado: "publicada" | "programada" | "sin_fecha";
 }
 
@@ -200,9 +206,21 @@ export function FilaEdicion({
             </span>
           )}
           <span className="text-panel-xs text-panel-tinta-3">
-            N.º {edicion.numero} · {edicion.notas}{" "}
-            {edicion.notas === 1 ? "nota" : "notas"} ·{" "}
-            <code className="font-mono">{edicion.slug}</code>
+            N.º {edicion.numero} ·{" "}
+            {/* Un número publicado como facsímil no tiene notas: tiene
+                páginas. Contar sus filas de `notas` y llamarlas "12 notas"
+                sería el panel diciendo algo que no existe. */}
+            {edicion.pdf ? (
+              <>
+                {edicion.pdf.paginas}{" "}
+                {edicion.pdf.paginas === 1 ? "página" : "páginas"} en PDF
+              </>
+            ) : (
+              <>
+                {edicion.notas} {edicion.notas === 1 ? "nota" : "notas"}
+              </>
+            )}{" "}
+            · <code className="font-mono">{edicion.slug}</code>
           </span>
         </div>
 
@@ -285,6 +303,18 @@ export function FilaEdicion({
                 </span>
               )}
             </p>
+
+            {/* La carga del PDF va acá abajo y no adentro de "Tema y fecha":
+                no es un dato del número, es CON QUÉ se publica. Y tiene su
+                propio bloque hundido porque lleva estado propio —avance de la
+                subida, confirmaciones, errores— que no tiene nada que ver con
+                el formulario de la fecha. */}
+            <PdfEdicion
+              slug={edicion.slug}
+              mes={edicion.mes}
+              pdf={edicion.pdf}
+              notasEscritas={edicion.notasEscritas}
+            />
 
             <div className="mt-3 flex flex-wrap items-center gap-panel-controles">
               <button

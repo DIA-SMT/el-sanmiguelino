@@ -40,7 +40,16 @@ export type ErrorIngreso =
    * blanco **después** de que la persona se autenticó bien — el peor momento
    * posible para no explicar nada.
    */
-  | "sesion-fallida";
+  | "sesion-fallida"
+  /**
+   * Cidituc dice que la persona es quien dice ser, y el diario decide igual que
+   * no entre.
+   *
+   * Autenticar no es autorizar: el bloqueo es nuestro, no de Cidituc, y por eso
+   * no se le explica al vecino quién lo decidió ni por qué — eso se conversa,
+   * no se pone en una pantalla.
+   */
+  | "bloqueado";
 
 /** Qué ve la persona. El detalle técnico va al log del servidor, no a la pantalla. */
 export const TEXTO_ERROR: Record<ErrorIngreso, string> = {
@@ -60,6 +69,8 @@ export const TEXTO_ERROR: Record<ErrorIngreso, string> = {
     "Había otro ingreso en curso. Cerrá las demás pestañas y probá de nuevo.",
   "sesion-fallida":
     "Cidituc te reconoció, pero no pudimos abrir tu sesión. Avisale a la Dirección de IA.",
+  bloqueado:
+    "Tu cuenta no puede ingresar al diario. Si te parece un error, escribinos.",
 };
 
 /**

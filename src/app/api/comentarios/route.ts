@@ -1,8 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUsuario } from "@/lib/auth/session";
+import { sesionParaParticipar } from "@/lib/auth/dal";
 import { comentariosRepo } from "@/lib/repos/comentarios";
 import { notaExiste } from "@/lib/repos/edicion";
 
+/**
+ * El GET se queda con  y NO pasa por .
+ *
+ * Leer los comentarios de una nota no es participar: son públicos para
+ * cualquiera que tenga sesión, y a alguien bloqueado no se le esconde lo que ya
+ * está publicado — se le impide escribir. El POST de acá abajo y la fila de
+ * votos sí lo chequean, que es donde el bloqueo tiene que morder.
+ */
 export async function GET(request: NextRequest) {
   const usuario = await getUsuario();
   if (!usuario) {
@@ -18,10 +27,17 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const usuario = await getUsuario();
-  if (!usuario) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const sesion = await sesionParaParticipar();
+  if (!sesion.ok) {
+    return NextResponse.json(
+      {
+        error:
+          sesion.motivo === "bloqueado" ? "Cuenta bloqueada" : "No autenticado",
+      },
+      { status: sesion.motivo === "bloqueado" ? 403 : 401 },
+    );
   }
+  const usuario = sesion.usuario;
 
   let body: { notaSlug?: string; texto?: string };
   try {

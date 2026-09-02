@@ -6,6 +6,8 @@ import { CitaPersona } from "@/components/cita-persona";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
 import { HojaDiario } from "@/components/hoja-diario";
+import { PaginaPdf } from "@/components/pdf/pagina-pdf";
+import { DescargarPdf } from "@/components/pdf/descargar-pdf";
 import { BotonEscuchar } from "@/components/voz/boton-escuchar";
 import { textoDeResumenDeTapa } from "@/lib/voz/texto-para-escuchar";
 import {
@@ -36,6 +38,46 @@ export default async function Portada() {
     getResumenEdicion(),
     getIndice(),
   ]);
+
+  /*
+   * El número publicado como facsímil del impreso: la tapa es la página 1 del
+   * PDF y no hay tapa que maquetar.
+   *
+   * La rama sale ACÁ, antes de mirar la primera nota, y no más abajo en el JSX:
+   * todo lo que viene después —el cuerpo de la nota principal, medir la foto,
+   * partir los párrafos— es trabajo sobre una nota escrita que en una edición
+   * de PDF no existe.
+   *
+   * La barra de secciones sigue siendo la de siempre: las páginas del facsímil
+   * son de la sección "Edición impresa", así que la barra muestra Portada y esa
+   * sola entrada, o el tema del número si tiene.
+   */
+  if (edicion.pdf) {
+    return (
+      <ViewTransition {...transicionPagina}>
+        <HojaDiario numeroPagina={1}>
+          <Masthead
+            edicion={edicion}
+            secciones={seccionesDeEdicion(indice)}
+            usuario={usuario}
+          />
+          <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+            <PaginaPdf
+              url={edicion.pdf.url}
+              pagina={1}
+              etiqueta={`Tapa de El Sanmiguelino, ${edicion.mes}`}
+            />
+            <DescargarPdf
+              url={edicion.pdf.url}
+              mes={edicion.mes}
+              paginas={edicion.pdf.paginas}
+            />
+          </main>
+          <SiteFooter />
+        </HojaDiario>
+      </ViewTransition>
+    );
+  }
   // Un administrador puede estar mirando una edición todavía sin notas: la
   // elección automática ya las exige, pero la vista previa no —y no debería,
   // porque justamente sirve para ir viendo cómo queda mientras se arma—.

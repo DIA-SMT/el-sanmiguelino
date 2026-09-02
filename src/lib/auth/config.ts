@@ -52,13 +52,26 @@ export const CIDITUC_CONFIGURADO =
 /**
  * Los `id_persona` de Cidituc que administran el diario, separados por coma.
  *
- * Es la fuente de verdad **provisoria**: Cidituc autentica pero no dice quién es
- * administrador, así que esa lista la pone el municipio hasta que exista una
- * tabla propia. Vacía por default, que es lo correcto — sin nombres cargados no
- * hay ningún administrador.
+ * **Ya no es la fuente provisoria: ahora es la red anti-lockout permanente.**
+ * Desde que existe la tabla `usuarios` y la pantalla `/admin/usuarios`, el rol
+ * normal sale de ahí. Esta lista queda para lo que la tabla no puede cubrir.
+ *
+ * Gana **antes de tocar la base**, y también sobre el bloqueo. Los dos detalles
+ * son el punto: una red que necesita que Supabase responda no es una red, y si
+ * el entorno ganara sólo sobre el rol, a un administrador de esta lista lo
+ * podrían bloquear desde la pantalla y no tendría cómo entrar a desbloquearse.
+ * Con la base caída, o después de un clic equivocado, tiene que seguir habiendo
+ * alguien que pueda entrar a arreglarlo.
+ *
+ * Vacía por default, que es lo correcto — sin nombres cargados el único camino
+ * al panel es la tabla, y la tabla arranca vacía también.
  *
  * Va en el entorno y no en el código para que agregar o sacar a alguien no
  * necesite un commit, y para que la lista no quede publicada en el repositorio.
+ *
+ * Consecuencia visible: a quien esté acá, `/admin/usuarios` no le ofrece cambiar
+ * el rol. No es prolijidad — `permisoDe()` ni le lee la fila, así que la
+ * escritura no tendría ningún efecto.
  */
 export const ADMINS_CIDITUC: ReadonlySet<string> = new Set(
   limpio(process.env.CIDITUC_ADMINS)
@@ -72,8 +85,9 @@ export const ADMINS_CIDITUC: ReadonlySet<string> = new Set(
  * redirect, para no anunciar que existen—.
  *
  * Son tres llaves independientes y en AND: la sesión tiene que venir de un token
- * que validó el backend de Cidituc, el `id_persona` tiene que estar en
- * `CIDITUC_ADMINS`, y además esto tiene que estar prendido. Desplegar el repo tal
- * cual, sin tocar variables: /admin es 404 para todos.
+ * que validó el backend de Cidituc, el permiso resuelto tiene que ser `admin` y
+ * sin bloqueo —de `CIDITUC_ADMINS` o de la tabla `usuarios`, en ese orden—, y
+ * además esto tiene que estar prendido. Desplegar el repo tal cual, sin tocar
+ * variables y con la tabla vacía: /admin es 404 para todos.
  */
 export const ADMIN_HABILITADO = process.env.ADMIN_HABILITADO === "1";

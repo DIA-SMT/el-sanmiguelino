@@ -595,6 +595,63 @@
   }
 
   /* ---------------------------------------------------------------------------
+     La página del facsímil
+
+     Cuando un número se publica como PDF del impreso, adentro de la hoja va la
+     página tal cual salió: un canvas dibujado por pdf.js con la capa de texto
+     encima. Ver src/components/pdf/pagina-pdf.tsx.
+  --------------------------------------------------------------------------- */
+
+  /* La página del PDF **se queda blanca en modo oscuro**, y es a propósito. Es
+     un facsímil: reproduce lo que se imprimió, y el papel del diario es
+     blanco. Invertirlo o teñirlo daría vuelta también las fotos y los avisos,
+     que es mostrar otra cosa y decir que es el diario de ese mes. Lo que sí
+     cambia es el marco —la hoja, la mesa y el resto de la pantalla siguen el
+     tema— así que la página se lee como una hoja apoyada y no como un
+     fogonazo: el borde y la sombra la separan del fondo. */
+  .pagina-pdf {
+    background-color: #fff;
+    border: 1px solid var(--line);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent);
+    overflow: hidden;
+  }
+
+  /* La capa de texto de pdf.js: los caracteres de verdad del PDF, transparentes
+     y ubicados sobre su dibujo. Es lo que permite seleccionar, copiar, buscar
+     con Ctrl+F y —sobre todo— leer la página con un lector de pantalla, que
+     sobre un canvas pelado no tendría absolutamente nada.
+
+     Las reglas son las mínimas del visor de pdf.js. Se escriben acá en lugar de
+     importar "pdfjs-dist/web/pdf_viewer.css" porque ese archivo trae además las
+     capas de anotaciones, formularios y dibujo, que el diario no usa y que
+     traen sus propios colores de sistema. */
+  .capa-texto {
+    position: absolute;
+    inset: 0;
+    overflow: clip;
+    line-height: 1;
+    text-align: initial;
+    transform-origin: 0 0;
+    forced-color-adjust: none;
+    /* El texto es transparente y la selección la pinta el navegador: con un
+       esquema de color forzado, dejarlo al sistema lo volvería visible encima
+       de su propio dibujo. */
+    color-scheme: only light;
+  }
+
+  .capa-texto :is(span, br) {
+    position: absolute;
+    color: transparent;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+  }
+
+  .capa-texto ::selection {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  /* ---------------------------------------------------------------------------
      Tipografía editorial
   --------------------------------------------------------------------------- */
 

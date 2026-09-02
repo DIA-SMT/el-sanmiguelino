@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getUsuario } from "@/lib/auth/session";
+import { sesionParaParticipar } from "@/lib/auth/dal";
 import {
   getCompletas,
   getIndice,
@@ -137,10 +137,17 @@ async function responder(
 }
 
 export async function POST(request: NextRequest) {
-  const usuario = await getUsuario();
-  if (!usuario) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const sesion = await sesionParaParticipar();
+  if (!sesion.ok) {
+    return NextResponse.json(
+      {
+        error:
+          sesion.motivo === "bloqueado" ? "Cuenta bloqueada" : "No autenticado",
+      },
+      { status: sesion.motivo === "bloqueado" ? 403 : 401 },
+    );
   }
+  const usuario = sesion.usuario;
 
   let body: {
     pregunta?: string;

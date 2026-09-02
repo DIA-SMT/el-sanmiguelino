@@ -71,7 +71,7 @@ export default async function AdminComentarios({
         bajada="Se publican directo, como se acordó con el municipio. Dar de baja no borra: el texto y los votos se conservan, y queda guardado quién lo decidió, cuándo y por qué."
       />
 
-      {/* La misma escalera vertical que las otras cuatro pantallas del panel.
+      {/* La misma escalera vertical que las otras cinco pantallas del panel.
           Acá no había ninguna: cada bloque elegía su propio `mt-` —6, 4, 4— y
           la fila de tarjetas de dato respiraba distinto que en `/admin`, con el
           mismo componente en la misma posición. */}

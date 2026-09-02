@@ -9,6 +9,8 @@ import { FiguraNota } from "@/components/figura-nota";
 import { medirImagen } from "@/lib/medir-imagen";
 import { CitaPersona } from "@/components/cita-persona";
 import { HojaDiario } from "@/components/hoja-diario";
+import { PaginaPdf } from "@/components/pdf/pagina-pdf";
+import { DescargarPdf } from "@/components/pdf/descargar-pdf";
 import { ColumnaDelLector } from "@/components/comentarios/columna-del-lector";
 import { CompartirNota } from "@/components/compartir-nota";
 import { BotonEscuchar } from "@/components/voz/boton-escuchar";
@@ -19,6 +21,7 @@ import {
   getIndice,
   getIndiceDe,
   getNota,
+  getPublicadas,
   getResumenEdicion,
 } from "@/lib/repos/edicion";
 import { seccionesDeEdicion, slugificarSeccion } from "@/lib/data/secciones";
@@ -133,6 +136,80 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
       : await getIndiceDe(nota.edicionSlug);
   const numeroPagina =
     indiceDeSuEdicion.findIndex((n) => n.slug === nota.slug) + 2;
+
+  /*
+   * Una página del facsímil del impreso.
+   *
+   * El PDF es el de LA EDICIÓN DE LA NOTA, no el de la que está en la calle: en
+   * el archivo son distintas, y una página de agosto tiene que dibujarse con el
+   * PDF de agosto. Cuando coinciden —todo lo que no es archivo— ya se trajo
+   * arriba y no cuesta una consulta más.
+   *
+   * De acá para abajo no hay cuerpo, ni foto, ni minutos de lectura, ni botón
+   * de escuchar: nada de eso existe en un facsímil. Lo que sí queda es la
+   * columna del lector, porque una página del impreso se comenta igual que una
+   * nota — para eso cada una es una fila de `notas`.
+   */
+  if (nota.pdfPagina) {
+    const suEdicion =
+      nota.edicionSlug === edicion.slug
+        ? edicion
+        : (await getPublicadas()).find((e) => e.slug === nota.edicionSlug);
+
+    // Sin PDF cargado no hay página que dibujar, y entonces cae al camino de
+    // siempre —que muestra una nota vacía— en vez de romper. Es el hueco que
+    // queda mientras se reemplaza el archivo de un número.
+    if (suEdicion?.pdf) {
+      return (
+        <ViewTransition {...transicionPagina}>
+          <HojaDiario
+            numeroPagina={numeroPagina}
+            edicionSlug={nota.edicionSlug}
+          >
+            <Masthead
+              edicion={edicion}
+              secciones={seccionesDeEdicion(indice)}
+              usuario={usuario}
+              seccionActiva={slugificarSeccion(nota.seccion)}
+              pagina={numeroPagina}
+            />
+
+            <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+              <nav aria-label="Volver" className="mb-7">
+                <Link
+                  href="/diario"
+                  transitionTypes={["pagina-atras"]}
+                  className="group inline-flex items-center gap-2 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3 transition-colors hover:text-accent"
+                >
+                  <ArrowLeft
+                    className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-1"
+                    aria-hidden="true"
+                  />
+                  Portada de {edicion.mes}
+                </Link>
+              </nav>
+
+              <PaginaPdf
+                url={suEdicion.pdf.url}
+                pagina={nota.pdfPagina}
+                etiqueta={`Página ${nota.pdfPagina} de El Sanmiguelino, ${suEdicion.mes}`}
+              />
+
+              <DescargarPdf
+                url={suEdicion.pdf.url}
+                mes={suEdicion.mes}
+                paginas={suEdicion.pdf.paginas}
+              />
+
+              <ColumnaDelLector notaSlug={nota.slug} usuario={usuario} />
+            </main>
+
+            <SiteFooter />
+          </HojaDiario>
+        </ViewTransition>
+      );
+    }
+  }
 
   return (
     <>

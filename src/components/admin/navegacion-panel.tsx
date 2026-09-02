@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Newspaper,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { LogoHoja } from "@/components/brand/logos";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -35,6 +36,7 @@ const SECCIONES = [
   { href: "/admin/comentarios", icono: MessageSquare, texto: "Comentarios" },
   { href: "/admin/migue", icono: Sparkles, texto: "Migue" },
   { href: "/admin/suscripciones", icono: Mailbox, texto: "Suscripciones" },
+  { href: "/admin/usuarios", icono: Users, texto: "Usuarios" },
 ] as const;
 
 /**
@@ -165,7 +167,7 @@ function SeccionesConRuta() {
  *
  * **En pantalla angosta no hay cajón ni menú desplegable.** La barra se dobla
  * en dos filas arriba de todo: marca y controles en una, las secciones en una
- * tira que se desplaza en la otra. Un cajón esconde cinco ítems detrás de un
+ * tira que se desplaza en la otra. Un cajón esconde seis ítems detrás de un
  * botón, se lleva puesto el foco del teclado y necesita estado; esto no
  * necesita nada, no tapa el contenido y deja cada sección a un toque. Los tres
  * bloques están una sola vez en el DOM y se reordenan con `order`: duplicarlos

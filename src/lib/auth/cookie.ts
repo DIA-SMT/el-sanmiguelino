@@ -18,8 +18,9 @@ export const SESSION_COOKIE = "sanmiguelino_session";
  * cambió de forma, pero sí de significado: el `id` pasó de ser el
  * `cidituc-demo-001` que repartía el mock a ser el `id_persona` de una persona
  * real. Una sesión emitida por el mock, firmada con el mismo secreto y el mismo
- * nombre de cookie, seguiría validando — y ahora `rolDe()` la mira contra la
- * lista de administradores. Un renglón para que ninguna sobreviva.
+ * nombre de cookie, seguiría validando — y ahora `permisoDe()` la resuelve
+ * contra la lista del entorno y la tabla de usuarios. Un renglón para que
+ * ninguna sobreviva.
  */
 export const VERSION_TOKEN = 2;
 

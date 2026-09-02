@@ -55,6 +55,29 @@ model Edicion {
   /// una edición mal cargada sale el 31 de agosto a la noche.
   publicaEn DateTime?
 
+  /// El PDF del impreso, cuando el número se publica como facsímil.
+  ///
+  /// URL pública del objeto en Storage. `null` = esta edición se arma con notas
+  /// escritas, como agosto y septiembre. **Las dos formas conviven**: el diario
+  /// mira esta columna para decidir qué sirve, así que una edición vieja se
+  /// sigue viendo exactamente como salió. Una edición con PDF, en cambio, no
+  /// tiene notas escritas: sus `notas` son las páginas del PDF (ver
+  /// `Nota.pdfPagina`).
+  ///
+  /// El archivo **no pasa por el servidor**: el navegador lo sube directo a
+  /// Storage con una URL firmada de un solo uso. En Vercel el cuerpo de un
+  /// request tiene un tope duro de 4,5 MB y un diario mensual se lo pasa
+  /// siempre, así que subirlo por una Server Action fallaría en producción y
+  /// andaría en la máquina de quien lo programó.
+  pdfUrl String?
+
+  /// Cuántas páginas tiene ese PDF: el foliado del número.
+  ///
+  /// Se guarda y no se cuenta al leer. Contarlas exige bajar y parsear el PDF
+  /// entero —decenas de megas— y esto se necesita en CADA request para dibujar
+  /// el mando de paso de página.
+  pdfPaginas Int?
+
   notas Nota[]
 
   @@unique([anio, numero])
@@ -64,8 +87,8 @@ model Edicion {
 }
 
 model Nota {
-  id     String @id @default(cuid())
-  slug   String @unique
+  id      String @id @default(cuid())
+  slug    String @unique
   /// Hoy es texto libre, igual que en el mock: las secciones se derivan
   /// agrupando las notas. Convertirlo en tabla cambiaría el orden y los slugs
   /// de /seccion/*, así que es una migración aparte y no ésta.
@@ -95,7 +118,7 @@ model Nota {
   /// resultados corta el fragmento con índices sobre esta misma cadena, así
   /// que no puede normalizarse ni recortarse: tiene que seguir siendo eso.
   /// Quien escriba el cuerpo escribe esto en la misma transacción.
-  textoPlano String
+  textoPlano     String
 
   /// Campos de ImagenNota, aplanados. Son tres columnas y no una tabla porque
   /// es una imagen por nota; la galería no está en el alcance.
@@ -107,6 +130,28 @@ model Nota {
   /// sobrevive a una base: sin esta columna, el número de página cambiaría
   /// solo entre requests.
   orden Int
+
+  /// Qué página del PDF es, cuando la edición se publica como facsímil.
+  ///
+  /// **En una edición con PDF, una página del impreso ES una fila de `notas`, y
+  /// es deliberado.** La alternativa era una tabla propia de páginas, y costaba
+  /// rehacer todo lo que ya cuelga de una nota: los comentarios tienen una clave
+  /// externa contra `notas.slug` —con su ON UPDATE CASCADE—, el foliado sale de
+  /// `orden`, el mando de paso de página se arma con el índice y la moderación
+  /// lista por nota. Una página que no es una nota necesitaría un segundo camino
+  /// para cada una de esas cosas, y comentarios anclados a dos lugares distintos.
+  ///
+  /// Estas filas no las escribe nadie a mano: las crea y las borra la carga del
+  /// PDF, con título "Página N", sin cuerpo y sin texto plano. Sin cuerpo el
+  /// buscador nunca las devuelve, que es lo correcto: de un facsímil no se
+  /// extrae texto (y si el PDF es un escaneo, no hay texto que extraer).
+  ///
+  /// **Empieza en 2.** La página 1 del PDF es la tapa y se sirve en `/diario`,
+  /// que es la página 1 de siempre y nunca llevó comentarios. Así el foliado no
+  /// cambia: la nota k-ésima de la edición sigue siendo la página k+1, o sea que
+  /// acá vale `pdfPagina = orden + 2`. Las dos columnas se escriben juntas en la
+  /// misma transacción; ninguna se deriva de la otra al leer.
+  pdfPagina Int?
 
   edicionId String
   edicion   Edicion @relation(fields: [edicionId], references: [id], onDelete: Cascade)
@@ -128,8 +173,11 @@ model Comentario {
   notaSlug String
   nota     Nota   @relation(fields: [notaSlug], references: [slug], onDelete: Cascade, onUpdate: Cascade)
 
-  /// El autor viene de Cidituc y no hay tabla de usuarios: Cidituc es la
-  /// fuente. El nombre se guarda desnormalizado a propósito — es el nombre con
+  /// El autor viene de Cidituc. Existe la tabla `Usuario` —para el rol y el
+  /// bloqueo— pero acá NO hay clave externa hacia ella: hay `usuarioId` de la
+  /// época del login mock que no corresponden a ningún `id_persona`, y borrar a
+  /// alguien de esa tabla no puede arrastrar los comentarios de un vecino.
+  /// El nombre se guarda desnormalizado a propósito — es el nombre con
   /// el que la persona firmó ese día, y no debería cambiar retroactivamente en
   /// comentarios ya publicados si después se lo cambia en Cidituc.
   usuarioId     String
@@ -220,7 +268,7 @@ model ConsultaMigue {
 /// Las filas son efímeras: se limpian las ventanas viejas.
 model ConsumoMigue {
   /// Hash del id de usuario. Nunca el id.
-  clave String
+  clave     String
   /// El comienzo de la hora, truncado. Dos consultas de la misma hora caen en
   /// la misma fila y el contador es un incremento atómico.
   ventana   DateTime
@@ -243,22 +291,99 @@ model ConsumoMigue {
 /// formulario va a pedir sólo correo y domicilio. Por eso `usuarioId` se
 /// guarda desde ahora: es lo que después permite reconocer al mismo vecino.
 model Suscripcion {
-  id     String @id @default(cuid())
-  nombre String
+  id        String @id @default(cuid())
+  nombre    String
   /// Opcional: hoy la carga la persona, y no es un dato que valga la pena
   /// exigir para recibir un diario.
-  edad   Int?
+  edad      Int?
   /// Único: dos suscripciones al mismo correo son la misma persona apretando
   /// el botón dos veces, no dos ejemplares.
   email     String @unique
   direccion String
 
-  /// De qué sesión salió. Hoy el login es el mock y esto es siempre el mismo
-  /// valor; con Cidituc real pasa a identificar de verdad.
+  /// De qué sesión salió: el `id_persona` de Cidituc desde el 2026-09-01.
+  /// Las filas anteriores a esa fecha traen el id único que repartía el mock,
+  /// así que no identifican a nadie.
   usuarioId String?
 
   fecha DateTime @default(now())
 
   @@index([fecha])
   @@map("suscripciones")
+}
+
+/// Quién entró al diario por Cidituc, y qué puede hacer acá.
+///
+/// Cidituc dice QUIÉN es cada uno; qué puede hacer lo decide esta tabla. La fila
+/// la escribe el callback del ingreso, no la carga nadie a mano: hasta que
+/// alguien entra una primera vez, para el diario esa persona no existe. Como
+/// consecuencia, un administrador cargado en `CIDITUC_ADMINS` que nunca ingresó
+/// **no aparece acá**, y la pantalla del panel tiene que decirlo o su número
+/// miente.
+///
+/// **No hay historial de ingresos, y es deliberado.** Es una sola columna que se
+/// pisa. Guardar cada entrada convertiría esto en un registro de la actividad de
+/// un vecino ante el municipio, que es otra cosa y necesitaría otro permiso — el
+/// mismo argumento por el que `ConsultaMigue` no guarda quién pregunta. Tampoco
+/// se guardan el CUIL ni el DNI que Cidituc devuelve: una lista para cambiar
+/// roles no necesita documentos.
+///
+/// **Sin relaciones hacia `Comentario`, `Voto` ni `Suscripcion`**, a propósito.
+/// Hay `usuarioId` de la época del login mock que no corresponden a ningún
+/// `id_persona`, así que la clave externa fallaría al crearse; y borrar a alguien
+/// de acá no puede arrastrar los comentarios de un vecino.
+model Usuario {
+  /// El `id_persona` de Cidituc ES la clave primaria: acá no va `cuid()`.
+  ///
+  /// Es la única excepción del esquema y tiene motivo: los otros modelos generan
+  /// su id porque nadie de afuera se lo provee, y éste ya viene validado por el
+  /// backend municipal, ya viaja en la sesión y ya está desnormalizado en
+  /// `Comentario.usuarioId`, `Voto.usuarioId` y `Suscripcion.usuarioId`. Con un
+  /// cuid propio harían falta dos claves y un `@unique` sobre la que de verdad
+  /// identifica.
+  id String @id
+
+  /// Nombre y apellido ya juntados, normalizados y recortados, tal como los arma
+  /// el callback. Se pisa en cada ingreso: acá es un espejo de Cidituc.
+  ///
+  /// En `Comentario.usuarioNombre` es exactamente lo contrario, y también a
+  /// propósito: ahí queda congelado, porque es el nombre con el que la persona
+  /// firmó ese día.
+  nombre String
+
+  /// "lector" | "editor" | "admin". Es texto y no enum de Postgres por lo mismo
+  /// que `Comentario.estado` y `ConsultaMigue.resultado`: sumar un rol no puede
+  /// ser una migración con lock de tabla.
+  ///
+  /// Acá el texto suma un argumento que allá no estaba: si la base trae un rol
+  /// que este código todavía no conoce, se cae a "lector" —lo menos— en vez de
+  /// romper. Un enum de Prisma con un valor nuevo tira al deserializar, y eso
+  /// sería una instancia vieja tumbando el ingreso al diario por un permiso.
+  /// La contracara obligatoria vive en `src/lib/auth/roles.ts`: el texto crudo se
+  /// valida contra los roles conocidos, nunca se afirma con `as`.
+  rol String @default("lector")
+
+  /// Columna aparte y NO un cuarto valor de `rol`, porque son dos preguntas
+  /// distintas: qué puede hacer, y si puede entrar. Como valor de `rol` el
+  /// bloqueo borraría el rol que la persona tenía, así que desbloquearla
+  /// obligaría a adivinarlo de nuevo.
+  bloqueado Boolean @default(false)
+
+  /// La última vez que entró. Se pisa; no hay historial (ver arriba).
+  ///
+  /// No es `@updatedAt`: ningún modelo del esquema lo usa, y acá además mentiría.
+  /// `@updatedAt` también se movería cuando un administrador le cambia el rol, o
+  /// sea que la columna diría "entró" cuando en realidad "la tocaron".
+  ultimoIngreso DateTime @default(now())
+
+  /// Rastro del último cambio de rol o de bloqueo, igual que la baja de un
+  /// comentario: una publicación oficial que le saca permisos a alguien tiene que
+  /// poder decir quién lo decidió. No es el historial completo — eso es otra tabla
+  /// y todavía no hace falta.
+  cambiadoPor String?
+  cambiadoEn  DateTime?
+
+  /// El listado del panel: los que entraron hace menos, primero.
+  @@index([ultimoIngreso])
+  @@map("usuarios")
 }

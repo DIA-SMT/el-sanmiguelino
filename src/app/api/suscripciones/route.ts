@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getUsuario } from "@/lib/auth/session";
+import { sesionParaParticipar } from "@/lib/auth/dal";
 import { suscribir } from "@/lib/repos/suscripciones";
 
 /**
@@ -21,10 +21,17 @@ const LARGOS = { nombre: 120, email: 160, direccion: 240 };
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export async function POST(request: NextRequest) {
-  const usuario = await getUsuario();
-  if (!usuario) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const sesion = await sesionParaParticipar();
+  if (!sesion.ok) {
+    return NextResponse.json(
+      {
+        error:
+          sesion.motivo === "bloqueado" ? "Cuenta bloqueada" : "No autenticado",
+      },
+      { status: sesion.motivo === "bloqueado" ? 403 : 401 },
+    );
   }
+  const usuario = sesion.usuario;
 
   let body: {
     nombre?: unknown;

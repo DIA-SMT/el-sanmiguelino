@@ -43,3 +43,8 @@ next-env.d.ts
 
 # claude (config local de cada dev)
 .claude/settings.local.json
+
+# pdf.js: worker, wasm y fuentes que copia `scripts/copiar-pdfjs.mjs` en
+# postinstall. Son cinco megas que ya viven en node_modules y que cambian con
+# la versión del paquete: se generan, no se versionan.
+/public/pdfjs/

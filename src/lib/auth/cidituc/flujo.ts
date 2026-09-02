@@ -9,6 +9,7 @@ import {
 import { validarToken } from "@/lib/auth/cidituc/persona";
 import { urlDelDerivador } from "@/lib/auth/cidituc/derivador";
 import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
+import { registrarIngreso } from "@/lib/repos/usuarios";
 import type { ErrorIngreso } from "@/lib/auth/cidituc/errores";
 import { SESSION_COOKIE, TTL_SESION_SEG } from "@/lib/auth/cookie";
 import { crearToken } from "@/lib/auth/session";
@@ -181,6 +182,26 @@ export async function callbackCidituc(
     // alguien al pie de un comentario, el diario prefiere no nombrarlo.
     "Vecino/a"
   ).slice(0, LARGO_MAXIMO_NOMBRE);
+
+  // El nombre que se guarda es el de arriba —ya normalizado, recortado a 72 y
+  // con el respaldo "Vecino/a"—, no `persona.nombre` crudo: si no, la tabla
+  // guardaría un nombre distinto del que viaja en la cookie.
+  //
+  // Va ANTES de `crearToken()` porque el chequeo de bloqueo tiene que poder
+  // abortar sin haber emitido nada. `registrarIngreso()` no tira nunca: si la
+  // base está caída devuelve `bloqueado: false` y la persona entra igual. La
+  // fila del registro no vale más que el ingreso, y si el ingreso dependiera de
+  // la base, con Supabase caído tampoco podría entrar el administrador que está
+  // en CIDITUC_ADMINS a arreglarlo.
+  const { bloqueado } = await registrarIngreso({ id: persona.id, nombre });
+  if (bloqueado) {
+    // Se borra además la cookie de sesión que pueda haber quedado viva:
+    // `conError()` sólo limpia la del flujo, y con una sesión vigente el proxy
+    // rebota /login → /diario y la persona nunca llega a leer el aviso.
+    const res = conError(request, "bloqueado");
+    res.cookies.set(SESSION_COOKIE, "", { ...OPCIONES_COOKIE, maxAge: 0 });
+    return res;
+  }
 
   // Lo único que puede tirar de acá para abajo, y tira por una sola razón:
   // falta SESSION_SECRET o es corto. Sin este catch sale un 500 en blanco con la

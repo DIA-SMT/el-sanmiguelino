@@ -420,3 +420,192 @@ export async function subirAudio(
 
   return urlPublicaDe(cfg, clave);
 }
+
+/* ------------------------------------------------------------------------
+ * El PDF del impreso
+ *
+ * Acá el archivo **no pasa por el servidor**, y es la única subida del
+ * proyecto que funciona así. La foto de una nota son cientos de kilobytes y
+ * viaja por una Server Action sin problema; el PDF de un diario mensual son
+ * decenas de megas, y en Vercel el cuerpo de un request tiene un tope duro de
+ * 4,5 MB. Una subida por el servidor andaría en la máquina de quien la
+ * programó y fallaría en producción con el primer número de verdad.
+ *
+ * En su lugar: el servidor le pide a Storage una **URL firmada de un solo
+ * uso** para una clave que elige él, y el navegador escribe directo en el
+ * bucket. Lo que sale del servidor es un token acotado a esa única clave y con
+ * vencimiento, no la `service_role`.
+ * --------------------------------------------------------------------- */
+
+/**
+ * Tope del PDF que aceptamos.
+ *
+ * Un diario mensual de 12 a 24 páginas con fotos ronda los 10-30 MB. Sesenta
+ * es holgado sin ser cualquier cosa, y sobre todo es un número que el editor
+ * ve ANTES de esperar diez minutos de subida: el navegador mide el archivo y
+ * avisa en el acto.
+ */
+const MAXIMO_BYTES_PDF = 60 * 1024 * 1024;
+
+/** Debajo de esto no hay diario que valga: es un PDF trunco o un cuerpo de
+ *  error guardado con nombre de PDF. */
+const MINIMO_BYTES_PDF = 1024;
+
+/** Cuánto vive la firma de subida, en segundos. Diez minutos: es lo que puede
+ *  tardar en subir un archivo grande desde una conexión municipal, y no tanto
+ *  como para que un token olvidado en una pestaña sirva mañana. */
+const VIDA_FIRMA_S = 600;
+
+/**
+ * Pide una URL firmada para subir el PDF de una edición.
+ *
+ * **La clave la elige el servidor**, igual que en `subirImagen()` y por la
+ * misma razón: el nombre que trae el archivo lo controla quien sube y puede
+ * llevar acentos, espacios, barras o `..`. Acá pesa además que la firma
+ * autoriza exactamente esa clave y nada más, así que elegirla es la mitad del
+ * control de acceso.
+ *
+ * El sufijo al azar evita pisar el PDF anterior al reemplazarlo: mientras las
+ * cachés y los lectores con la página abierta se ponen al día, el viejo sigue
+ * respondiendo. Queda huérfano en el bucket, que es barato.
+ */
+export async function urlFirmadaParaPdf(edicionSlug: string): Promise<{
+  /** A dónde tiene que hacer el PUT el navegador. Lleva el token adentro. */
+  destino: string;
+  /** Dónde va a quedar el archivo, para guardarlo en la edición. */
+  urlPublica: string;
+}> {
+  const cfg = config();
+  if (!cfg) {
+    throw new Error(
+      "Falta configurar el storage: SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY.",
+    );
+  }
+
+  const sufijo = crypto.randomUUID().slice(0, 8);
+  const clave = `pdf/${saneado(edicionSlug)}-${sufijo}.pdf`;
+
+  const res = await fetch(
+    `${cfg.url}/storage/v1/object/upload/sign/${cfg.bucket}/${clave}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cfg.clave}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ expiresIn: VIDA_FIRMA_S }),
+    },
+  );
+
+  if (!res.ok) {
+    const detalle = await res.text().catch(() => "");
+    // Igual que en las fotos: el mensaje de Supabase se acorta porque puede
+    // traer partes de la petición, y esto va a la pantalla del editor.
+    throw new Error(
+      `Storage no dio permiso para subir (${res.status}). ` +
+        (res.status === 404
+          ? `¿Existe el bucket "${cfg.bucket}"?`
+          : detalle.slice(0, 120)),
+    );
+  }
+
+  // Supabase contesta `{ url: "/object/upload/sign/<bucket>/<clave>?token=…" }`:
+  // una ruta relativa a /storage/v1, no una dirección completa.
+  const cuerpo: unknown = await res.json().catch(() => null);
+  const relativa =
+    esObjetoPlano(cuerpo) && typeof cuerpo.url === "string" ? cuerpo.url : null;
+  if (!relativa) {
+    throw new Error("Storage contestó una firma que no se entiende.");
+  }
+
+  return {
+    destino: `${cfg.url}/storage/v1${relativa}`,
+    urlPublica: urlPublicaDe(cfg, clave),
+  };
+}
+
+function esObjetoPlano(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Comprueba que en esa dirección haya de verdad un PDF, y con cuántos bytes.
+ *
+ * Se llama DESPUÉS de que el navegador subió, antes de guardar la dirección en
+ * la edición. Sin esto el panel estaría creyéndole al cliente que la subida
+ * salió bien, y una edición podría quedar apuntando a un objeto que no existe
+ * —o que existe y no es un PDF— sin que nadie se entere hasta que un lector
+ * abre el diario.
+ *
+ * **Pide los primeros cinco bytes con `Range`, no un HEAD.** Un HEAD sólo
+ * puede mirar el `content-type`, que es el que declaró el navegador al subir:
+ * o sea, lo mismo que estamos tratando de verificar. Cinco bytes cuestan lo
+ * mismo que una cabecera y dicen si el archivo empieza con `%PDF-`, que es lo
+ * que el visor va a necesitar. Es el mismo criterio que `subirImagen()` con
+ * las firmas de las fotos: se valida por los bytes, no por lo que dice quien
+ * sube.
+ *
+ * El tamaño sale de `content-range` (`bytes 0-4/12345678`), que es donde
+ * viaja el total en una respuesta parcial.
+ */
+export async function verificarPdfSubido(
+  url: string,
+): Promise<{ bytes: number | null }> {
+  const cfg = config();
+  // Sin storage configurado no hay nada que verificar, y tampoco había forma
+  // de subir: el llamador nunca llega hasta acá.
+  if (!cfg) throw new Error("Falta configurar el storage.");
+  if (!url.startsWith(`${cfg.url}/storage/v1/object/public/${cfg.bucket}/`)) {
+    // La dirección la manda el cliente. Que tenga que caer dentro de NUESTRO
+    // bucket es lo que impide que una edición del diario municipal termine
+    // sirviendo un archivo alojado en cualquier otro lado.
+    throw new Error("Esa dirección no es del storage del diario.");
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Range: "bytes=0-4" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(ESPERA_CONSULTA_MS),
+    });
+  } catch {
+    throw new Error(
+      "No se pudo confirmar la subida: el storage no contestó a tiempo.",
+    );
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      res.status === 404
+        ? "La subida no quedó guardada: en esa dirección no hay nada."
+        : `El storage contestó ${res.status} al confirmar la subida.`,
+    );
+  }
+
+  const cabeza = new Uint8Array(await res.arrayBuffer());
+  if (String.fromCharCode(...cabeza.slice(0, 5)) !== "%PDF-") {
+    throw new Error(
+      "Lo que se subió no es un PDF. Si le cambiaste la extensión, el " +
+        "contenido sigue siendo el de antes.",
+    );
+  }
+
+  const rango = res.headers.get("content-range");
+  const total = rango?.match(/\/(\d+)$/)?.[1];
+  const bytes = total ? Number(total) : null;
+
+  if (bytes !== null) {
+    if (bytes < MINIMO_BYTES_PDF) {
+      throw new Error(`El archivo subido pesa ${bytes} bytes: está trunco.`);
+    }
+    if (bytes > MAXIMO_BYTES_PDF) {
+      throw new Error(
+        `El PDF pesa ${(bytes / 1024 / 1024).toFixed(1)} MB y el máximo son ` +
+          `${MAXIMO_BYTES_PDF / 1024 / 1024} MB.`,
+      );
+    }
+  }
+
+  return { bytes };
+}

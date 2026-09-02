@@ -9,7 +9,7 @@ qué no supo contestar Migue.
 | Tema | Decisión |
 |---|---|
 | Base de datos | Supabase (Postgres) |
-| Rol de admin | Lista de `id_persona` en `CIDITUC_ADMINS` — Cidituc autentica pero no da roles (2026-09-01) |
+| Rol de admin | Tabla `usuarios` desde /admin/usuarios; `CIDITUC_ADMINS` como red anti-lockout (2026-09-01) |
 | Deploy | Vercel |
 | Imágenes | Supabase Storage (decidido el 2026-08-26) |
 | Moderación | Los comentarios publican directo; el admin los da de baja |
@@ -40,7 +40,7 @@ independientes, todas cerradas por default, en AND:
 | Llave | Default | Efecto si falta |
 |---|---|---|
 | `SESSION_SECRET` | ninguno | en producción la app **tira**: nada se firma |
-| `CIDITUC_ADMINS` | vacía | `rolDe()` devuelve `"lector"` para todo el mundo |
+| `CIDITUC_ADMINS` + tabla `usuarios` | vacías | `permisoDe()` devuelve `"lector"` para todo el mundo |
 | `ADMIN_HABILITADO` | sin setear | `/admin/**` responde 404, no redirect |
 
 Desplegar el repo tal cual, sin tocar variables: `/admin` es 404 para todos.
@@ -298,8 +298,8 @@ como está, sabiendo por qué.
 ## Cómo se entra al panel (decidido el 2026-08-26, revisado el 2026-09-01)
 
 **Una sola regla, igual en desarrollo y en producción**: entra quien tenga sesión
-de Cidituc, esté en `CIDITUC_ADMINS` y con `ADMIN_HABILITADO=1`. Si falta
-cualquiera de las tres, `/admin` responde 404.
+de Cidituc, cuyo permiso resuelto sea `admin` sin bloqueo, y con
+`ADMIN_HABILITADO=1`. Si falta cualquiera de las tres, `/admin` responde 404.
 
 Hasta el 2026-09-01 había una excepción: fuera de producción cualquier sesión
 válida entraba sin rol. Estaba bien fundada mientras existió el mock —un login
@@ -317,6 +317,64 @@ el `id_persona` propio en `CIDITUC_ADMINS`, que es una línea en `.env.local`.
 `rolDe()` sí se tocó, y ahora hace su trabajo: consulta `CIDITUC_ADMINS` en vez
 de devolver `"lector"` siempre. Sigue sin mentir — lo que cambió es que ahora hay
 una verdad que consultar.
+
+## La sección Usuarios (2026-09-01)
+
+`rolDe()` pasó a llamarse **`permisoDe()`** y ahora devuelve tres cosas —rol,
+bloqueo y de dónde salió—, porque el rol y el bloqueo salen de la misma fila y
+pedirlos por separado serían dos consultas o una memo compartida frágil.
+
+De dónde sale el permiso, **en este orden**:
+
+1. **`CIDITUC_ADMINS`**, antes de tocar la base. Dejó de ser la fuente provisoria
+   y pasó a ser la red anti-lockout permanente.
+2. **Sin `DATABASE_URL`, `lector`.** El repo se puede clonar y mirar sin
+   credenciales, y eso incluye poder ingresar.
+3. **La tabla `usuarios`.** Sin fila, `lector`: es alguien que todavía no entró.
+
+### Las decisiones de esta etapa
+
+- **El id es el `id_persona`, no un `cuid()`.** Única excepción del esquema: ya
+  viene validado por el backend municipal, ya viaja en la sesión y ya está
+  desnormalizado en `Comentario`, `Voto` y `Suscripcion`.
+- **El rol es texto y no enum de Postgres.** Sumar un rol no puede ser una
+  migración con lock. Y si la base trae un valor que el código no conoce, cae a
+  `lector` en vez de romper: un enum de Prisma tira al deserializar, y eso sería
+  una instancia vieja tumbando el ingreso al diario por un permiso.
+- **`bloqueado` es columna aparte y no un cuarto rol.** Son dos preguntas
+  distintas: qué puede hacer, y si puede entrar. Como valor de `rol`, el bloqueo
+  borraría el rol que la persona tenía y desbloquearla obligaría a adivinarlo.
+- **No hay historial de ingresos**, una sola columna que se pisa. Guardarlo
+  convertiría esto en un registro de la actividad de un vecino ante el municipio.
+  Tampoco se guardan CUIL, DNI ni correo: una lista para cambiar roles no
+  necesita documentos.
+- **El entorno gana también sobre el bloqueo.** Si ganara sólo sobre el rol, a un
+  administrador de la lista lo podrían bloquear desde la pantalla y no tendría
+  cómo entrar a desbloquearse.
+- **Las reglas anti-lockout viven en el repositorio**, adentro de la misma
+  transacción `Serializable` que la escritura, y no en la pantalla. La pantalla
+  deshabilita para *explicar*. La carrera es real: dos administradores
+  degradándose a la vez se cuentan mutuamente, los dos pasan y quedan cero.
+- **Sólo `lector` y `admin` por ahora.** `editor` existe en el tipo pero ningún
+  camino del código lo mira, así que la pantalla no lo ofrece: un control que
+  guarda un valor que nadie lee es peor que uno que no existe.
+
+### Hasta dónde llega el bloqueo
+
+En tres capas, porque la sesión dura ocho horas y no se renueva sola:
+
+1. **El panel**, vía `sesionActual()`: 404 en el pedido siguiente.
+2. **Las cinco rutas de `/api`**, con `sesionParaParticipar()`: comentar, votar,
+   preguntarle a Migue, suscribirse y pedir audio devuelven **403**. Antes
+   llamaban a `getUsuario()` en directo y salteaban el DAL entero.
+3. **El callback del ingreso**: no se emite sesión nueva, y se borra la que
+   hubiera quedado viva.
+
+**Lo que el bloqueo NO hace todavía**: cortarle la lectura a quien ya tenga
+sesión abierta. Sigue leyendo el diario hasta que se le venza, como mucho ocho
+horas. Chequearlo en `(diario)/layout.tsx` costaría una consulta por vista de
+página de **cada lector**, y quedó fuera de esta etapa. El GET de comentarios
+tampoco lo chequea a propósito: leer lo que ya está publicado no es participar.
 
 ### Dos cosas que aparecieron al verificar
 

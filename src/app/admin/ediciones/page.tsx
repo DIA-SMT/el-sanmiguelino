@@ -29,13 +29,31 @@ export const metadata = { title: "Ediciones" };
  */
 export default async function AdminEdiciones() {
   await requerirAdmin();
-  const [filas, enFoco] = await Promise.all([
+  const [filas, escritasPorEdicion, enFoco] = await Promise.all([
     db().edicion.findMany({
       orderBy: [{ anio: "desc" }, { numero: "desc" }],
       include: { _count: { select: { notas: true } } },
     }),
+    /*
+     * Cuántas notas ESCRITAS tiene cada edición, aparte del total.
+     *
+     * Las dos cuentas hacen falta y no son la misma: en una edición publicada
+     * como facsímil, cada página del PDF es una fila de `notas` (ver
+     * `Nota.pdfPagina`), así que el total diría "12 notas" sobre un número
+     * que no tiene ninguna escrita. Y la carga del PDF necesita saber si hay
+     * notas escritas para no dejar mezclar las dos formas.
+     */
+    db().nota.groupBy({
+      by: ["edicionId"],
+      where: { pdfPagina: null },
+      _count: { _all: true },
+    }),
     edicionEnFoco(),
   ]);
+
+  const escritas = new Map(
+    escritasPorEdicion.map((e) => [e.edicionId, e._count._all]),
+  );
 
   const ahora = new Date();
   // La que el lector ve: la más reciente ya publicada. Se calcula igual que en
@@ -54,6 +72,11 @@ export default async function AdminEdiciones() {
     publicaEnTexto: e.publicaEn ? textoHoraTucuman(e.publicaEn) : null,
     tema: e.tema,
     notas: e._count.notas,
+    notasEscritas: escritas.get(e.id) ?? 0,
+    pdf:
+      e.pdfUrl && e.pdfPaginas
+        ? { url: e.pdfUrl, paginas: e.pdfPaginas }
+        : null,
     estado: !e.publicaEn
       ? "sin_fecha"
       : e.publicaEn <= ahora
@@ -80,7 +103,7 @@ export default async function AdminEdiciones() {
         }
       />
 
-      {/* La misma escalera vertical que las otras cuatro pantallas del panel:
+      {/* La misma escalera vertical que las otras cinco pantallas del panel:
           la pila va en un `grid gap-6` y ningún hijo trae su propio `mt-`. */}
       <div className="grid gap-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

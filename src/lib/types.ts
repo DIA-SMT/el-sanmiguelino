@@ -60,6 +60,11 @@ export interface NotaResumen {
   /** Derivado del cuerpo. Se calcula al ESCRIBIR, no al leer: es lo que
    *  permite que este resumen no necesite el cuerpo. */
   minutosLectura: number;
+  /** Qué página del PDF muestra, si la edición se publica como facsímil del
+   *  impreso. Presente = esto no es una nota escrita sino una página del PDF,
+   *  y se dibuja con el visor en lugar del cuerpo. Empieza en 2: la página 1
+   *  es la tapa y se sirve en /diario. */
+  pdfPagina?: number;
 }
 
 /** La nota entera, para la pantalla que efectivamente la muestra. */
@@ -86,6 +91,13 @@ export interface EdicionResumen {
   /** De qué se trata el número: "Historia de San Miguel de Tucumán".
    *  Ausente en las ediciones viejas, que salieron con secciones. */
   tema?: string;
+  /** El facsímil del impreso, si este número se publica como PDF.
+   *
+   *  Ausente = la edición se arma con notas escritas, como agosto y
+   *  septiembre. Es un objeto y no dos campos sueltos porque los dos van
+   *  juntos o no va ninguno: una URL sin foliado no se puede paginar y un
+   *  foliado sin URL no se puede dibujar. */
+  pdf?: { url: string; paginas: number };
 }
 
 /**

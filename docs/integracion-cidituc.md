@@ -31,7 +31,7 @@ Los nombres de los repos están cruzados: el repo llamado `cidituc` sirve
    la barra de direcciones, ni en el historial, ni en el `Referer`.
 
 Cidituc dice **quién es** la persona. **Qué puede hacer** lo decide el diario:
-el rol sale de `CIDITUC_ADMINS`, no del token.
+el rol sale de la tabla `usuarios` —o de `CIDITUC_ADMINS`, que gana—, nunca del token.
 
 ## Dónde está el código
 
@@ -55,7 +55,7 @@ el rol sale de `CIDITUC_ADMINS`, no del token.
 | `CIDITUC_CALLBACK_URL` | la URL de retorno, idéntica a la registrada en el derivador |
 | `CIDITUC_CLAVE_APP` | la clave del `?next=`; por defecto `sanmiguelino` |
 | `CIDITUC_CA_PEM` | **la válvula de escape del certificado** — ver abajo |
-| `CIDITUC_ADMINS` | los `id_persona` que administran el diario, separados por coma |
+| `CIDITUC_ADMINS` | red anti-lockout: los `id_persona` que administran pase lo que pase, separados por coma |
 | `SESSION_SECRET` | firma nuestra sesión. Sin él, el callback corta con `sesion-fallida` |
 
 Detalle completo en `.env.example`.
@@ -139,7 +139,7 @@ diario. Eso vive en otro repositorio: ver más abajo.
   (empleados municipales) devuelve `{ user: {...} }`. Se aceptan las dos y la
   plana.
 - **El `#` del derivador es obligatorio** (HashRouter). Sin él te expulsa a
-  `ciudaddigital`. Acá lo agrega `inicioCidituc()`, así que
+  `ciudaddigital`. Acá lo agrega `urlDelDerivador()`, así que
   `CIDITUC_DERIVADOR_URL` va con el **origen solo**.
 - **No pedir la clave de firma.** Es HS256: tenerla permite fabricar tokens
   válidos para cualquier persona de cualquier app del municipio. La consulta a
@@ -181,6 +181,7 @@ Vuelven como `/login?error=<código>` y se traducen en `errores.ts`.
 | `cuenta-inactiva` | la persona figura dada de baja en Cidituc |
 | `no-disponible` | no se llegó al backend, o contestó algo raro — mirar los logs |
 | `sesion-fallida` | Cidituc validó pero no pudimos firmar la sesión: falta `SESSION_SECRET` o es corto |
+| `bloqueado` | la persona está bloqueada en la tabla `usuarios`. Es nuestra decisión, no de Cidituc |
 
 Que un intento dé `token-invalido` es, en una prueba con un token basura, el
 **resultado bueno**: distingue "no llegué al backend" de "el backend contestó".

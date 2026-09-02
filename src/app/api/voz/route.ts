@@ -1,5 +1,5 @@
 import { after, NextResponse, type NextRequest } from "next/server";
-import { getUsuario } from "@/lib/auth/session";
+import { sesionParaParticipar } from "@/lib/auth/dal";
 import { edicionEnFoco } from "@/lib/auth/vista-previa";
 import { db } from "@/lib/db";
 import { CLAVE_DE_LA_VOZ } from "@/lib/migue/tope";
@@ -361,10 +361,18 @@ async function corteAntesDeGenerar(): Promise<NextResponse | null> {
  * ese techo es el que también acota al `after` de abajo.
  */
 export async function POST(request: NextRequest) {
-  const usuario = await getUsuario();
-  if (!usuario) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const sesion = await sesionParaParticipar();
+  if (!sesion.ok) {
+    return NextResponse.json(
+      {
+        error:
+          sesion.motivo === "bloqueado" ? "Cuenta bloqueada" : "No autenticado",
+      },
+      { status: sesion.motivo === "bloqueado" ? 403 : 401 },
+    );
   }
+  // Acá no se usa el usuario: alcanza con que haya sesión y no esté bloqueada.
+  // El audio se paga con plata del municipio, así que participar incluye esto.
 
   let body: { que?: unknown; slug?: unknown };
   try {

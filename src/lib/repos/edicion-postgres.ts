@@ -56,7 +56,20 @@ const CAMPOS_RESUMEN = {
   imagenSrc: true,
   imagenAlt: true,
   imagenEpigrafe: true,
+  pdfPagina: true,
 } as const;
+
+/**
+ * Una edición cuenta como número del diario si tiene algo que mostrar.
+ *
+ * Antes la condición era `notas: { some: {} }` a secas, y con el facsímil eso
+ * deja afuera un caso real: un PDF de UNA sola página no crea ninguna fila en
+ * `notas` —la página 1 es la tapa y se sirve en /diario— así que la edición
+ * quedaría con el número entero cargado y sin salir nunca, en silencio.
+ */
+const TIENE_CONTENIDO = {
+  OR: [{ notas: { some: {} } }, { pdfUrl: { not: null } }],
+};
 
 interface FilaResumen {
   slug: string;
@@ -67,6 +80,7 @@ interface FilaResumen {
   imagenSrc: string | null;
   imagenAlt: string | null;
   imagenEpigrafe: string | null;
+  pdfPagina: number | null;
 }
 
 /**
@@ -99,7 +113,24 @@ function aResumen(fila: FilaResumen): NotaResumen {
     bajada: fila.bajada,
     imagen: aImagen(fila),
     minutosLectura: fila.minutosLectura,
+    // Ausente y no `null` cuando no es una página del PDF: el resto del diario
+    // pregunta `nota.pdfPagina &&` para decidir si dibuja el visor en lugar del
+    // cuerpo, igual que hace con `nota.imagen`.
+    ...(fila.pdfPagina === null ? {} : { pdfPagina: fila.pdfPagina }),
   };
+}
+
+/**
+ * El facsímil de una edición, o `undefined`.
+ *
+ * Los dos campos van juntos o no va ninguno: una URL sin foliado no se puede
+ * paginar y un foliado sin URL no se puede dibujar. Que la base pueda
+ * representar media carga —porque son dos columnas y no una— no significa que
+ * el diario tenga que saber dibujar esa mitad.
+ */
+function aPdf(fila: { pdfUrl: string | null; pdfPaginas: number | null }) {
+  if (!fila.pdfUrl || !fila.pdfPaginas) return undefined;
+  return { url: fila.pdfUrl, paginas: fila.pdfPaginas };
 }
 
 /**
@@ -150,7 +181,7 @@ const edicionActualFila = cache(async () => {
       //
       // No esconde el error: el panel sigue marcando "En la calle" sobre
       // agosto, que es donde el error tiene que verse.
-      notas: { some: {} },
+      ...TIENE_CONTENIDO,
     },
     orderBy: { publicaEn: "desc" },
   });
@@ -166,15 +197,15 @@ const edicionActualFila = cache(async () => {
 
 export const edicionPostgresRepo: EdicionRepo = {
   async resumen(): Promise<EdicionResumen> {
-    const { slug, mes, numero, anio, etiqueta, tema } =
-      await edicionActualFila();
+    const fila = await edicionActualFila();
     return {
-      slug,
-      mes,
-      numero,
-      anio,
-      etiqueta: etiqueta ?? undefined,
-      tema: tema ?? undefined,
+      slug: fila.slug,
+      mes: fila.mes,
+      numero: fila.numero,
+      anio: fila.anio,
+      etiqueta: fila.etiqueta ?? undefined,
+      tema: fila.tema ?? undefined,
+      pdf: aPdf(fila),
     };
   },
 
@@ -434,9 +465,9 @@ export const edicionPostgresRepo: EdicionRepo = {
     const filas = await db().edicion.findMany({
       where: {
         publicaEn: { not: null, lte: new Date() },
-        // Con notas: una edición vacía no es un número del diario, y ya se la
-        // excluye de la elección automática por lo mismo.
-        notas: { some: {} },
+        // Con contenido: una edición vacía no es un número del diario, y ya se
+        // la excluye de la elección automática por lo mismo.
+        ...TIENE_CONTENIDO,
       },
       orderBy: { publicaEn: "desc" },
     });
@@ -447,6 +478,7 @@ export const edicionPostgresRepo: EdicionRepo = {
       anio: e.anio,
       etiqueta: e.etiqueta ?? undefined,
       tema: e.tema ?? undefined,
+      pdf: aPdf(e),
     }));
   },
 
@@ -459,7 +491,7 @@ export const edicionPostgresRepo: EdicionRepo = {
    */
   async proxima(): Promise<ProximaEdicion | null> {
     const fila = await db().edicion.findFirst({
-      where: { publicaEn: { gt: new Date() }, notas: { some: {} } },
+      where: { publicaEn: { gt: new Date() }, ...TIENE_CONTENIDO },
       orderBy: { publicaEn: "asc" },
       select: { mes: true, numero: true, publicaEn: true },
     });

@@ -105,7 +105,7 @@ export default async function AdminSuscripciones() {
         )}
       </BannerPanel>
 
-      {/* La misma escalera vertical que las otras cuatro pantallas del panel.
+      {/* La misma escalera vertical que las otras cinco pantallas del panel.
           Acá tampoco había ninguna: dos `mt-6` sueltos que había que acordarse
           de repetir en cada bloque nuevo. */}
       <div className="grid gap-6">

@@ -5,10 +5,19 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { COOKIE_EDICION } from "@/lib/auth/vista-previa";
 import { desdeHoraTucuman } from "@/lib/fecha-edicion";
-import { subirImagen } from "@/lib/storage";
+import {
+  subirImagen,
+  urlFirmadaParaPdf,
+  verificarPdfSubido,
+} from "@/lib/storage";
+import {
+  guardarPdfDeEdicion,
+  quitarPdfDeEdicion,
+} from "@/lib/repos/edicion-pdf";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
 import { comentariosRepo } from "@/lib/repos/comentarios";
+import { cambiarBloqueo, cambiarRol } from "@/lib/repos/usuarios";
 import type { BloqueNota, NotaBorrador } from "@/lib/types";
 
 /**
@@ -370,6 +379,214 @@ export async function subirImagenAction(
     return {
       ok: false,
       error: e instanceof Error ? e.message : "No se pudo subir la foto.",
+    };
+  }
+}
+
+/* ------------------------------------------------------------------ usuarios */
+
+/**
+ * Cambiar el rol o bloquear a alguien.
+ *
+ * Las dos acciones **no repiten las reglas** de quién puede quedar sin permiso:
+ * eso vive adentro de `repos/usuarios.ts`, en la misma transacción que la
+ * escritura. Acá se valida la forma de lo que llega —que es lo que hace toda
+ * acción de este archivo— y se traduce el motivo a algo que un administrador
+ * entienda.
+ *
+ * `requerirAdmin()` va primero y por su cuenta, como en todas: una Server Action
+ * es un endpoint POST con su propia URL y el layout no corre para ella.
+ */
+
+function explicar(motivo: "inexistente" | "es-del-entorno" | "ultimo-admin" | "uno-mismo"): string {
+  switch (motivo) {
+    case "inexistente":
+      return "Esa persona ya no está en la lista.";
+    case "es-del-entorno":
+      return "Su rol viene de CIDITUC_ADMINS, así que se cambia en las variables de entorno y no acá.";
+    case "ultimo-admin":
+      return "Es el último administrador: dejarías al diario sin nadie que pueda entrar al panel.";
+    case "uno-mismo":
+      return "No podés bloquearte a vos mismo.";
+  }
+}
+
+export async function cambiarRolAction(
+  id: unknown,
+  rol: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  const { usuario } = await requerirAdmin();
+
+  try {
+    if (!textoNoVacio(id)) throw new Error("Falta la persona.");
+    // Sólo los roles que la pantalla ofrece hoy. "editor" existe en el tipo pero
+    // ningún camino del código lo mira todavía, así que aceptarlo acá sería
+    // guardar un valor que no hace nada — el defecto que este repo condena por
+    // escrito. Cuando `editor` signifique algo, se suma en el mismo commit.
+    if (rol !== "lector" && rol !== "admin") throw new Error("Rol desconocido.");
+
+    const resultado = await cambiarRol(id, rol, usuario.id);
+    if (!resultado.ok) throw new Error(explicar(resultado.motivo));
+
+    revalidatePath("/admin/usuarios");
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo cambiar el rol.",
+    };
+  }
+}
+
+export async function cambiarBloqueoAction(
+  id: unknown,
+  bloqueado: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  const { usuario } = await requerirAdmin();
+
+  try {
+    if (!textoNoVacio(id)) throw new Error("Falta la persona.");
+    if (typeof bloqueado !== "boolean") throw new Error("Falta qué hacer.");
+
+    const resultado = await cambiarBloqueo(id, bloqueado, usuario.id);
+    if (!resultado.ok) throw new Error(explicar(resultado.motivo));
+
+    revalidatePath("/admin/usuarios");
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo cambiar el acceso.",
+    };
+  }
+}
+
+
+/* ------------------------------------------------------------------------
+ * El PDF del impreso
+ *
+ * Son tres acciones y no una porque la subida no pasa por el servidor: el
+ * archivo va del navegador a Storage, y el servidor sólo firma antes y
+ * confirma después. El porqué está en `urlFirmadaParaPdf()`, en
+ * src/lib/storage.ts — en resumen, en Vercel un request no puede pesar más de
+ * 4,5 MB y el PDF de un diario mensual siempre pesa más.
+ * --------------------------------------------------------------------- */
+
+/**
+ * Primer paso: pedir permiso para subir.
+ *
+ * Devuelve una dirección con un token adentro que autoriza escribir **una sola
+ * clave**, la que elige el servidor, y por diez minutos. Lo que nunca sale de
+ * acá es la `service_role`, que no es una llave de subida sino la llave
+ * maestra del proyecto entero.
+ */
+export async function firmarSubidaPdfAction(edicionSlug: unknown): Promise<{
+  ok: boolean;
+  destino?: string;
+  urlPublica?: string;
+  error?: string;
+}> {
+  await requerirAdmin();
+
+  try {
+    if (!textoNoVacio(edicionSlug) || !SLUG_VALIDO.test(edicionSlug)) {
+      throw new Error("Falta la edición.");
+    }
+    const { destino, urlPublica } = await urlFirmadaParaPdf(edicionSlug);
+    return { ok: true, destino, urlPublica };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof Error ? e.message : "No se pudo preparar la subida.",
+    };
+  }
+}
+
+/**
+ * Tercer paso: el archivo ya está en el bucket, guardarlo en la edición.
+ *
+ * **Confirma contra el storage antes de guardar nada.** Quien llama es nuestro
+ * propio panel, pero lo que dice —"quedó subido acá"— es exactamente lo que no
+ * se puede dar por bueno: si la subida falló a mitad de camino, la edición
+ * quedaría apuntando a un objeto que no existe y el error aparecería recién
+ * cuando un lector abre el diario.
+ *
+ * El número de páginas sí sale del navegador, que es el único que tiene los
+ * bytes. Se valida que sea un entero razonable y nada más: contarlas del lado
+ * del servidor significaría bajar y parsear el PDF entero en cada carga. Quien
+ * miente ahí es un administrador rompiendo su propio número, no un problema de
+ * seguridad — y se ve al toque, porque el diario queda con páginas de más o de
+ * menos.
+ */
+export async function guardarPdfEdicionAction(datos: unknown): Promise<{
+  ok: boolean;
+  error?: string;
+  paginas?: number;
+  borradas?: number;
+}> {
+  await requerirAdmin();
+
+  try {
+    if (!esObjeto(datos)) throw new Error("Faltan los datos del PDF.");
+    const { slug, url, paginas } = datos;
+
+    if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
+      throw new Error("Falta la edición.");
+    }
+    if (!textoNoVacio(url)) throw new Error("Falta la dirección del archivo.");
+
+    // Que esté, que sea un PDF y que pese lo que tiene que pesar. Tira con un
+    // mensaje que dice qué pasó.
+    await verificarPdfSubido(url);
+
+    const resultado = await guardarPdfDeEdicion(slug, url, Number(paginas));
+
+    // El diario entero cambia: la tapa, cada página, el archivo y el índice que
+    // el layout baja al mando de paso de página.
+    revalidatePath("/diario");
+    revalidatePath("/archivo");
+    revalidatePath("/buscar");
+    revalidatePath("/admin/ediciones");
+    revalidatePath("/admin");
+    revalidatePath("/", "layout");
+
+    return { ok: true, ...resultado };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo guardar el PDF.",
+    };
+  }
+}
+
+/** Saca el PDF de la edición. Borra las páginas y sus comentarios; el objeto
+ *  del bucket queda donde está (ver `quitarPdfDeEdicion`). */
+export async function quitarPdfEdicionAction(slug: unknown): Promise<{
+  ok: boolean;
+  error?: string;
+  borradas?: number;
+}> {
+  await requerirAdmin();
+
+  try {
+    if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
+      throw new Error("Falta la edición.");
+    }
+    const { borradas } = await quitarPdfDeEdicion(slug);
+
+    revalidatePath("/diario");
+    revalidatePath("/archivo");
+    revalidatePath("/buscar");
+    revalidatePath("/admin/ediciones");
+    revalidatePath("/admin");
+    revalidatePath("/", "layout");
+
+    return { ok: true, borradas };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo quitar el PDF.",
     };
   }
 }
