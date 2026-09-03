@@ -52,7 +52,20 @@ export default async function Portada() {
    * son de la sección "Edición impresa", así que la barra muestra Portada y esa
    * sola entrada, o el tema del número si tiene.
    */
-  if (edicion.pdf) {
+  /*
+   * La condición no es "¿hay PDF?" sino "¿hay PDF y NADIE cubre la página 1?".
+   *
+   * Una edición digitalizada conserva su PDF —el facsímil sigue estando, a un
+   * botón, en cada página— así que preguntar sólo por `edicion.pdf` mandaba a
+   * la tapa a dibujar la página 1 del archivo aunque estuviera digitalizada, que
+   * es justamente la pantalla ilegible que hay que sacar del teléfono.
+   *
+   * El signo es estructural y no una convención: al digitalizar, la página 1 del
+   * impreso pasa a ser la primera nota de la edición —la tapa del papel ES un
+   * artículo, y esta portada está hecha para mostrar exactamente eso—, mientras
+   * que un facsímil sin digitalizar empieza a numerar en la 2 y deja la 1 acá.
+   */
+  if (edicion.pdf && !indice.some((n) => n.pdfPagina === 1)) {
     return (
       <ViewTransition {...transicionPagina}>
         <HojaDiario numeroPagina={1}>
@@ -181,6 +194,7 @@ export default async function Portada() {
                 <FiguraNota
                   alt={principal.imagen.alt}
                   epigrafe={principal.imagen.epigrafe}
+                  credito={principal.imagen.credito}
                   src={principal.imagen.src}
                   prioridad
                   className="entra entra-2 mt-6"
@@ -199,6 +213,7 @@ export default async function Portada() {
                   <FiguraNota
                     alt={principal.imagen.alt}
                     epigrafe={principal.imagen.epigrafe}
+                  credito={principal.imagen.credito}
                     src={principal.imagen.src}
                     prioridad
                     className="mb-4"

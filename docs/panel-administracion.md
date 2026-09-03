@@ -1384,3 +1384,90 @@ Ahora se lo dice, y también cuando el lector está en la tapa:
 
 Verificado contra el OpenRouter de mentira que el mensaje llega en los dos
 casos. Que el modelo lo aproveche se ve en producción.
+
+## Digitalizar el impreso (2026-09-03)
+
+Una edición publicada como facsímil dibujaba la página entera del PDF en un
+canvas. En un teléfono, una A3 de 842×1191 pt metida en 360 px deja el cuerpo en
+menos de 4 px: ilegible, y con aspecto de PDF pegado sobre un fondo. Y como esas
+filas de `notas` no tenían cuerpo ni texto plano, el buscador, la voz y Migue no
+las alcanzaban: a cualquier pregunta sobre agosto, Migue contestaba —con
+razón— que no tenía el dato.
+
+Ahora el PDF se convierte en las notas que el diario ya sabe maquetar.
+
+### Tres comandos, en este orden
+
+```
+npm run digitalizar -- <archivo.pdf> <carpeta>
+npm run verificar:digitalizacion -- <archivo.pdf> <carpeta>
+npm run cargar:digitalizacion -- <carpeta> --edicion <slug> [--vista-previa]
+```
+
+El primero no toca la base ni la red: escribe un `paginas.json` y las figuras
+recortadas, y ahí se miran antes de que existan en ningún lado. El segundo
+contesta la única pregunta que importa —¿se perdió texto?— y contra el número de
+agosto da **100% de 1.476 palabras**. El tercero escribe, y va aparte a
+propósito: la base de desarrollo y la de producción son la misma, así que entre
+convertir y publicar tiene que haber alguien que mire. `--vista-previa` arma una
+copia con otro slug y sin fecha, que sólo ve un admin que la ponga en foco.
+
+### Dónde vive la inteligencia
+
+`src/lib/pdf/estructura.ts`, y es **puro**: entran las palabras con su posición y
+su tipografía, salen `titulo`, `bajada` y `BloqueNota[]`. No sabe de pdf.js, ni
+de Node, ni del DOM, porque el día que esto se mueva al navegador del panel
+—que es el único lugar con los bytes del archivo, por el tope de 4,5 MB de
+Vercel— tiene que dar exactamente el mismo resultado.
+
+**De ahí no sale una palabra que no esté en el PDF.** El texto se reordena, se
+une y se corta; nunca se escribe.
+
+### Lo que costó un prototipo cada uno
+
+- **Primero la grilla, después las líneas.** La calle entre columnas mide 11 pt y
+  el cuerpo también. Agrupar por altura antes que por columna pega el final de
+  una columna con el principio de la otra: sale texto perfectamente legible que
+  dice cualquier cosa.
+- **Se clasifican grupos, no líneas.** La cita de la intendenta son cuatro
+  líneas y sólo la primera abre comillas.
+- **La posición desambigua lo que el tamaño no.** Poppins-Bold de 10 pt en una
+  columna es un subtítulo; de 9 pt dentro del recuadro es un encabezado de ficha.
+- **El cuerpo es el estilo más GRANDE de los que cargan buena parte de la
+  página**, no el que más caracteres tiene. En las páginas 4 y 5, las fichas y
+  los rótulos suman más texto que el texto. Antes se probó la regularidad del
+  interlineado (la tiró abajo una lista de 70 nombres de plaza, más regular que
+  cualquier prosa) y la justificación (la tiró abajo una ficha justificada). Lo
+  que queda en pie es tipográfico: lo accesorio siempre se compone más chico.
+- **El cuerpo de un diario es un solo texto que corre por todas las columnas**, y
+  lo único que lo corta es la sangría. Todo lo demás —citas, destacados,
+  subtítulos, rótulos— flota encima y espera al próximo corte de párrafo. Antes
+  interrumpían el flujo y partían oraciones al medio en cada cambio de columna.
+
+### Lo que cambió en el resto del diario
+
+- Bloque **`foto`** nuevo (`src/lib/types.ts`): una foto dentro del cuerpo, con
+  epígrafe y crédito. Hacía falta porque las páginas 6 y 7 son galerías de seis
+  fotos y `ImagenNota` es una sola. El `switch` exhaustivo de `derivar.ts` marcó
+  todos los lugares a tocar.
+- **`imagenCredito`** en `notas`: la firma del fotógrafo existía en el papel y no
+  tenía dónde ir. En una publicación oficial la autoría de una foto no se tira.
+- **`pdfPagina = orden + 1`** en una edición digitalizada, contra `orden + 2` en
+  un facsímil sin digitalizar. La diferencia es que la página 1 pasa a ser una
+  fila: la tapa del papel es un artículo, y la portada del diario está hecha para
+  mostrar uno.
+- **El facsímil no se tira.** `VerFacsimil` lo abre en un diálogo desde cada
+  página, con el visor de siempre. La maqueta del impreso —qué tamaño tenía el
+  titular, cómo se cruzaban la infografía y el aviso— es información que la
+  versión web no reproduce, y en una publicación oficial eso es el documento.
+- Las dos ramas que preguntaban "¿hay PDF?" ahora preguntan si la página está
+  digitalizada: en la nota, mirando si tiene cuerpo; en la tapa, mirando si
+  alguna nota cubre la página 1.
+
+### Lo que todavía no hace
+
+- **Las infografías vectoriales no se recortan.** Sólo se extraen las imágenes
+  incrustadas; la línea de tiempo de la página 2 es dibujo vectorial y se pierde
+  como imagen —su texto no, ése está entero—. Para recortarla hay que rasterizar
+  la región, y `@napi-rs/canvas` ya está instalado para cuando se haga.
+- El conversor corre como script, no desde el panel.

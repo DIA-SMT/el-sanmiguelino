@@ -24,6 +24,27 @@ export type BloqueNota =
   /** Frase del propio texto, promovida a destacado. No lleva comillas ni
    *  autor: no es una cita, es el redactor subrayando su propia idea. */
   | { tipo: "destacado"; texto: string }
+  /**
+   * Una foto DENTRO del cuerpo, con su epígrafe.
+   *
+   * Existe por el impreso. `ImagenNota` es la foto de apertura y es una sola,
+   * que alcanza para una nota escrita; pero una página del diario en papel trae
+   * seis fotos con su epígrafe cada una —las páginas de plazas de agosto son
+   * exactamente eso— y sin este bloque no habría dónde ponerlas.
+   *
+   * `credito` es la firma del fotógrafo, que en el impreso va en cuerpo 6
+   * girada contra el borde. Va aparte del epígrafe porque no es lo mismo: el
+   * epígrafe cuenta qué se ve y el crédito dice quién lo sacó, y en una
+   * publicación oficial la autoría de una foto no se mezcla con su descripción.
+   */
+  | {
+      tipo: "foto";
+      /** URL del blob store o ruta bajo /public. */
+      src: string;
+      alt: string;
+      epigrafe?: string;
+      credito?: string;
+    }
   /** Recuadro de datos: un título y una lista de entradas, cada una con su
    *  encabezado en negrita. En el impreso va en un marco de esquinas
    *  redondeadas y en dos columnas. */
@@ -40,6 +61,11 @@ export interface ImagenNota {
   /** ruta bajo /public (ej. "/notas/foto.jpg") o URL del blob store. Si no
    *  hay archivo todavía, se renderiza el placeholder editorial */
   src?: string;
+  /** Quién sacó la foto. Va aparte del epígrafe porque no es lo mismo: el
+   *  epígrafe cuenta qué se ve y el crédito dice de quién es la imagen. En una
+   *  publicación oficial la autoría de una fotografía no se mezcla con su
+   *  descripción ni se omite. */
+  credito?: string;
 }
 
 /**

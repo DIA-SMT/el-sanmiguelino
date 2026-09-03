@@ -56,6 +56,7 @@ const CAMPOS_RESUMEN = {
   imagenSrc: true,
   imagenAlt: true,
   imagenEpigrafe: true,
+  imagenCredito: true,
   pdfPagina: true,
 } as const;
 
@@ -80,6 +81,7 @@ interface FilaResumen {
   imagenSrc: string | null;
   imagenAlt: string | null;
   imagenEpigrafe: string | null;
+  imagenCredito: string | null;
   pdfPagina: number | null;
 }
 
@@ -102,6 +104,7 @@ function aImagen(fila: FilaResumen): ImagenNota | undefined {
     alt: fila.imagenAlt,
     epigrafe: fila.imagenEpigrafe ?? "",
     src: fila.imagenSrc ?? undefined,
+    ...(fila.imagenCredito ? { credito: fila.imagenCredito } : {}),
   };
 }
 
@@ -329,6 +332,7 @@ export const edicionPostgresRepo: EdicionRepo = {
       imagenSrc: imagen?.src ?? null,
       imagenAlt: imagen?.alt ?? null,
       imagenEpigrafe: imagen?.epigrafe ?? null,
+      imagenCredito: imagen?.credito ?? null,
       minutosLectura: minutosDeLectura(cuerpo),
       textoPlano: textoPlanoDe(cuerpo),
     };

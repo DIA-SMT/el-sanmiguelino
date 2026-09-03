@@ -120,11 +120,16 @@ model Nota {
   /// Quien escriba el cuerpo escribe esto en la misma transacción.
   textoPlano     String
 
-  /// Campos de ImagenNota, aplanados. Son tres columnas y no una tabla porque
-  /// es una imagen por nota; la galería no está en el alcance.
+  /// Campos de ImagenNota, aplanados. Son columnas y no una tabla porque es UNA
+  /// imagen por nota: la de apertura. Las demás fotos de una nota viven como
+  /// bloques `foto` dentro de `cuerpo`, que es donde el impreso las pone.
   imagenSrc      String?
   imagenAlt      String?
   imagenEpigrafe String?
+  /// Quién sacó la foto. Aparte del epígrafe a propósito: uno describe la
+  /// imagen y el otro dice de quién es. En el impreso va en cuerpo 6, girada
+  /// contra el borde de la página, y una vez por página.
+  imagenCredito  String?
 
   /// El foliado ("Página 5 de 9") sale de acá. El orden de un array no
   /// sobrevive a una base: sin esta columna, el número de página cambiaría
@@ -141,16 +146,29 @@ model Nota {
   /// lista por nota. Una página que no es una nota necesitaría un segundo camino
   /// para cada una de esas cosas, y comentarios anclados a dos lugares distintos.
   ///
-  /// Estas filas no las escribe nadie a mano: las crea y las borra la carga del
-  /// PDF, con título "Página N", sin cuerpo y sin texto plano. Sin cuerpo el
-  /// buscador nunca las devuelve, que es lo correcto: de un facsímil no se
-  /// extrae texto (y si el PDF es un escaneo, no hay texto que extraer).
+  /// **Una edición con PDF puede estar en uno de dos estados**, y esta columna
+  /// significa lo mismo en los dos: de qué página del impreso salió esta fila.
   ///
-  /// **Empieza en 2.** La página 1 del PDF es la tapa y se sirve en `/diario`,
-  /// que es la página 1 de siempre y nunca llevó comentarios. Así el foliado no
-  /// cambia: la nota k-ésima de la edición sigue siendo la página k+1, o sea que
-  /// acá vale `pdfPagina = orden + 2`. Las dos columnas se escriben juntas en la
-  /// misma transacción; ninguna se deriva de la otra al leer.
+  /// 1. **Sin digitalizar.** Las filas las crea la carga del PDF, con título
+  ///    "Página N", sin cuerpo y sin texto plano; la página se dibuja con el
+  ///    visor. Empieza en 2, porque la 1 es la tapa y se sirve en `/diario`, que
+  ///    es la página 1 de siempre y nunca llevó comentarios. Así el foliado no
+  ///    cambia y vale `pdfPagina = orden + 2`.
+  ///
+  /// 2. **Digitalizada.** Las filas tienen título, bajada, cuerpo y texto plano
+  ///    de verdad, sacados del propio PDF, y la página se maqueta como cualquier
+  ///    nota — que es lo único legible en un teléfono —; el facsímil queda a un
+  ///    botón. Acá la página 1 SÍ es una fila: la tapa del papel es un artículo
+  ///    y la portada del diario está hecha para mostrar uno. Entonces empieza en
+  ///    1 y vale `pdfPagina = orden + 1`.
+  ///
+  /// Lo que distingue un estado del otro es si la fila tiene cuerpo, y no una
+  /// columna nueva: el dato ya está y así no puede desincronizarse. Para saber
+  /// si una EDICIÓN está digitalizada alcanza con preguntar si alguna de sus
+  /// notas cubre la página 1.
+  ///
+  /// Ninguna de las dos columnas se deriva de la otra al leer: se escriben
+  /// juntas en la misma transacción.
   pdfPagina Int?
 
   edicionId String

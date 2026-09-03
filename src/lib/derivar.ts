@@ -50,6 +50,14 @@ export function textoDeBloque(bloque: BloqueNota): string {
         bloque.titulo,
         ...bloque.entradas.flatMap((e) => [e.lead, e.texto]),
       ].join(" ");
+    case "foto":
+      // El epígrafe y el crédito, no el `alt`. El `alt` describe la imagen para
+      // quien no la ve y suele repetir lo que ya dice el epígrafe; meterlo
+      // duplicaría cada foto en el índice y le comería contexto a Migue.
+      //
+      // El crédito SÍ va: "¿de quién son las fotos de las plazas?" es una
+      // pregunta razonable, y la respuesta está impresa en la página.
+      return [bloque.epigrafe, bloque.credito].filter(Boolean).join(" ");
     default: {
       const _exhaustivo: never = bloque;
       return _exhaustivo;

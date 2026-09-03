@@ -107,6 +107,37 @@ function validarBloque(v: unknown, i: number): BloqueNota {
     return { tipo: "ficha", titulo: v.titulo, entradas };
   }
 
+  if (tipo === "foto") {
+    if (!textoNoVacio(v.src)) {
+      throw new Error(
+        `La foto del bloque ${i + 1} no tiene archivo. Subí una imagen o ` +
+          `cambiale el tipo al bloque.`,
+      );
+    }
+    // El `alt` es obligatorio y el epígrafe no, por la misma razón por la que
+    // una cita exige autor: sin `alt`, quien navega con lector de pantalla se
+    // encuentra una foto muda en una publicación del Estado. Si no lo
+    // escribieron, cae el epígrafe, que describe la foto igual de bien.
+    const alt = textoNoVacio(v.alt)
+      ? v.alt
+      : textoNoVacio(v.epigrafe)
+        ? v.epigrafe
+        : null;
+    if (!alt) {
+      throw new Error(
+        `La foto del bloque ${i + 1} no dice qué se ve en ella. Hace falta el ` +
+          `epígrafe o el texto alternativo.`,
+      );
+    }
+    return {
+      tipo: "foto",
+      src: v.src,
+      alt,
+      ...(textoNoVacio(v.epigrafe) ? { epigrafe: v.epigrafe } : {}),
+      ...(textoNoVacio(v.credito) ? { credito: v.credito } : {}),
+    };
+  }
+
   throw new Error(`El bloque ${i + 1} es de un tipo desconocido: "${tipo}".`);
 }
 
@@ -162,6 +193,9 @@ export async function guardarNotaAction(
               alt: imagen.alt,
               epigrafe: textoNoVacio(imagen.epigrafe) ? imagen.epigrafe : "",
               ...(textoNoVacio(imagen.src) ? { src: imagen.src } : {}),
+              ...(textoNoVacio(imagen.credito)
+                ? { credito: imagen.credito }
+                : {}),
             },
           }
         : {}),

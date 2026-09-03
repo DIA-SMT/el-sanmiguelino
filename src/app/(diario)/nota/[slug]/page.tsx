@@ -11,6 +11,7 @@ import { CitaPersona } from "@/components/cita-persona";
 import { HojaDiario } from "@/components/hoja-diario";
 import { PaginaPdf } from "@/components/pdf/pagina-pdf";
 import { DescargarPdf } from "@/components/pdf/descargar-pdf";
+import { VerFacsimil } from "@/components/pdf/ver-facsimil";
 import { ColumnaDelLector } from "@/components/comentarios/columna-del-lector";
 import { CompartirNota } from "@/components/compartir-nota";
 import { BotonEscuchar } from "@/components/voz/boton-escuchar";
@@ -95,6 +96,21 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
           </dl>
         </section>
       );
+    case "foto":
+      /* Una foto dentro del cuerpo. NO cruza las columnas: se queda en la suya
+         y deja que el multicol la acomode. Es lo que convierte una página de
+         galería del impreso —seis fotos con su epígrafe— en dos filas de tres
+         sin una sola línea de layout propia. */
+      return (
+        <FiguraNota
+          src={bloque.src}
+          alt={bloque.alt}
+          epigrafe={bloque.epigrafe ?? ""}
+          credito={bloque.credito}
+          className="my-6"
+          sizes="(min-width: 1100px) 340px, (min-width: 768px) 50vw, 100vw"
+        />
+      );
     default:
       return (
         <p className="texto-diario font-serif text-[0.97rem] leading-[1.72] text-ink">
@@ -138,6 +154,23 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
     indiceDeSuEdicion.findIndex((n) => n.slug === nota.slug) + 2;
 
   /*
+   * La edición DE LA NOTA, que es de donde sale su PDF.
+   *
+   * En el archivo no es la que está en la calle: una página de agosto tiene que
+   * dibujarse con el PDF de agosto. Cuando coinciden —todo lo que no es
+   * archivo— ya se trajo arriba y no cuesta una consulta más.
+   *
+   * Se resuelve acá arriba, y no adentro de la rama del facsímil como estaba,
+   * porque ahora hay DOS lugares que necesitan el PDF: la página sin
+   * digitalizar, que lo dibuja entero, y la digitalizada, que ofrece el botón
+   * para verlo.
+   */
+  const suEdicion =
+    nota.edicionSlug === edicion.slug
+      ? edicion
+      : (await getPublicadas()).find((e) => e.slug === nota.edicionSlug);
+
+  /*
    * Una página del facsímil del impreso.
    *
    * El PDF es el de LA EDICIÓN DE LA NOTA, no el de la que está en la calle: en
@@ -150,12 +183,21 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
    * columna del lector, porque una página del impreso se comenta igual que una
    * nota — para eso cada una es una fila de `notas`.
    */
-  if (nota.pdfPagina) {
-    const suEdicion =
-      nota.edicionSlug === edicion.slug
-        ? edicion
-        : (await getPublicadas()).find((e) => e.slug === nota.edicionSlug);
-
+  /*
+   * `cuerpo.length === 0` es lo que separa una página digitalizada de una que
+   * todavía no lo está.
+   *
+   * Una página del impreso SIN digitalizar no tiene otra cosa que mostrar que
+   * el dibujo del PDF, y es el camino de abajo. Una página digitalizada tiene
+   * título, bajada, texto y fotos de verdad: se dibuja como cualquier nota —que
+   * es lo único que se lee en un teléfono— y el facsímil queda a un botón, con
+   * `VerFacsimil`.
+   *
+   * La condición mira el cuerpo y no una columna nueva a propósito: el dato ya
+   * está y no puede desincronizarse. Una página con cuerpo ES una página
+   * digitalizada, por definición y no por convención.
+   */
+  if (nota.pdfPagina && nota.cuerpo.length === 0) {
     // Sin PDF cargado no hay página que dibujar, y entonces cae al camino de
     // siempre —que muestra una nota vacía— en vez de romper. Es el hueco que
     // queda mientras se reemplaza el archivo de un número.
@@ -278,6 +320,18 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                     fuente={{ que: "nota", slug: nota.slug }}
                   />
                 </div>
+                {/* El facsímil, para una página que salió en papel. Va debajo
+                    de la franja de meta y no dentro: no es un dato de la nota
+                    —cuánto tarda, de qué mes es— sino otra manera de verla. */}
+                {nota.pdfPagina && suEdicion?.pdf && (
+                  <div className="mt-3">
+                    <VerFacsimil
+                      url={suEdicion.pdf.url}
+                      pagina={nota.pdfPagina}
+                      mes={suEdicion.mes}
+                    />
+                  </div>
+                )}
               </header>
 
               {/* La apaisada va arriba, a lo ancho. La vertical entra en el
@@ -288,6 +342,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                 <FiguraNota
                   alt={nota.imagen.alt}
                   epigrafe={nota.imagen.epigrafe}
+                  credito={nota.imagen.credito}
                   src={nota.imagen.src}
                   prioridad
                   className="entra entra-2 mx-auto mt-9 max-w-4xl"
@@ -300,6 +355,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                   <FiguraNota
                     alt={nota.imagen.alt}
                     epigrafe={nota.imagen.epigrafe}
+                  credito={nota.imagen.credito}
                     src={nota.imagen.src}
                     prioridad
                     className="mb-4"

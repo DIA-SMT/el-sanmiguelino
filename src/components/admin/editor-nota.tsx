@@ -65,6 +65,11 @@ const TIPOS: { valor: BloqueNota["tipo"]; nombre: string; ayuda: string }[] = [
     nombre: "Ficha de datos",
     ayuda: "Recuadro con entradas, para consultar y no para leer de corrido.",
   },
+  {
+    valor: "foto",
+    nombre: "Foto",
+    ayuda: "Una foto dentro del texto, con su epígrafe. Para páginas de fotos.",
+  },
 ];
 
 /**
@@ -81,7 +86,14 @@ function convertirBloque(
   tipo: BloqueNota["tipo"],
 ): BloqueNota {
   if (bloque.tipo === tipo) return bloque;
-  const texto = bloque.tipo === "ficha" ? bloque.titulo : bloque.texto;
+  // Qué cuenta como "el texto" de cada tipo: el título de una ficha y el
+  // epígrafe de una foto, que es lo único que un humano escribió ahí.
+  const texto =
+    bloque.tipo === "ficha"
+      ? bloque.titulo
+      : bloque.tipo === "foto"
+        ? (bloque.epigrafe ?? "")
+        : bloque.texto;
 
   switch (tipo) {
     case "cita":
@@ -96,6 +108,11 @@ function convertirBloque(
         titulo: texto,
         entradas: [{ lead: "", texto: "" }],
       };
+    case "foto":
+      // El texto baja a epígrafe y la foto queda sin archivo: convertir un
+      // párrafo en foto no puede inventar una imagen. Se guarda recién cuando
+      // el editor sube una, que es lo que exige `validarBloque`.
+      return { tipo: "foto", src: "", alt: texto, epigrafe: texto };
     default:
       return { tipo, texto };
   }
@@ -243,6 +260,9 @@ export function EditorNota({
   const [imagenEpigrafe, setImagenEpigrafe] = useState(
     nota?.imagen?.epigrafe ?? "",
   );
+  const [imagenCredito, setImagenCredito] = useState(
+    nota?.imagen?.credito ?? "",
+  );
   const [subiendo, setSubiendo] = useState(false);
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
   const [cuerpo, setCuerpo] = useState<BloqueNota[]>(
@@ -310,7 +330,10 @@ export function EditorNota({
    * deja la nota a medio cambiar, y el redactor ve el resultado antes de
    * publicar nada.
    */
-  async function subirFoto(archivo: File) {
+  /** Sube un archivo y devuelve su dirección, o null si falló. No toca ningún
+   *  campo: quién la pidió decide dónde va. Lo usan la foto de apertura y las
+   *  fotos que viven dentro del cuerpo, que son dos destinos distintos. */
+  async function subirArchivo(archivo: File): Promise<string | null> {
     setErrorFoto(null);
     setSubiendo(true);
     try {
@@ -320,16 +343,23 @@ export function EditorNota({
       const res = await subirImagenAction(datos);
       if (!res.ok || !res.url) {
         setErrorFoto(res.error ?? "No se pudo subir la foto.");
-        return;
+        return null;
       }
-      setImagenSrc(res.url);
-      setGuardado(false);
-      setSucio(true);
+      return res.url;
     } catch {
       setErrorFoto("No se pudo hablar con el servidor al subir la foto.");
+      return null;
     } finally {
       setSubiendo(false);
     }
+  }
+
+  async function subirFoto(archivo: File) {
+    const url = await subirArchivo(archivo);
+    if (!url) return;
+    setImagenSrc(url);
+    setGuardado(false);
+    setSucio(true);
   }
 
   function guardar() {
@@ -355,7 +385,12 @@ export function EditorNota({
           // perderlos. Que falte el alt lo decide el servidor, con un mensaje.
           imagen:
             imagenSrc.trim() || imagenAlt.trim() || imagenEpigrafe.trim()
-              ? { src: imagenSrc, alt: imagenAlt, epigrafe: imagenEpigrafe }
+              ? {
+                  src: imagenSrc,
+                  alt: imagenAlt,
+                  epigrafe: imagenEpigrafe,
+                  credito: imagenCredito,
+                }
               : undefined,
         });
         if (!res.ok) {
@@ -614,6 +649,20 @@ export function EditorNota({
               placeholder="La línea que va debajo de la foto, a la vista de todos"
             />
           </div>
+
+          <div className="sm:col-span-2">
+            <label htmlFor="nota-imagen-credito" className={etiqueta}>
+              Crédito
+            </label>
+            <input
+              id="nota-imagen-credito"
+              value={imagenCredito}
+              onChange={(e) => alEditar(setImagenCredito)(e.target.value)}
+              {...sinEnviarConEnter}
+              className={cn(campo, "mt-1.5")}
+              placeholder="Quién sacó la foto"
+            />
+          </div>
         </div>
       </SeccionPanel>
 
@@ -741,6 +790,8 @@ export function EditorNota({
                   bloque={bloque}
                   indice={i}
                   onCambio={(c) => editarBloque(i, c)}
+                  onSubir={subirArchivo}
+                  subiendo={subiendo}
                 />
               </TarjetaPanel>
             </li>
@@ -877,10 +928,15 @@ function CamposBloque({
   bloque,
   indice,
   onCambio,
+  onSubir,
+  subiendo,
 }: {
   bloque: BloqueNota;
   indice: number;
   onCambio: (cambios: Partial<BloqueNota>) => void;
+  /** Sube un archivo y devuelve su dirección. Sólo lo usa el bloque de foto. */
+  onSubir: (archivo: File) => Promise<string | null>;
+  subiendo: boolean;
 }) {
   if (bloque.tipo === "ficha") {
     return (
@@ -971,6 +1027,66 @@ function CamposBloque({
           <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           Agregar entrada
         </button>
+      </div>
+    );
+  }
+
+  if (bloque.tipo === "foto") {
+    return (
+      <div className="mt-3 space-y-3">
+        <input
+          value={bloque.src}
+          onChange={(e) => onCambio({ src: e.target.value })}
+          {...sinEnviarConEnter}
+          aria-label={`Dirección de la foto del bloque ${indice + 1}`}
+          className={campo}
+          placeholder="Dirección de la foto"
+        />
+        <label
+          className={cn(
+            "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-borde-campo px-3 py-1.5 text-[0.78rem] font-medium",
+            subiendo && "opacity-60",
+          )}
+        >
+          {subiendo ? "Subiendo…" : "Reemplazar la foto"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={subiendo}
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) void onSubir(f).then((url) => url && onCambio({ src: url }));
+            }}
+          />
+        </label>
+        <input
+          value={bloque.epigrafe ?? ""}
+          onChange={(e) => onCambio({ epigrafe: e.target.value })}
+          {...sinEnviarConEnter}
+          aria-label={`Epígrafe de la foto del bloque ${indice + 1}`}
+          className={campo}
+          placeholder="Epígrafe: qué se ve en la foto"
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input
+            value={bloque.alt}
+            onChange={(e) => onCambio({ alt: e.target.value })}
+            {...sinEnviarConEnter}
+            aria-label={`Texto alternativo de la foto del bloque ${indice + 1}`}
+            className={campo}
+            placeholder="Texto alternativo"
+          />
+          <input
+            value={bloque.credito ?? ""}
+            onChange={(e) => onCambio({ credito: e.target.value })}
+            {...sinEnviarConEnter}
+            aria-label={`Crédito de la foto del bloque ${indice + 1}`}
+            className={campo}
+            placeholder="Quién la sacó (opcional)"
+          />
+        </div>
       </div>
     );
   }

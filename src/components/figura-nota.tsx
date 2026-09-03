@@ -32,6 +32,10 @@ export async function FiguraNota({
    *  precarga desde el <head> (en Next 16 esto es `preload`, no `priority`) */
   prioridad = false,
   sizes = "(min-width: 1024px) 640px, 100vw",
+  /** Firma del fotógrafo. En el impreso va en cuerpo 6 girada contra el borde
+   *  de la página; acá va debajo del epígrafe, más chica y en versalitas, que
+   *  es como la lleva un diario cuando no puede girarla. */
+  credito,
 }: {
   alt: string;
   epigrafe: string;
@@ -40,6 +44,7 @@ export async function FiguraNota({
   proporcion?: string;
   prioridad?: boolean;
   sizes?: string;
+  credito?: string;
 }) {
   const real = imagenDisponible(src);
   const medidas = real && src ? await medirImagen(src) : null;
@@ -112,6 +117,11 @@ export async function FiguraNota({
           que lo separe. Todo eso lo habíamos puesto nosotros. */}
       <figcaption className="mt-2 font-sans text-[0.68rem] leading-snug text-ink-3 text-pretty">
         {epigrafe}
+        {credito ? (
+          <span className="mt-1 block text-[0.6rem] uppercase tracking-[0.12em] text-ink-3/80">
+            {credito}
+          </span>
+        ) : null}
       </figcaption>
     </figure>
   );

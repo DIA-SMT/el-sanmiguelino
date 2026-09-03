@@ -67,6 +67,7 @@ async function main() {
           imagenSrc: nota.imagen?.src ?? null,
           imagenAlt: nota.imagen?.alt ?? null,
           imagenEpigrafe: nota.imagen?.epigrafe ?? null,
+          imagenCredito: nota.imagen?.credito ?? null,
           // El orden del array es el foliado: la nota i-ésima es la página i+1.
           orden: i,
           edicionId: edicion.id,

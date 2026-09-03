@@ -15,6 +15,9 @@
     "verificar:migue": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-migue.mjs",
     "verificar:voz": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-voz.mjs",
     "verificar:pdf": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-pdf.mjs",
+    "digitalizar": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/digitalizar.mjs",
+    "verificar:digitalizacion": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verificar-digitalizacion.mjs",
+    "cargar:digitalizacion": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/cargar-digitalizacion.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -47,6 +50,7 @@
     "eslint-config-next": "16.3.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "prisma": "^7.9.1",
+    "sharp": "^0.35.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
