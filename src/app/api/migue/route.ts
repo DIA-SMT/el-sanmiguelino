@@ -26,7 +26,10 @@ import {
   respuestaSobreElDiario,
   simplificar,
   type SobreElDiario,
+  ES_PEDIDO_DE_CONTINUACION,
+  paginaPedida,
 } from "@/lib/migue/interpretacion";
+import { notaEnPagina } from "@/lib/data/paginas";
 import {
   textoDeResumenDeNota,
   textoDeResumenDeTapa,
@@ -62,6 +65,17 @@ import {
  * lo menos relacionado con la pregunta.
  */
 const TOPE_CONTEXTO = 24_000;
+
+/**
+ * Lo que suma haber nombrado una página.
+ *
+ * Es deliberadamente enorme, y no es un número mágico sino la traducción de una
+ * idea: **nombrar una página no es una pista sobre el tema, es una dirección.**
+ * Quien escribe "la página 3" ya sabe qué quiere y no hay coincidencia de
+ * palabras que pueda valer más que eso. Un peso chico lo dejaría competir, y
+ * competir es exactamente lo que no tiene que hacer.
+ */
+const PESO_DE_LA_PAGINA = 1000;
 
 
 const STOPWORDS = new Set(
@@ -216,9 +230,40 @@ export async function POST(request: NextRequest) {
       : undefined,
     archivo: publicadas.filter((e) => e.slug !== edicion.slug).map((e) => e.mes),
   };
-  const tokens = tokenizar(pregunta);
   // Lo que miran los atajos: sin tildes y en minúscula. Ver simplificar().
   const simple = simplificar(pregunta);
+
+  /*
+   * De qué se está hablando, para buscar.
+   *
+   * Casi siempre es la propia pregunta. La excepción es un pedido de
+   * continuación —"de nuevo", "otra vez"—, que no trae tema: el tema quedó en
+   * el mensaje anterior. Sin esto, "de nuevo" se buscaba como si fuera un tema
+   * y el token `nuevo` puntuaba contra "Pensar de nuevo los espacios públicos",
+   * así que Migue cambiaba de nota en mitad de la conversación.
+   *
+   * El texto que se le manda al modelo sigue siendo el que escribió la persona;
+   * lo único que se toma prestado del turno anterior es CONTRA QUÉ buscar.
+   */
+  const anterior = [...historial]
+    .reverse()
+    .find((t) => t.rol === "usuario" && !ES_PEDIDO_DE_CONTINUACION(simplificar(t.texto)));
+  const paraBuscar =
+    ES_PEDIDO_DE_CONTINUACION(simple) && anterior ? anterior.texto : pregunta;
+  const tokens = tokenizar(paraBuscar);
+
+  /*
+   * La página que nombró el lector, si nombró alguna.
+   *
+   * Es una referencia EXACTA y por eso gana a cualquier puntaje: quien escribe
+   * "la página 3" no está describiendo un tema, está señalando una hoja. El
+   * foliado del diario coincide con el del impreso, así que el número que ve al
+   * pie de la hoja y el que está impreso en el papel son el mismo.
+   */
+  const numeroPedido = paginaPedida(simplificar(paraBuscar));
+  const notaPedida = numeroPedido
+    ? notaEnPagina(indice, numeroPedido)
+    : null;
 
   /**
    * Los atajos deterministas sólo valen para el PRIMER mensaje.
@@ -277,10 +322,13 @@ export async function POST(request: NextRequest) {
    * El texto sale de `indice`, que ya está pedido arriba y trae la bajada: no
    * hace falta `getCompletas()` ni una consulta más.
    */
-  if (PIDE_QUE_LE_LEA(simple)) {
-    const abierta = body.notaSlug
-      ? indice.find((n) => n.slug === body.notaSlug)
-      : undefined;
+  if (PIDE_QUE_LE_LEA(simple) || (notaPedida && PIDE_AUDIO_DE_OTRA_NOTA(simple))) {
+    // Si nombró una página, esa manda: es una referencia exacta y le gana tanto
+    // a la nota abierta como a cualquier puntaje. "Leeme la página 3" desde la
+    // página 5 quiere la 3, no la 5.
+    const abierta =
+      notaPedida ??
+      (body.notaSlug ? indice.find((n) => n.slug === body.notaSlug) : undefined);
 
     if (abierta) {
       return responder(
@@ -404,11 +452,41 @@ export async function POST(request: NextRequest) {
      * Va DESPUÉS de buscar por tema: si el mensaje nombra una nota, esa gana.
      * "Dame un audio de la peatonal" en medio de una charla sobre el bacheo
      * tiene que leer la peatonal.
+     *
+     * **Y sólo vale si el mensaje NO trae destinatario propio**, que es la
+     * corrección que costó dos lecturas equivocadas en producción. El
+     * respaldo daba por sentado que si el tema no puntúa es porque no se nombró
+     * ninguna nota; con una referencia por número de página esa suposición se
+     * rompe, porque el mensaje SÍ nombra un destino y lo único que pasa es que
+     * la ruta no supo resolverlo. Ante "resumime en audio la 3ra pagina" Migue
+     * leyó en voz alta la última nota citada —la página 7— dos veces seguidas,
+     * y el lector escuchó un artículo entero que no tenía nada que ver.
+     *
+     * Eso contradice de frente la regla escrita más arriba en este mismo
+     * archivo: **si no hay una nota claramente mejor, NO se lee**. En pantalla
+     * un desacierto se ve de un vistazo; hablado hay que escucharlo entero.
      */
     const ultima =
-      typeof body.ultimaNota === "string"
+      typeof body.ultimaNota === "string" && numeroPedido === null
         ? indice.find((n) => n.slug === body.ultimaNota)
         : undefined;
+
+    /*
+     * Nombró una página que no existe. Se lo decimos, en vez de leerle otra.
+     *
+     * Es la diferencia entre "no tengo eso" y leerle treinta segundos de una
+     * nota equivocada, y en una publicación oficial no son lo mismo.
+     */
+    if (numeroPedido !== null && !notaPedida) {
+      return responder(
+        "sin_respuesta",
+        `Esta edición de ${edicion.mes} tiene ${indice.length} ` +
+          `${indice.length === 1 ? "página" : "páginas"}, así que no encuentro ` +
+          `la ${numeroPedido}. Decime otro número y te la leo.`,
+        { pregunta, contextoSlug: body.notaSlug },
+      );
+    }
+
     if (ultima) {
       return responder(
         "leer",
@@ -440,6 +518,7 @@ export async function POST(request: NextRequest) {
     const propios = new Set(tokenizar(textoDeNota(nota)));
     let puntaje = tokens.filter((t) => propios.has(t)).length;
     if (notaAbierta && nota.slug === notaAbierta.slug) puntaje += 1;
+    if (notaPedida && nota.slug === notaPedida.slug) puntaje += PESO_DE_LA_PAGINA;
     if (puntaje > mejorPuntaje) {
       mejorPuntaje = puntaje;
       mejorNota = nota;
@@ -461,7 +540,16 @@ export async function POST(request: NextRequest) {
     const puntuadas = completas
       .map((n) => {
         const propios = new Set(tokenizar(textoDeNota(n)));
-        return { nota: n, puntaje: tokens.filter((t) => propios.has(t)).length };
+        const base = tokens.filter((t) => propios.has(t)).length;
+        // La página nombrada va primera, así que es la que seguro entra en el
+        // contexto aunque haya que recortar.
+        return {
+          nota: n,
+          puntaje:
+            notaPedida && n.slug === notaPedida.slug
+              ? base + PESO_DE_LA_PAGINA
+              : base,
+        };
       })
       .sort((a, b) => b.puntaje - a.puntaje);
 

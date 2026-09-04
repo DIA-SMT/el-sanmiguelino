@@ -18,6 +18,11 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { minutosDeLectura, textoPlanoDe } from "@/lib/derivar";
+import {
+  camposDePagina,
+  type PaginaDigitalizada,
+} from "@/lib/pdf/estructura";
 import { esLaUnicaServible } from "@/lib/repos/edicion-servibles";
 
 /** Lo que puede tener un PDF de diario. Un número de más acá casi seguro es un
@@ -162,6 +167,150 @@ export async function guardarPdfDeEdicion(
     });
 
     return { paginas, borradas, notasBorradas };
+  });
+}
+
+/**
+ * Escribe la digitalización de un PDF: cada página pasa a ser una nota de
+ * verdad, con título, bajada, cuerpo y fotos.
+ *
+ * Reemplaza a las filas "Página N" que dejó `guardarPdfDeEdicion()`. El
+ * facsímil no se toca: `pdfUrl` sigue donde estaba y cada página conserva su
+ * `pdfPagina`, así que el botón "Verla como salió impresa" sigue andando.
+ *
+ * **Digitalizada, la página 1 SÍ es una fila.** Sin digitalizar la tapa se
+ * dibuja en `/diario` y las notas empiezan en la 2; digitalizada, la tapa del
+ * papel es un artículo —titular, bajada, foto de apertura, cita— y la portada
+ * del diario está hecha para mostrar exactamente eso. Ver `Nota.pdfPagina`.
+ */
+export async function guardarDigitalizacion(
+  edicionSlug: string,
+  paginas: PaginaDigitalizada[],
+  opciones: {
+    /**
+     * Confirmación para digitalizar una edición **que ya está publicada**.
+     *
+     * Va como bandera explícita, igual que `reemplazarNotasEscritas`, y por la
+     * misma razón: del otro lado hay un número que los vecinos están leyendo.
+     * Quien la prende tiene que haber visto cuántas notas y cuántos comentarios
+     * hay en juego, y el panel se lo dice antes de preguntar.
+     */
+    confirmarPublicada?: boolean;
+  } = {},
+): Promise<{ paginas: number; borradas: number }> {
+  if (paginas.length === 0) {
+    throw new Error("La digitalización no produjo ninguna página.");
+  }
+
+  const edicion = await db().edicion.findUnique({
+    where: { slug: edicionSlug },
+    select: { id: true, mes: true, tema: true, publicaEn: true },
+  });
+  if (!edicion) throw new Error(`No existe la edición "${edicionSlug}".`);
+
+  /*
+   * ¿Está en la calle?
+   *
+   * Una edición sin fecha de publicación no la ve nadie más que un
+   * administrador con la vista previa, así que digitalizarla es gratis. Una
+   * publicada es otra cosa: lo que se escriba acá reemplaza lo que los lectores
+   * están viendo AHORA, y si la conversión sale mal, sale mal en público y en
+   * nombre del municipio.
+   */
+  const yaPublicada =
+    edicion.publicaEn !== null && edicion.publicaEn.getTime() <= Date.now();
+  if (yaPublicada && !opciones.confirmarPublicada) {
+    const comentarios = await db().comentario.count({
+      where: { nota: { edicionId: edicion.id } },
+    });
+    throw new Error(
+      `"${edicion.mes}" ya está publicada: es lo que están leyendo los vecinos. ` +
+        `Digitalizarla reemplaza sus ${paginas.length} páginas` +
+        (comentarios > 0
+          ? `, y sus ${comentarios} ${comentarios === 1 ? "comentario" : "comentarios"} quedan colgados de las páginas nuevas`
+          : "") +
+        ". Hay que confirmarlo.",
+    );
+  }
+
+  const slugDePagina = (n: number) => `${edicionSlug}-p${n}`;
+
+  return db().$transaction(async (tx) => {
+    /*
+     * Todo el foliado viejo a un rango alto antes de escribir.
+     *
+     * Sin esto, darle `orden: 0` a la página 1 choca contra
+     * `@@unique([edicionId, orden])`: la fila que hoy tiene el 0 es la página 2
+     * del facsímil, y todavía existe. Correrlas y borrar al final lo que sobró
+     * es lo que permite pasar de la numeración sin digitalizar —que empieza en
+     * la página 2— a la digitalizada, que empieza en la 1.
+     */
+    const viejas = await tx.nota.findMany({
+      where: { edicionId: edicion.id },
+      select: { id: true, orden: true },
+    });
+    for (const vieja of viejas) {
+      await tx.nota.update({
+        where: { id: vieja.id },
+        data: { orden: vieja.orden + 1000 },
+      });
+    }
+
+    /*
+     * Una página sin título propio hereda el de la anterior, con
+     * "(continuación)".
+     *
+     * Pasa con las galerías: la página 7 de agosto son seis fotos más de las
+     * plazas que empezó a mostrar la 6, y en el papel no lleva título porque se
+     * lee como una doble página. En la web cada página es una nota y necesita
+     * un nombre: aparece en el índice, en el buscador, en las flechas de paso
+     * de página y en lo que contesta Migue. Dejarla como "Página 7" sería poner
+     * ahí justamente el cartel que la digitalización vino a sacar.
+     *
+     * El conversor no lo puede resolver solo porque mira una página por vez y
+     * esto es una relación entre dos. Y no inventa nada: el título es el de al
+     * lado.
+     */
+    let tituloPrevio = "";
+    for (const pagina of paginas) {
+      // El título y la bajada los decide `camposDePagina`, que es puro y lo
+      // comparte con el script de carga: son las dos únicas formas de escribir
+      // una digitalización y tienen que dar exactamente lo mismo.
+      const { titulo, bajada } = camposDePagina(pagina, {
+        mes: edicion.mes,
+        tituloPrevio,
+      });
+      tituloPrevio = titulo;
+
+      const campos = {
+        seccion: edicion.tema || "Edición impresa",
+        titulo,
+        bajada,
+        cuerpo: pagina.cuerpo,
+        minutosLectura: minutosDeLectura(pagina.cuerpo),
+        textoPlano: textoPlanoDe(pagina.cuerpo),
+        imagenSrc: pagina.imagen?.src ?? null,
+        imagenAlt: pagina.imagen?.alt ?? null,
+        imagenEpigrafe: pagina.imagen?.epigrafe ?? null,
+        imagenCredito: pagina.imagen?.credito ?? null,
+        pdfPagina: pagina.pagina,
+        orden: pagina.pagina - 1,
+        edicionId: edicion.id,
+      };
+
+      await tx.nota.upsert({
+        where: { slug: slugDePagina(pagina.pagina) },
+        update: campos,
+        create: { slug: slugDePagina(pagina.pagina), ...campos },
+      });
+    }
+
+    // Lo que quedó en el rango alto es una página que el PDF nuevo ya no tiene.
+    const { count: borradas } = await tx.nota.deleteMany({
+      where: { edicionId: edicion.id, orden: { gte: 1000 } },
+    });
+
+    return { paginas: paginas.length, borradas };
   });
 }
 

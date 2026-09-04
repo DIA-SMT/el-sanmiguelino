@@ -46,6 +46,9 @@ export interface EdicionFila {
   laUnicaServible: boolean;
   /** El facsímil del impreso, si el número se publica así. */
   pdf: { url: string; paginas: number } | null;
+  /** De las páginas del PDF, cuántas están digitalizadas: con título, cuerpo y
+   *  fotos de verdad en vez del dibujo del archivo. */
+  paginasDigitalizadas: number;
   estado: "publicada" | "programada" | "sin_fecha";
 }
 
@@ -374,6 +377,8 @@ export function FilaEdicion({
                 edicion.comentarios - edicion.comentariosEscritos
               }
               laUnicaServible={edicion.laUnicaServible}
+              publicada={edicion.estado === "publicada"}
+              paginasDigitalizadas={edicion.paginasDigitalizadas}
             />
 
             <div className="mt-3 flex flex-wrap items-center gap-panel-controles">

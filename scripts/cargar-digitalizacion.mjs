@@ -38,6 +38,7 @@ import {
   minutosDeLectura,
   textoPlanoDe,
 } from "../src/lib/derivar.ts";
+import { camposDePagina } from "../src/lib/pdf/estructura.ts";
 
 cargarEnv({ path: ".env.local", quiet: true });
 
@@ -220,24 +221,16 @@ await db.$transaction(async (tx) => {
   for (const pagina of paginas) {
     const cuerpo = conUrls(pagina.cuerpo);
     const imagen = pagina.imagen ? conUrls(pagina.imagen) : null;
-    const titulo =
-      pagina.titulo ||
-      (tituloPrevio
-        ? `${tituloPrevio.replace(/ \(continuación\)$/, "")} (continuación)`
-        : `Página ${pagina.pagina}`);
-    tituloPrevio = titulo;
 
-    /*
-     * Una nota necesita bajada: es lo que se lee en el índice, en el buscador y
-     * en la voz. Si la página no tenía —la 4 y las galerías no traen—, se toma
-     * la primera oración del texto. **No se inventa nada**: es texto del propio
-     * impreso, recortado.
-     */
-    const primerParrafo = cuerpo.find((b) => b.tipo === "parrafo")?.texto ?? "";
-    const bajada =
-      pagina.bajada ||
-      primerParrafo.split(/(?<=\.)\s/)[0]?.slice(0, 240) ||
-      `Página ${pagina.pagina} de ${destino.mes}, tal como salió impresa.`;
+    // El título y la bajada los decide `camposDePagina`, compartido con
+    // `guardarDigitalizacion()`. Tener una copia acá ya nos costó una vez:
+    // el mismo número cargado desde el panel y desde la consola salía con
+    // bajadas distintas.
+    const { titulo, bajada } = camposDePagina(
+      { ...pagina, cuerpo },
+      { mes: destino.mes, tituloPrevio },
+    );
+    tituloPrevio = titulo;
 
     const campos = {
       seccion: destino.tema || "Edición impresa",

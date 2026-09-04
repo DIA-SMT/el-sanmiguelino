@@ -47,6 +47,84 @@
 
 import type { BloqueNota, ImagenNota } from "@/lib/types";
 
+/* ------------------------------------- de página digitalizada a nota ------ */
+
+/**
+ * El título y la bajada con los que se guarda una página.
+ *
+ * Vive acá, y no en quien escribe en la base, porque tiene **dos** llamadores
+ * que obligatoriamente tienen que coincidir: la acción del panel, que
+ * digitaliza al subir el PDF, y el script `cargar:digitalizacion`, que hace lo
+ * mismo desde la línea de comandos. Con una copia en cada lado, un número
+ * cargado desde el panel y el mismo número cargado desde la consola salían con
+ * bajadas distintas — y nadie lo iba a notar hasta que a Migue se le escapara
+ * la diferencia.
+ *
+ * **No inventa nada.** Todo lo que devuelve es texto del propio impreso; lo
+ * único que hace es elegir de dónde sacarlo cuando la página no trae lo obvio.
+ */
+export function camposDePagina(
+  pagina: PaginaDigitalizada,
+  contexto: {
+    mes: string;
+    /** El título de la página anterior, para las galerías que continúan. */
+    tituloPrevio?: string;
+  },
+): { titulo: string; bajada: string } {
+  /*
+   * Una página sin título propio hereda el de la anterior, con
+   * "(continuación)".
+   *
+   * Pasa con las galerías: la página 7 de agosto son seis fotos más de las
+   * plazas que empezó a mostrar la 6, y en el papel no lleva título porque se
+   * lee como una doble página. En la web cada página es una nota y necesita un
+   * nombre: aparece en el índice, en el buscador, en las flechas de paso de
+   * página y en lo que contesta Migue. Dejarla como "Página 7" sería poner ahí
+   * justamente el cartel que la digitalización vino a sacar.
+   */
+  const titulo =
+    pagina.titulo ||
+    (contexto.tituloPrevio
+      ? `${contexto.tituloPrevio.replace(/ \(continuación\)$/, "")} (continuación)`
+      : `Página ${pagina.pagina}`);
+
+  /*
+   * Una nota necesita bajada: es lo que se lee en el índice, en el buscador y
+   * en la voz.
+   *
+   * El orden importa y la última opción es un último recurso de verdad. Antes
+   * era la única alternativa y decía «Página 7 de Agosto de 2026, tal como
+   * salió impresa», y esa cadena hizo dos daños a la vez: en voz alta Migue le
+   * leía eso a un vecino que había pedido un resumen, y —peor— la palabra
+   * "Página" quedaba indexada, así que **cualquier** pregunta que dijera
+   * "página" puntuaba contra esa nota y le ganaba a todas las demás.
+   * Preguntar por la página 3 devolvía la 7.
+   *
+   * Una galería sí tiene qué decir de sí misma: los epígrafes de sus fotos son
+   * los nombres de las plazas que muestra.
+   */
+  const primerParrafo =
+    pagina.cuerpo.find((b) => b.tipo === "parrafo")?.texto ?? "";
+  // Sin repetir: una galería puede traer dos fotos de la misma plaza, y
+  // "Plaza 1º de Mayo, Plaza 1º de Mayo" leído en voz alta suena a error.
+  const epigrafes = [
+    ...new Set(
+      pagina.cuerpo
+        .filter((b) => b.tipo === "foto")
+        .map((b) => (b.tipo === "foto" ? (b.epigrafe ?? "") : ""))
+        .filter(Boolean),
+    ),
+  ];
+
+  const bajada =
+    pagina.bajada ||
+    primerParrafo.split(/(?<=\.)\s/)[0]?.slice(0, 240) ||
+    (epigrafes.length > 0 ? `${epigrafes.join(", ")}.` : "") ||
+    `${contexto.mes}, tal como salió impresa.`;
+
+  return { titulo, bajada };
+}
+
 /* ------------------------------------------------------------------ entrada */
 
 /** Una palabra —o un pedazo de línea— tal como la entrega el PDF. */

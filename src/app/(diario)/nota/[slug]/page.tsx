@@ -26,6 +26,7 @@ import {
   getResumenEdicion,
 } from "@/lib/repos/edicion";
 import { seccionesDeEdicion, slugificarSeccion } from "@/lib/data/secciones";
+import { numeroDeNota } from "@/lib/data/paginas";
 import { getUsuario } from "@/lib/auth/session";
 import type { BloqueNota } from "@/lib/types";
 
@@ -150,8 +151,10 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
     nota.edicionSlug === edicion.slug
       ? indice
       : await getIndiceDe(nota.edicionSlug);
-  const numeroPagina =
-    indiceDeSuEdicion.findIndex((n) => n.slug === nota.slug) + 2;
+  // La regla vive en `paginas.ts`: en un número digitalizado la tapa es la
+  // página 1 y no hay portada aparte, así que el foliado del diario coincide
+  // con el que trae impreso el papel.
+  const numeroPagina = numeroDeNota(indiceDeSuEdicion, nota.slug);
 
   /*
    * La edición DE LA NOTA, que es de donde sale su PDF.

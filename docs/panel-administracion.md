@@ -1396,7 +1396,46 @@ razón— que no tenía el dato.
 
 Ahora el PDF se convierte en las notas que el diario ya sabe maquetar.
 
-### Tres comandos, en este orden
+### Desde el panel: subir el PDF ya es digitalizarlo (2026-09-03)
+
+**Cargar el PDF de una edición la digitaliza sola.** Terminada la subida, el
+panel llama a `digitalizarEdicionAction` y el número queda con sus notas de
+verdad. No hay un segundo paso que alguien tenga que recordar: subir el impreso y
+publicarlo legible son la misma operación para quien carga la edición.
+
+Al lado queda **"Digitalizar de nuevo"**, que **no pide volver a subir el
+archivo**. Y esa es la asimetría que vale la pena entender: el PDF no pasa por el
+servidor cuando se sube —en Vercel un request no puede pesar más de 4,5 MB y un
+diario mensual siempre pesa más, así que el navegador escribe directo en el
+bucket—, pero una vez guardado queda en una URL pública y **bajarlo es un
+fetch**. Por eso el servidor puede reprocesar cualquier número viejo cuando el
+conversor mejore, con un botón y sin el archivo a mano.
+
+Medido contra agosto —8 páginas A3, 29 imágenes, 6,2 MB— el trabajo completo
+tarda **4,9 segundos**: bajar, parsear, decodificar cada foto, recodificarla en
+WebP y subirla. De ahí sale el `maxDuration = 60` de `/admin/ediciones`: las
+Server Actions corren con el presupuesto de la página que las invoca, y un número
+de 24 páginas es el triple de trabajo.
+
+Al terminar, el panel muestra cuántas páginas y cuántas imágenes salieron y
+**los avisos del conversor**, cada uno con un enlace directo al editor de esa
+página. Los avisos son lo único que hay que mirar sí o sí: son el conversor
+diciendo dónde no estuvo seguro —una página sin título propio, una cita que se
+quedó sin autor—. El resto de la revisión es opcional.
+
+Si la edición **ya está publicada**, pregunta antes: lo que se escriba reemplaza
+lo que los vecinos están leyendo. Es la misma ceremonia que reemplazar notas
+escritas o quitar un PDF, y por la misma razón.
+
+Dos cosas que hacen falta para que esto ande en Vercel y que no son obvias:
+`serverExternalPackages` para `sharp` y `pdfjs-dist`, y sobre todo
+`outputFileTracingIncludes` con los tres directorios de assets de pdf.js. Next
+arma el paquete de cada función siguiendo los `import`, y **esos archivos no los
+importa nadie**: pdf.js los abre por ruta en tiempo de ejecución. Sin
+declararlos, la digitalización en producción devuelve las páginas con todo su
+texto y **sin una sola foto**, sin tirar ningún error.
+
+### Y los tres comandos, que siguen estando
 
 ```
 npm run digitalizar -- <archivo.pdf> <carpeta>
@@ -1404,13 +1443,14 @@ npm run verificar:digitalizacion -- <archivo.pdf> <carpeta>
 npm run cargar:digitalizacion -- <carpeta> --edicion <slug> [--vista-previa]
 ```
 
-El primero no toca la base ni la red: escribe un `paginas.json` y las figuras
-recortadas, y ahí se miran antes de que existan en ningún lado. El segundo
-contesta la única pregunta que importa —¿se perdió texto?— y contra el número de
-agosto da **100% de 1.476 palabras**. El tercero escribe, y va aparte a
-propósito: la base de desarrollo y la de producción son la misma, así que entre
-convertir y publicar tiene que haber alguien que mire. `--vista-previa` arma una
-copia con otro slug y sin fecha, que sólo ve un admin que la ponga en foco.
+Sirven para trabajar sobre un PDF **antes** de subirlo a ningún lado: el primero
+no toca la base ni la red, escribe un `paginas.json` y las figuras recortadas, y
+ahí se miran. El segundo contesta la única pregunta que importa —¿se perdió
+texto?— y contra el número de agosto da **100% de 1.476 palabras**; conviene
+correrlo cuando se toca el conversor, porque un error de clasificación se ve a
+simple vista pero una frase que desapareció no la ve nadie. El tercero escribe en
+la base, con `--vista-previa` para armar una copia con otro slug y sin fecha que
+sólo ve un admin que la ponga en foco.
 
 ### Dónde vive la inteligencia
 

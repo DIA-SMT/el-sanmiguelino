@@ -2,14 +2,17 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   AlertTriangle,
   ExternalLink,
   FileText,
   Trash2,
   Upload,
+  Wand2,
 } from "lucide-react";
 import {
+  digitalizarEdicionAction,
   firmarSubidaPdfAction,
   guardarPdfEdicionAction,
   quitarPdfEdicionAction,
@@ -41,7 +44,14 @@ type Paso =
   /** Quitar el PDF también borra páginas y comentarios: se pregunta igual. */
   | { que: "confirmar-quitar" }
   | { que: "subiendo"; porcentaje: number }
-  | { que: "guardando" };
+  | { que: "guardando" }
+  /** El servidor se está bajando el PDF y convirtiéndolo. Son unos cinco
+   *  segundos para ocho páginas, así que necesita su propio cartel: sin él
+   *  parece que la subida se colgó justo al final. */
+  | { que: "digitalizando" }
+  /** Digitalizar una edición que ya está publicada reemplaza lo que los
+   *  vecinos están leyendo. Se pregunta antes. */
+  | { que: "confirmar-digitalizar" };
 
 /**
  * Cargar el PDF del impreso en una edición.
@@ -64,6 +74,8 @@ export function PdfEdicion({
   comentariosEscritos,
   comentariosPaginas,
   laUnicaServible,
+  publicada,
+  paginasDigitalizadas,
 }: {
   slug: string;
   mes: string;
@@ -80,16 +92,29 @@ export function PdfEdicion({
   /** Es la única edición que el diario puede servir. Quitarle el PDF la deja
    *  sin contenido, así que dejaría el sitio sin ningún número. */
   laUnicaServible: boolean;
+  /** Ya salió: es lo que están leyendo los vecinos. Digitalizarla reemplaza el
+   *  contenido en vivo, así que se pregunta antes. */
+  publicada: boolean;
+  /** Cuántas de sus páginas ya están digitalizadas. Con 0, el número está
+   *  cargado como facsímil y se ve el PDF dibujado. */
+  paginasDigitalizadas: number;
 }) {
   const router = useRouter();
   const campo = useRef<HTMLInputElement>(null);
   const [paso, setPaso] = useState<Paso>({ que: "quieto" });
   const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<{
+    paginas: number;
+    figuras: number;
+    segundos: number;
+    avisos: { pagina: number; texto: string }[];
+  } | null>(null);
 
   const ocupado =
     paso.que !== "quieto" &&
     paso.que !== "confirmar" &&
-    paso.que !== "confirmar-quitar";
+    paso.que !== "confirmar-quitar" &&
+    paso.que !== "confirmar-digitalizar";
 
   function limpiarCampo() {
     // Sin esto, elegir el MISMO archivo dos veces seguidas —después de un
@@ -207,11 +232,50 @@ export function PdfEdicion({
       });
       if (!guardado.ok) throw new Error(guardado.error ?? "No se pudo guardar.");
 
-      setPaso({ que: "quieto" });
-      router.refresh();
+      // Y se digitaliza en el acto. Es lo que hace que un número nuevo salga
+      // legible sin que nadie tenga que acordarse de un segundo paso: subir el
+      // PDF y digitalizarlo son la misma operación desde el punto de vista de
+      // quien carga la edición.
+      await digitalizar();
     } catch (e) {
       setPaso({ que: "quieto" });
       setError(e instanceof Error ? e.message : "No se pudo subir el PDF.");
+    }
+  }
+
+  /**
+   * Convierte el PDF ya cargado en las notas del diario.
+   *
+   * Se puede repetir cuantas veces haga falta y **no exige volver a subir el
+   * archivo**: el objeto vive en una URL pública y el servidor se lo baja solo.
+   * Eso es lo que permite mejorar el conversor y reprocesar un número viejo con
+   * un botón.
+   */
+  async function digitalizar() {
+    setError(null);
+    setResultado(null);
+    setPaso({ que: "digitalizando" });
+    try {
+      const res = await digitalizarEdicionAction({
+        slug,
+        // Sólo cuando de verdad está publicada. El servidor lo exige en ese
+        // caso y acá ya se preguntó.
+        confirmarPublicada: publicada,
+      });
+      if (!res.ok) throw new Error(res.error ?? "No se pudo digitalizar.");
+      setPaso({ que: "quieto" });
+      setResultado({
+        paginas: res.paginas ?? 0,
+        figuras: res.figuras ?? 0,
+        segundos: res.segundos ?? 0,
+        avisos: res.avisos ?? [],
+      });
+      router.refresh();
+    } catch (e) {
+      setPaso({ que: "quieto" });
+      setError(
+        e instanceof Error ? e.message : "No se pudo digitalizar el PDF.",
+      );
     }
   }
 
@@ -257,7 +321,45 @@ export function PdfEdicion({
         )}
       </div>
 
-      {paso.que === "confirmar-quitar" ? (
+      {paso.que === "confirmar-digitalizar" ? (
+        <>
+          <Aviso
+            icono={AlertTriangle}
+            tono="var(--grafico-alerta)"
+            sobre="tarjeta"
+            rol="alert"
+          >
+            {mes}{" "}
+            <strong className="font-semibold text-panel-tinta">
+              ya está publicada
+            </strong>
+            : es el número que están leyendo los vecinos. Digitalizarlo de nuevo
+            reemplaza el texto y las fotos de sus{" "}
+            <strong className="font-semibold text-panel-tinta">
+              {pdf?.paginas ?? 0} páginas
+            </strong>{" "}
+            por lo que salga de la conversión, en vivo. Los comentarios no se
+            pierden: siguen colgados de cada página.
+          </Aviso>
+          <div className="flex flex-wrap items-center gap-panel-controles">
+            <button
+              type="button"
+              onClick={() => void digitalizar()}
+              className={BOTON_DESTRUCTIVO}
+            >
+              <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Digitalizar igual
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaso({ que: "quieto" })}
+              className={BOTON_QUIETO}
+            >
+              Cancelar
+            </button>
+          </div>
+        </>
+      ) : paso.que === "confirmar-quitar" ? (
         <>
           <Aviso
             icono={AlertTriangle}
@@ -443,10 +545,80 @@ export function PdfEdicion({
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   Quitar
                 </button>
+                {/* Digitalizar de nuevo NO pide volver a subir el archivo: el
+                    servidor se lo baja del bucket. Sirve para reprocesar un
+                    número viejo cuando el conversor mejora, y para rehacer una
+                    página que se corrigió a mano y quedó peor. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    if (publicada) setPaso({ que: "confirmar-digitalizar" });
+                    else void digitalizar();
+                  }}
+                  disabled={ocupado}
+                  className={BOTON_SECUNDARIO}
+                >
+                  <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {paginasDigitalizadas > 0
+                    ? "Digitalizar de nuevo"
+                    : "Digitalizar"}
+                </button>
               </>
             )}
           </div>
+
+          {/* Cómo quedó el número: digitalizado o dibujado. Es la diferencia
+              entre que se lea en un teléfono y que no, así que se dice acá y no
+              hay que ir a buscarlo al diario. */}
+          {pdf && !resultado && (
+            <p className="text-panel-xs text-panel-tinta-3">
+              {paginasDigitalizadas > 0
+                ? `${paginasDigitalizadas} ${paginasDigitalizadas === 1 ? "página digitalizada" : "páginas digitalizadas"}: el diario las muestra como notas y el facsímil queda a un botón.`
+                : "Sin digitalizar: el diario dibuja las páginas del PDF, que en un teléfono no se leen."}
+            </p>
+          )}
         </>
+      )}
+
+      {resultado && (
+        <div className="grid gap-1.5 rounded-panel-2 bg-panel-tarjeta p-3">
+          <p className="text-panel-sm font-medium text-panel-tinta-2">
+            {resultado.paginas}{" "}
+            {resultado.paginas === 1 ? "página" : "páginas"} y{" "}
+            {resultado.figuras}{" "}
+            {resultado.figuras === 1 ? "imagen" : "imágenes"}, en{" "}
+            {resultado.segundos} s.
+          </p>
+          {resultado.avisos.length > 0 ? (
+            <>
+              {/* Los avisos son lo ÚNICO que hay que mirar sí o sí. El resto de
+                  la revisión es opcional; esto es el conversor diciendo dónde
+                  no estuvo seguro. */}
+              <p className="text-panel-xs text-panel-tinta-3">
+                Revisá estas {resultado.avisos.length === 1 ? "página" : "páginas"}:
+              </p>
+              <ul className="grid gap-1">
+                {resultado.avisos.map((a, i) => (
+                  <li key={i} className="text-panel-xs text-panel-tinta-2">
+                    <Link
+                      href={`/admin/nota/${slug}-p${a.pagina}`}
+                      className="font-medium underline underline-offset-2 hover:text-accent"
+                    >
+                      Página {a.pagina}
+                    </Link>
+                    : {a.texto}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-panel-xs text-panel-tinta-3">
+              El conversor no encontró nada dudoso. Igual conviene mirar el
+              número en el diario antes de publicarlo.
+            </p>
+          )}
+        </div>
       )}
 
       {ocupado && (
@@ -460,7 +632,9 @@ export function PdfEdicion({
               ? "Leyendo el PDF y contando las páginas…"
               : paso.que === "subiendo"
                 ? `Subiendo… ${paso.porcentaje}%`
-                : "Guardando las páginas de la edición…"}
+                : paso.que === "digitalizando"
+                  ? "Digitalizando: separando el texto, recortando las fotos y armando las notas. Puede tardar unos segundos."
+                  : "Guardando las páginas de la edición…"}
           </p>
           {/* La barra es decorativa: el número ya está escrito arriba y lo
               anuncia el `aria-live`. Una segunda voz diciendo lo mismo

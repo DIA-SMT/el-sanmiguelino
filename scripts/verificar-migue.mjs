@@ -30,6 +30,8 @@ const {
   interpretar,
   respuestaSobreElDiario,
   simplificar,
+  paginaPedida,
+  ES_PEDIDO_DE_CONTINUACION,
 } = await import(
   new URL("../src/lib/migue/interpretacion.ts", import.meta.url).href
 );
@@ -248,6 +250,69 @@ grupo("Charla", "modelo", [
  * El parser. Cada entrada de acá es una forma que el modelo escribió de verdad
  * o que escribe habitualmente; las dos primeras salieron a pantalla.
  */
+/*
+ * Nombrar una página por su número.
+ *
+ * **Las tres primeras frases salieron del registro de consultas de
+ * producción**, tal como las escribió un lector, y son el motivo de que esta
+ * función exista: de las tres veces que alguien pidió una página por número,
+ * DOS escribió el ordinal antes del sustantivo. La primera versión del arreglo
+ * sólo miraba después —"la pag 3"— y dejaba afuera al caso mayoritario, así que
+ * el bug seguía vivo con el arreglo puesto.
+ *
+ * Y las dos últimas son las que NO tienen que disparar: una frase que menciona
+ * cuántas páginas hay no está pidiendo ninguna.
+ */
+console.log("\nNOMBRAR UNA PÁGINA POR SU NÚMERO\n");
+const PAGINAS = [
+  ["resumime en audio la 3ra pagina", 3],
+  ["resumime la 2da pagina", 2],
+  ["resumime en audio la pag 3", 3],
+  ["leeme la pagina 3", 3],
+  ["leeme la tercera pagina", 3],
+  ["que dice la hoja 5", 5],
+  ["contame de la página 8", 8],
+  ["pag. 4", 4],
+  ["la edicion tiene 8 paginas", null],
+  ["cuantas paginas tiene", null],
+  ["que plazas se renovaron", null],
+];
+for (const [frase, esperado] of PAGINAS) {
+  const dio = paginaPedida(simplificar(frase));
+  const mal = dio !== esperado;
+  fallas += mal ? 1 : 0;
+  console.log(
+    `  ${mal ? "MAL" : "ok "} ${JSON.stringify(frase)} -> ${dio}` +
+      (mal ? `  (esperado ${esperado})` : ""),
+  );
+}
+
+/*
+ * Pedidos de continuación: no traen tema, el tema quedó en el mensaje anterior.
+ *
+ * "de nuevo" salió del mismo registro. Sin reconocerlo, quedaba el token
+ * `nuevo`, que puntúa contra la nota "Pensar de nuevo los espacios públicos" y
+ * se la llevaba puesta: Migue cambiaba de nota en mitad de la conversación.
+ */
+console.log("\nPEDIDOS DE CONTINUACIÓN\n");
+const CONTINUACIONES = [
+  ["de nuevo", true],
+  ["otra vez", true],
+  ["repetilo", true],
+  ["dale", true],
+  ["de nuevo el resumen de la pag 3", false],
+  ["contame de nuevo sobre las plazas", false],
+];
+for (const [frase, esperado] of CONTINUACIONES) {
+  const dio = ES_PEDIDO_DE_CONTINUACION(simplificar(frase));
+  const mal = dio !== esperado;
+  fallas += mal ? 1 : 0;
+  console.log(
+    `  ${mal ? "MAL" : "ok "} ${JSON.stringify(frase)} -> ${dio}` +
+      (mal ? `  (esperado ${esperado})` : ""),
+  );
+}
+
 console.log("\nLO QUE EL MODELO CONTESTA\n");
 const casos = [
   ["FUENTE pelado", "Hay obras.\nFUENTE: plan-bacheo", { texto: "Hay obras.", notaSlug: "plan-bacheo" }],

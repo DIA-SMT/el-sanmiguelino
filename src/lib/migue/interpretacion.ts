@@ -351,6 +351,83 @@ export function PIDE_AUDIO_DE_OTRA_NOTA(simple: string): boolean {
  * "audio" puntúan contra cualquier nota que las mencione —y hay una sobre
  * Migue que las menciona— y el desempate se lo lleva la nota equivocada.
  */
+/**
+ * "La página 3": el número de página que nombra el lector, si nombra alguno.
+ *
+ * Hace falta un atajo determinista porque **por búsqueda de texto esto no se
+ * puede resolver, y el intento fallaba de dos maneras a la vez**. Primero, el
+ * tokenizador descarta todo lo que tenga dos caracteres o menos, así que el
+ * "3" se evaporaba antes de llegar a ninguna comparación. Y segundo, lo único
+ * que quedaba era la palabra "pagina", que puntuaba contra cualquier nota que
+ * la tuviera escrita: pedir la página 3 devolvía la 7.
+ *
+ * Ahora que el foliado del diario coincide con el que trae impreso el papel
+ * —ver `paginasDeEdicion`— un número es una referencia exacta y no hay nada que
+ * adivinar.
+ *
+ * Se le pasa el texto ya simplificado, o sea sin tildes: por eso alcanza con
+ * "pag".
+ */
+const ORDINALES: Record<string, number> = {
+  primera: 1, primer: 1, segunda: 2, tercera: 3, tercer: 3, cuarta: 4,
+  quinta: 5, sexta: 6, septima: 7, setima: 7, octava: 8, novena: 9,
+  decima: 10, ultima: 0 /* 0 = la última, se resuelve con el total */,
+};
+
+export function paginaPedida(simple: string): number | null {
+  /*
+   * El número puede ir de los DOS lados del sustantivo, y en el registro de
+   * producción la forma más usada es la que estuvo rota más tiempo: de las tres
+   * veces que un lector pidió una página por número, dos escribió el ordinal
+   * primero —"resumime en audio la 3ra pagina", "resumime la 2da pagina"— y una
+   * sola escribió "la pag 3". Una expresión que sólo mirara después del
+   * sustantivo dejaría afuera al caso mayoritario.
+   */
+  const despues = /\b(?:pa?g(?:ina)?s?|hojas?)\.?\s*(?:nro\.?|n[°º]\.?)?\s*(\d{1,3})\b/.exec(
+    simple,
+  );
+  if (despues) return Number(despues[1]);
+
+  // Número primero. Se exige el sufijo ordinal ("3ra", "2da", "3°") o un
+  // artículo delante, para no confundir una PREGUNTA por una página con una
+  // frase que apenas menciona cuántas hay: "tiene 8 paginas" no es un pedido.
+  const antes =
+    /\b(?:(\d{1,3})\s*(?:ra|da|era|ta|va|ma|do|to|mo|vo|[°º])\s*(?:pa?g(?:ina)?|hoja)|(?:la|en|de|una)\s+(\d{1,3})\s*(?:pa?g(?:ina)?|hoja))\b/.exec(
+      simple,
+    );
+  if (antes) return Number(antes[1] ?? antes[2]);
+
+  // Y escrito con letras: "la tercera página".
+  const escrito = new RegExp(
+    `\\b(${Object.keys(ORDINALES).join("|")})\\s+(?:pa?g(?:ina)?|hoja)\\b`,
+  ).exec(simple);
+  if (escrito) {
+    const n = ORDINALES[escrito[1]];
+    return n > 0 ? n : null;
+  }
+
+  return null;
+}
+
+/**
+ * "De nuevo", "otra vez", "repetilo": pedidos que no traen tema propio.
+ *
+ * El tema está en el mensaje ANTERIOR, y tratarlos como una pregunta nueva sale
+ * mal de una forma que parece un disparate. Pasó en producción: a "de nuevo"
+ * queda el token `nuevo`, que puntúa contra la nota titulada "Pensar de nuevo
+ * los espacios públicos" y se la lleva puesta — así que Migue contestaba una
+ * nota que no tenía nada que ver con lo que se estaba hablando.
+ *
+ * La lista es corta y cerrada a propósito: son frases que en un diario no
+ * pueden ser un tema. Cualquier cosa más larga trae su propio tema y va por el
+ * camino de siempre.
+ */
+export function ES_PEDIDO_DE_CONTINUACION(simple: string): boolean {
+  return /^(?:de nuevo|otra vez|de vuelta|repetilo|repetila|repetilo por favor|repeti|otra|lo mismo|segui|continua|continuá|dale)\.?\??$/.test(
+    simple.trim(),
+  );
+}
+
 export const PALABRAS_DEL_PEDIDO = new Set([
   "dame", "damelo", "pasame", "quiero", "podes", "puedes", "necesito",
   "hacer", "haceme", "hace", "decime", "contame", "mandame", "ponme", "poneme",
@@ -359,4 +436,9 @@ export const PALABRAS_DEL_PEDIDO = new Set([
   "dictame", "narrame", "resumen", "resumenes", "resumime", "resumir",
   "nota", "notas", "noticia", "noticias", "articulo", "articulos",
   "tapa", "portada", "edicion", "sobre", "acerca", "por", "favor",
+  // Las palabras con las que se nombra una página. El número lo resuelve
+  // `paginaPedida`, así que acá sólo estorban: sin filtrarlas, "la 3ra pagina"
+  // dejaba el tema en ["3ra","pagina"] y eso alcanzaba para habilitar la
+  // búsqueda por tema sobre un pedido que no tiene tema ninguno.
+  "pagina", "paginas", "pag", "pags", "pg", "hoja", "hojas",
 ]);

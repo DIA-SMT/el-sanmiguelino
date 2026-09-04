@@ -27,9 +27,21 @@ export const metadata = { title: "Ediciones" };
  * y en los tres lugares el color va acompañado de su palabra. El color acá no
  * informa: agrupa. Quien no lo distingue lee exactamente lo mismo.
  */
+/**
+ * Un minuto, por la digitalización.
+ *
+ * Las Server Actions corren con el presupuesto de la página que las invoca, y
+ * `digitalizarEdicionAction` se dispara desde acá: baja el PDF del bucket, lo
+ * parsea, decodifica cada foto, la recodifica en WebP y la sube. Medido contra
+ * el número de agosto —8 páginas A3, 29 imágenes— son 4,9 segundos, pero un
+ * número de 24 páginas es el triple de trabajo y el default de Vercel lo
+ * cortaría por la mitad, dejando la edición a medio escribir.
+ */
+export const maxDuration = 60;
+
 export default async function AdminEdiciones() {
   await requerirAdmin();
-  const [filas, notasDelSistema, enFoco] = await Promise.all([
+  const [filas, digitalizadas, notasDelSistema, enFoco] = await Promise.all([
     db().edicion.findMany({
       orderBy: [{ anio: "desc" }, { numero: "desc" }],
       include: { _count: { select: { notas: true } } },
@@ -51,6 +63,21 @@ export default async function AdminEdiciones() {
      *
      * Sin el cuerpo ni el texto plano: son cuentas, no contenido.
      */
+    /*
+     * Cuántas páginas de cada edición están DIGITALIZADAS.
+     *
+     * Va como consulta aparte y no como un campo más de la de arriba porque lo
+     * que distingue una página digitalizada de una que no lo está es que tenga
+     * cuerpo, y traer el cuerpo de cada nota del sistema para contar cuáles no
+     * están vacías sería traerse el diario entero. `textoPlano` sirve igual —es
+     * exactamente el cuerpo aplanado— y un `groupBy` lo resuelve sin mover
+     * texto.
+     */
+    db().nota.groupBy({
+      by: ["edicionId"],
+      where: { pdfPagina: { not: null }, textoPlano: { not: "" } },
+      _count: { _all: true },
+    }),
     db().nota.findMany({
       select: {
         edicionId: true,
@@ -125,6 +152,8 @@ export default async function AdminEdiciones() {
       e.pdfUrl && e.pdfPaginas
         ? { url: e.pdfUrl, paginas: e.pdfPaginas }
         : null,
+    paginasDigitalizadas:
+      digitalizadas.find((d) => d.edicionId === e.id)?._count._all ?? 0,
     estado: !e.publicaEn
       ? "sin_fecha"
       : e.publicaEn <= ahora

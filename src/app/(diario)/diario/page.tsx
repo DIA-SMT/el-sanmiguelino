@@ -18,6 +18,7 @@ import {
 import { getUsuario } from "@/lib/auth/session";
 import { transicionPagina } from "@/lib/transiciones";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
+import { numeroDeNota } from "@/lib/data/paginas";
 import { medirImagen } from "@/lib/medir-imagen";
 import type { NotaCompleta } from "@/lib/types";
 
@@ -128,10 +129,11 @@ export default async function Portada() {
 
   const parrafos = principal ? parrafosDe(principal) : [];
   const cita = principal ? citaDe(principal) : null;
-  // Las notas empiezan en la página 2: la 1 es esta portada.
-  const paginaPrincipal = principal
-    ? indice.findIndex((n) => n.slug === principal.slug) + 2
-    : 1;
+  // En qué página sigue la nota de tapa. La regla vive en `paginas.ts` porque
+  // no es la misma en los dos tipos de edición: en una de notas escritas la
+  // tapa es una vidriera y la nota empieza en la página 2, y en una
+  // digitalizada la tapa ES la página 1 del impreso.
+  const paginaPrincipal = principal ? numeroDeNota(indice, principal.slug) : 1;
 
   return (
     <ViewTransition {...transicionPagina}>

@@ -11,9 +11,11 @@ import {
   verificarPdfSubido,
 } from "@/lib/storage";
 import {
+  guardarDigitalizacion,
   guardarPdfDeEdicion,
   quitarPdfDeEdicion,
 } from "@/lib/repos/edicion-pdf";
+import { digitalizarPdf } from "@/lib/pdf/digitalizar-servidor";
 import { borrarEdicion } from "@/lib/repos/edicion-borrar";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
@@ -597,6 +599,87 @@ export async function guardarPdfEdicionAction(datos: unknown): Promise<{
     return {
       ok: false,
       error: e instanceof Error ? e.message : "No se pudo guardar el PDF.",
+    };
+  }
+}
+
+/**
+ * Digitaliza el PDF de una edición: cada página pasa a ser una nota de verdad.
+ *
+ * **El servidor se baja el PDF del bucket.** Al subirlo el archivo no pasa por
+ * acá —el navegador escribe directo, porque en Vercel un request no puede pesar
+ * más de 4,5 MB—, pero una vez guardado queda en una URL pública y bajarlo es
+ * un fetch. Esa asimetría es la que hace que esto se pueda repetir cuantas
+ * veces haga falta sin volver a subir nada: si el conversor mejora, se aprieta
+ * el botón de nuevo.
+ *
+ * Tarda unos cinco segundos para ocho páginas —bajar, parsear, decodificar cada
+ * foto, recodificarla y subirla— así que la función necesita más aire que el
+ * default de Vercel. De ahí el `maxDuration` de este módulo.
+ */
+export async function digitalizarEdicionAction(datos: unknown): Promise<{
+  ok: boolean;
+  error?: string;
+  paginas?: number;
+  figuras?: number;
+  segundos?: number;
+  avisos?: { pagina: number; texto: string }[];
+}> {
+  await requerirAdmin();
+
+  try {
+    if (!esObjeto(datos)) throw new Error("Faltan los datos de la edición.");
+    const { slug, confirmarPublicada } = datos;
+    if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
+      throw new Error("Falta la edición.");
+    }
+
+    const edicion = await db().edicion.findUnique({
+      where: { slug },
+      select: { pdfUrl: true },
+    });
+    if (!edicion?.pdfUrl) {
+      throw new Error(
+        "Esta edición no tiene un PDF cargado. Subí el archivo del impreso " +
+          "antes de digitalizarlo.",
+      );
+    }
+
+    const { paginas, figuras, segundos } = await digitalizarPdf(
+      edicion.pdfUrl,
+      slug,
+    );
+
+    await guardarDigitalizacion(slug, paginas, {
+      // `=== true` y no un truthy: esta bandera reescribe un número que puede
+      // estar publicado, así que un `"false"` o un `1` que llegue por la
+      // petición de la acción no puede valer por un sí.
+      confirmarPublicada: confirmarPublicada === true,
+    });
+
+    revalidatePath("/diario");
+    revalidatePath("/archivo");
+    revalidatePath("/buscar");
+    revalidatePath("/admin/ediciones");
+    revalidatePath("/admin");
+    revalidatePath("/", "layout");
+
+    return {
+      ok: true,
+      paginas: paginas.length,
+      figuras,
+      segundos,
+      // Los avisos son lo que hay que mirar primero en la revisión: páginas sin
+      // título propio, citas que se quedaron sin autor, recuadros raros.
+      avisos: paginas.flatMap((p) =>
+        p.avisos.map((texto) => ({ pagina: p.pagina, texto })),
+      ),
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof Error ? e.message : "No se pudo digitalizar el PDF.",
     };
   }
 }
