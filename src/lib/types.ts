@@ -44,6 +44,21 @@ export type BloqueNota =
       alt: string;
       epigrafe?: string;
       credito?: string;
+      /**
+       * Cruza las columnas y se dibuja del ancho de la nota.
+       *
+       * Existe por las infografías del impreso. Una foto común se queda en su
+       * columna y el multicol la acomoda, que es lo correcto para una galería;
+       * pero una infografía rasterizada metida en una columna de 340px deja sus
+       * rótulos —«Tótems solares para carga de celular y agua caliente»— en tres
+       * píxeles de alto. Medido sobre la salida real: las cifras grandes
+       * sobreviven y todo lo demás se vuelve una mancha gris. Se rescataba el
+       * dibujo del PDF y se lo perdía en el layout.
+       *
+       * Ausente = una foto como cualquier otra. Sólo lo pone la digitalización
+       * cuando reconoció arte vectorial, y el editor puede sacarlo.
+       */
+      anchoCompleto?: boolean;
     }
   /** Recuadro de datos: un título y una lista de entradas, cada una con su
    *  encabezado en negrita. En el impreso va en un marco de esquinas

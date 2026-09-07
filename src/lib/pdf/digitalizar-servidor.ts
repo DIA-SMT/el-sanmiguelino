@@ -15,12 +15,17 @@ import "server-only";
  * es lo que hace que "volver a digitalizar" sea un botón y no una resubida.
  *
  * Medido contra el número de agosto —8 páginas A3, 29 imágenes, 6,2 MB— el
- * trabajo completo tarda **4,9 segundos**: bajar, parsear, decodificar cada
- * foto, recodificarla en WebP y subirla. De ahí sale el `maxDuration` de la
- * acción que lo llama.
+ * trabajo completo tardaba **4,9 segundos**: bajar, parsear, decodificar cada
+ * foto, recodificarla en WebP y subirla. Rasterizar las dos infografías
+ * vectoriales de las páginas 6 y 7 le suma **medio segundo** —3,63 contra 3,07
+ * en el script de consola, que hace lo mismo sin bajar ni subir—, así que sigue
+ * lejos del `maxDuration` de 60 segundos de la acción que lo llama.
  *
- * Las dos dependencias pesadas ya estaban instaladas: `pdfjs-dist` lo usa el
- * visor del diario y `sharp` lo trae Next para optimizar imágenes.
+ * Las tres dependencias pesadas ya estaban instaladas: `pdfjs-dist` lo usa el
+ * visor del diario, `sharp` lo trae Next para optimizar imágenes y
+ * `@napi-rs/canvas` viene con pdf.js, que es el que lo pide para poder dibujar
+ * fuera del navegador. Los tres están declarados en `serverExternalPackages`:
+ * son binarios nativos y empaquetarlos no funciona.
  */
 
 import { createRequire } from "node:module";
@@ -30,6 +35,7 @@ import {
   type ItemTexto,
   type PaginaDigitalizada,
 } from "@/lib/pdf/estructura";
+import { zonasDeInfografia, type ZonaVectorial } from "@/lib/pdf/vectores";
 import { subirImagen } from "@/lib/storage";
 
 /** Debajo de esto no es una figura: es un logo, una viñeta o un filete. En
@@ -40,6 +46,11 @@ const AREA_MINIMA = 8000;
  *  así que una a todo el ancho de una A3 son 1.577 px de origen: recortar a
  *  1.600 no pierde nada y le pone techo a lo que se sube. */
 const ANCHO_MAXIMO = 1600;
+
+/** Techo a cuánto se agranda una infografía al rasterizarla. Una zona angosta
+ *  llevada a 1.600 px de ancho serían 20 veces el original: mucho archivo para
+ *  nada, porque el vector se ve nítido bastante antes. */
+const ESCALA_MAXIMA = 4;
 
 /** Cuánto se espera a que el bucket entregue el PDF. */
 const TIMEOUT_MS = 30_000;
@@ -97,6 +108,67 @@ function pixeles(pagina: unknown, id: string): Promise<ImagenCruda | null> {
       resolver(null);
     }
   });
+}
+
+/** Lo mínimo que se le pide a una página de pdf.js para poder dibujarla. Se
+ *  declara acá porque el módulo se importa dinámico y no hay un tipo a mano. */
+interface PaginaDibujable {
+  getViewport(opciones: {
+    scale: number;
+    offsetX?: number;
+    offsetY?: number;
+  }): unknown;
+  render(parametros: unknown): { promise: Promise<void> };
+}
+
+/**
+ * Renderiza un rectángulo de una página y lo devuelve en WebP.
+ *
+ * No se dibuja la hoja entera para recortarla después: el `offset` del viewport
+ * corre el origen, así que el lienzo mide sólo la zona y la página cae encima
+ * ya encuadrada. Una A3 completa a esta escala son 64 MB de píxeles y acá son
+ * 6, que en una función de Vercel es la diferencia entre andar y no.
+ *
+ * El blanco del principio no es decorativo. El PDF **no pinta el papel**: lo que
+ * no dibuja queda transparente, y una infografía de líneas negras sobre nada se
+ * ve como una plancha negra en cuanto alguien la abre en modo oscuro.
+ */
+async function rasterizarZona(
+  pagina: PaginaDibujable,
+  zona: ZonaVectorial,
+): Promise<Buffer> {
+  const { createCanvas } = await import("@napi-rs/canvas");
+  const { default: sharp } = await import("sharp");
+
+  const escala = Math.min(ANCHO_MAXIMO / zona.ancho, ESCALA_MAXIMA);
+  const ancho = Math.round(zona.ancho * escala);
+  const alto = Math.round(zona.alto * escala);
+  const vista = pagina.getViewport({
+    scale: escala,
+    offsetX: -zona.x * escala,
+    offsetY: -zona.y * escala,
+  });
+
+  const lienzo = createCanvas(ancho, alto);
+  const contexto = lienzo.getContext("2d");
+  contexto.fillStyle = "#ffffff";
+  contexto.fillRect(0, 0, ancho, alto);
+  // pdf.js declara el lienzo del DOM porque es donde vive casi siempre; acá el
+  // que dibuja es Skia, que es justamente el motor que el propio pdf.js usa
+  // cuando corre en Node.
+  await pagina.render({
+    canvasContext: contexto,
+    viewport: vista,
+    canvas: lienzo,
+  }).promise;
+
+  const crudo = contexto.getImageData(0, 0, ancho, alto).data;
+  return await sharp(
+    Buffer.from(crudo.buffer, crudo.byteOffset, crudo.byteLength),
+    { raw: { width: ancho, height: alto, channels: 4 } },
+  )
+    .webp({ quality: 82 })
+    .toBuffer();
 }
 
 export interface ResultadoDigitalizacion {
@@ -224,12 +296,41 @@ export async function digitalizarPdf(
         }
       }
 
+      /*
+       * Las infografías dibujadas con trazos, que hasta acá no las miraba
+       * nadie: ver `vectores.ts`.
+       *
+       * Se resuelve ANTES de recortar las imágenes porque una zona se traga la
+       * ilustración que tiene de fondo: esa imagen es una capa de la
+       * infografía y no una figura aparte, y publicarla suelta era publicar el
+       * mismo dibujo dos veces —el segundo desvaído y sin sus cifras—.
+       */
+      const zonas = zonasDeInfografia({
+        operadores,
+        OPS: {
+          save: pdfjs.OPS.save,
+          restore: pdfjs.OPS.restore,
+          transform: pdfjs.OPS.transform,
+          constructPath: pdfjs.OPS.constructPath,
+          endPath: pdfjs.OPS.endPath,
+          paintFormXObjectBegin: pdfjs.OPS.paintFormXObjectBegin,
+          paintFormXObjectEnd: pdfjs.OPS.paintFormXObjectEnd,
+        },
+        ancho: vista.width,
+        alto: vista.height,
+        imagenes: colocadas,
+        textos: items,
+      });
+      const absorbidas = new Set(zonas.flatMap((z) => z.absorbidas));
+
       const figuras: FiguraPagina[] = [];
       const vistos = new Set<string>();
       for (const c of colocadas) {
         // El mismo objeto dibujado dos veces es una sola figura.
         if (vistos.has(c.id)) continue;
         vistos.add(c.id);
+        // Y la ilustración de fondo de una infografía ya viaja adentro de ella.
+        if (absorbidas.has(c.id)) continue;
 
         const cruda = await pixeles(pagina, c.id);
         if (!cruda?.data || !cruda.width || !cruda.height) continue;
@@ -262,6 +363,29 @@ export async function digitalizarPdf(
           y: c.y,
           ancho: c.ancho,
           alto: c.alto,
+        });
+      }
+
+      for (const zona of zonas) {
+        const webp = await rasterizarZona(
+          pagina as unknown as PaginaDibujable,
+          zona,
+        );
+        const { url: direccion } = await subirImagen(
+          new File([new Uint8Array(webp)], `p${n}-info.webp`, {
+            type: "image/webp",
+          }),
+          `${edicionSlug}-p${n}-info`,
+        );
+        figurasSubidas++;
+
+        figuras.push({
+          src: direccion,
+          x: zona.x,
+          y: zona.y,
+          ancho: zona.ancho,
+          alto: zona.alto,
+          infografia: true,
         });
       }
 

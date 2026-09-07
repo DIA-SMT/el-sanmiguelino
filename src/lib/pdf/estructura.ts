@@ -154,6 +154,24 @@ export interface FiguraPagina {
   y: number;
   ancho: number;
   alto: number;
+  /**
+   * Es una infografía rescatada del arte vectorial (ver `vectores.ts`), no una
+   * foto que el PDF traía como imagen.
+   *
+   * Cambia tres cosas y todas por el mismo motivo —**adentro de esa imagen hay
+   * texto**, pasado a curvas—:
+   *
+   *  - No se le busca epígrafe. El rótulo que tiene al lado, o adentro, es
+   *    parte del dibujo; robárselo a la página deja sin bajada a la 6, cuyo
+   *    «¿Qué elementos en común tienen las plazas…?» es justamente eso.
+   *  - No se le pone el crédito del fotógrafo. Una ilustración no la sacó
+   *    nadie con una cámara, y esto es una publicación oficial.
+   *  - El texto alternativo queda genérico. Un `alt` de verdad tiene que decir
+   *    las cifras que la infografía muestra, y eso no se puede sacar del PDF:
+   *    lo escribe una persona —o el paso que lo mira con un modelo— en la
+   *    revisión del panel.
+   */
+  infografia?: boolean;
 }
 
 export interface PaginaPdfCruda {
@@ -866,6 +884,9 @@ export function digitalizarPagina(cruda: PaginaPdfCruda): PaginaDigitalizada {
   const epigrafeDeFigura = new Map<FiguraPagina, Grupo>();
   const epigrafesUsados = new Set<Grupo>();
   for (const figura of figuras) {
+    // Una infografía no toma prestado el texto de al lado: lo que dice ya está
+    // dibujado adentro.
+    if (figura.infografia) continue;
     const epi = epigrafeDe(figura, epigrafes);
     // Un epígrafe es de una sola figura: si dos se lo disputan, se lo queda la
     // primera, que por el orden es la más grande.
@@ -876,9 +897,11 @@ export function digitalizarPagina(cruda: PaginaPdfCruda): PaginaDigitalizada {
   }
 
   // La foto de apertura: la más grande de la página. Es la que el impreso pone
-  // arriba del texto y la que el diario web sabe mostrar a todo el ancho.
+  // arriba del texto y la que el diario web sabe mostrar a todo el ancho. Una
+  // infografía no abre una nota: se lee, no se mira de reojo, y encima suele
+  // ser la figura más grande de su página.
   let imagen: ImagenNota | undefined;
-  const principal = figuras[0];
+  const principal = figuras.find((f) => !f.infografia);
   if (principal) {
     usadas.add(principal);
     const epi = epigrafeDeFigura.get(principal);
@@ -905,6 +928,7 @@ export function digitalizarPagina(cruda: PaginaPdfCruda): PaginaDigitalizada {
   const retrato = figuras.find(
     (f) =>
       !usadas.has(f) &&
+      !f.infografia &&
       f.ancho <= 200 &&
       f.alto / f.ancho > 0.85 &&
       f.alto / f.ancho < 1.18,
@@ -1141,6 +1165,18 @@ export function digitalizarPagina(cruda: PaginaPdfCruda): PaginaDigitalizada {
 
   for (const figura of figuras) {
     if (usadas.has(figura)) continue;
+    if (figura.infografia) {
+      cuerpo.push({
+        tipo: "foto",
+        src: figura.src,
+        alt: `Infografía de la página ${cruda.pagina} de la edición impresa`,
+        // Cruza las columnas. Adentro de una de 340px sus rótulos quedan en
+        // tres píxeles de alto: se rescataba el dibujo del PDF y se lo perdía
+        // en el layout.
+        anchoCompleto: true,
+      });
+      continue;
+    }
     const epi = epigrafeDeFigura.get(figura);
     cuerpo.push({
       tipo: "foto",
@@ -1248,6 +1284,24 @@ function paginaGrafica(
   const enOrden = [...cruda.figuras].sort((a, b) => a.y - b.y || a.x - b.x);
 
   for (const figura of enOrden) {
+    /*
+     * Una infografía va sola: sin rótulo, sin crédito y con un `alt` genérico.
+     *
+     * `rotuloDe` busca el texto que cae DENTRO de la caja de la figura, y la
+     * infografía de la página 6 se traga así el «¿Qué elementos en común tienen
+     * las plazas que renovamos de manera integral?» que está impreso adentro
+     * del recuadro. Ese renglón es la BAJADA de la página —es el único texto
+     * suelto que tiene—, y dárselo a la imagen dejaba la nota sin bajada.
+     */
+    if (figura.infografia) {
+      cuerpo.push({
+        tipo: "foto",
+        src: figura.src,
+        alt: `Infografía de la página ${cruda.pagina} de la edición impresa`,
+        anchoCompleto: true,
+      });
+      continue;
+    }
     const rotulo = rotuloDe(figura);
     if (rotulo) usados.add(rotulo);
     cuerpo.push({

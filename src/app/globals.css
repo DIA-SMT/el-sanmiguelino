@@ -826,6 +826,19 @@
     break-inside: auto;
   }
 
+  /* Una figura que cruza las columnas: la infografía del impreso.
+     `column-span: all` la saca del reparto y le da el ancho de la nota entera.
+     Sin esto la infografía cae en una columna de 340px y sus rótulos —«Tótems
+     solares para carga de celular y agua caliente»— quedan en tres píxeles de
+     alto: se rescata el dibujo del PDF y se lo pierde en el layout.
+     El aire de arriba y abajo es mayor que el de una foto normal porque el
+     elemento parte el texto en dos: sin respiro, la columna que sigue se lee
+     como si continuara la anterior. */
+  .note-columns .figura-ancha {
+    column-span: all;
+    margin-block: 2.25rem;
+  }
+
 
   /* Filete doble, como la fecha del impreso. */
   .rule-double {

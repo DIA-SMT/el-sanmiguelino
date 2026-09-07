@@ -20,19 +20,28 @@
  *     se sacan de `page.objs`, que los entrega ya decodificados —el PDF de
  *     imprenta usa JPEG 2000 para las fotos y sin los decodificadores wasm
  *     salen en blanco—.
+ *  3. **Las infografías dibujadas.** Lo que el PDF no trae como imagen sino
+ *     como trazos, con el texto pasado a curvas. `vectores.ts` dice qué
+ *     rectángulo de la página es una infografía y acá se lo renderiza a un
+ *     lienzo y se lo guarda como una figura más. Sin este paso, las páginas 6 y
+ *     7 de agosto salían con seis fotos y ni una de sus cifras.
  *
  * Y después le pasa todo eso a `digitalizarPagina()`, que es puro y no sabe de
  * PDF: ahí vive la inteligencia y ahí se la puede leer.
  *
- * Las dos dependencias que usa —`sharp` para codificar y `pdfjs-dist` para
- * leer— ya estaban instaladas: la primera la trae Next para optimizar imágenes.
+ * Las tres dependencias que usa ya estaban instaladas: `pdfjs-dist` para leer,
+ * `sharp` para codificar —la trae Next para optimizar imágenes— y
+ * `@napi-rs/canvas`, que es el lienzo con el que pdf.js dibuja fuera del
+ * navegador.
  */
 
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import { createCanvas } from "@napi-rs/canvas";
 import { digitalizarPagina } from "../src/lib/pdf/estructura.ts";
+import { zonasDeInfografia } from "../src/lib/pdf/vectores.ts";
 
 const require = createRequire(import.meta.url);
 const sharp = require("sharp");
@@ -45,6 +54,11 @@ const AREA_MINIMA = 8000;
  *  que una a todo el ancho de una A3 son 1.577 px; recortarlas a 1.600 no pierde
  *  nada y le pone techo a lo que se sube. */
 const ANCHO_MAXIMO = 1600;
+
+/** Techo a cuánto se agranda una infografía al rasterizarla. Una zona angosta
+ *  llevada a 1.600 px de ancho serían 20 veces el original: mucho archivo para
+ *  nada, porque el vector se ve nítido bastante antes. */
+const ESCALA_MAXIMA = 4;
 
 const [, , archivoArg, salidaArg] = process.argv;
 
@@ -111,6 +125,56 @@ function pixeles(pagina, id) {
       resolver(null);
     }
   });
+}
+
+/** Los códigos de operador que `vectores.ts` necesita. Se le pasan en vez de que
+ *  importe pdf.js, para que ese módulo siga siendo puro. */
+const CODIGOS = {
+  save: pdfjs.OPS.save,
+  restore: pdfjs.OPS.restore,
+  transform: pdfjs.OPS.transform,
+  constructPath: pdfjs.OPS.constructPath,
+  endPath: pdfjs.OPS.endPath,
+  paintFormXObjectBegin: pdfjs.OPS.paintFormXObjectBegin,
+  paintFormXObjectEnd: pdfjs.OPS.paintFormXObjectEnd,
+};
+
+/**
+ * Renderiza un rectángulo de una página y lo devuelve en WebP.
+ *
+ * No se dibuja la hoja entera para recortarla después: el `offset` del viewport
+ * corre el origen, así que el lienzo mide sólo la zona y la página cae encima
+ * ya encuadrada. Una A3 completa a esta escala son 64 MB de píxeles y acá son 6.
+ *
+ * El blanco del principio no es decorativo. El PDF **no pinta el papel**: lo que
+ * no dibuja queda transparente, y una infografía de líneas negras sobre nada se
+ * ve como una plancha negra en cuanto alguien la abre en modo oscuro.
+ */
+async function rasterizar(pagina, zona) {
+  const escala = Math.min(ANCHO_MAXIMO / zona.ancho, ESCALA_MAXIMA);
+  const ancho = Math.round(zona.ancho * escala);
+  const alto = Math.round(zona.alto * escala);
+  const vista = pagina.getViewport({
+    scale: escala,
+    offsetX: -zona.x * escala,
+    offsetY: -zona.y * escala,
+  });
+
+  const lienzo = createCanvas(ancho, alto);
+  const contexto = lienzo.getContext("2d");
+  contexto.fillStyle = "#ffffff";
+  contexto.fillRect(0, 0, ancho, alto);
+  await pagina.render({ canvasContext: contexto, viewport: vista, canvas: lienzo })
+    .promise;
+
+  const crudo = contexto.getImageData(0, 0, ancho, alto).data;
+  const buffer = await sharp(
+    Buffer.from(crudo.buffer, crudo.byteOffset, crudo.byteLength),
+    { raw: { width: ancho, height: alto, channels: 4 } },
+  )
+    .webp({ quality: 82 })
+    .toBuffer();
+  return { buffer, ancho, alto };
 }
 
 const paginas = [];
@@ -180,11 +244,30 @@ for (let n = 1; n <= documento.numPages; n++) {
     }
   }
 
+  /*
+   * Las infografías dibujadas con trazos, que hasta acá no las miraba nadie.
+   *
+   * Se resuelve ANTES de recortar las imágenes porque una zona se traga la
+   * ilustración que tiene de fondo: esa imagen es una capa de la infografía y
+   * no una figura aparte, y publicarla suelta era publicar el mismo dibujo dos
+   * veces —el segundo desvaído y sin sus cifras—.
+   */
+  const zonas = zonasDeInfografia({
+    operadores,
+    OPS: CODIGOS,
+    ancho: vista.width,
+    alto: vista.height,
+    imagenes: colocadas,
+    textos: items,
+  });
+  const absorbidas = new Set(zonas.flatMap((z) => z.absorbidas));
+
   const figuras = [];
   const vistos = new Set();
   for (const c of colocadas) {
     if (vistos.has(c.id)) continue;
     vistos.add(c.id);
+    if (absorbidas.has(c.id)) continue;
 
     const datos = await pixeles(pagina, c.id);
     if (!datos?.data || !datos.width || !datos.height) {
@@ -223,6 +306,25 @@ for (let n = 1; n <= documento.numPages; n++) {
     });
   }
 
+  for (const zona of zonas) {
+    const nombre = `p${String(n).padStart(2, "0")}-${figuras.length + 1}.webp`;
+    const { buffer, ancho, alto } = await rasterizar(pagina, zona);
+    writeFileSync(path.join(salida, nombre), buffer);
+
+    figuras.push({
+      src: nombre,
+      x: zona.x,
+      y: zona.y,
+      ancho: zona.ancho,
+      alto: zona.alto,
+      infografia: true,
+      /* sólo para el informe */
+      px: `${ancho}×${alto}`,
+      kb: Math.round(buffer.length / 1024),
+      trazos: zona.trazos,
+    });
+  }
+
   /* ------------------------------------------------------------ estructura */
 
   const resultado = digitalizarPagina({
@@ -241,7 +343,7 @@ for (let n = 1; n <= documento.numPages; n++) {
   }, {});
   console.log(
     `p${String(n).padStart(2)} ${resultado.clase.padEnd(8)} ` +
-      `${figuras.length} fig  ` +
+      `${figuras.length} fig${zonas.length > 0 ? ` (${zonas.length} info)` : "      "}  ` +
       Object.entries(cuenta)
         .map(([t, c]) => `${c} ${t}`)
         .join(", ")

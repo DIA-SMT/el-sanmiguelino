@@ -101,8 +101,24 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
       /* Una foto dentro del cuerpo. NO cruza las columnas: se queda en la suya
          y deja que el multicol la acomode. Es lo que convierte una página de
          galería del impreso —seis fotos con su epígrafe— en dos filas de tres
-         sin una sola línea de layout propia. */
-      return (
+         sin una sola línea de layout propia.
+
+         La excepción es la infografía (`anchoCompleto`), que sí las cruza y va
+         del ancho de la nota: metida en una columna de 340px, sus rótulos
+         quedan en tres píxeles y el gráfico deja de decir lo que dice. Y va sin
+         el recorte 8:5, porque en un gráfico lo que se recorta es información y
+         no aire. */
+      return bloque.anchoCompleto ? (
+        <FiguraNota
+          src={bloque.src}
+          alt={bloque.alt}
+          epigrafe={bloque.epigrafe ?? ""}
+          credito={bloque.credito}
+          className="figura-ancha"
+          sinRecorte
+          sizes="(min-width: 1100px) 1100px, 100vw"
+        />
+      ) : (
         <FiguraNota
           src={bloque.src}
           alt={bloque.alt}

@@ -146,6 +146,11 @@ function validarBloque(v: unknown, i: number): BloqueNota {
       alt,
       ...(textoNoVacio(v.epigrafe) ? { epigrafe: v.epigrafe } : {}),
       ...(textoNoVacio(v.credito) ? { credito: v.credito } : {}),
+      // La marca de la infografía tiene que sobrevivir a que alguien abra la
+      // nota en el editor y la guarde: esta proyección es la que decide qué
+      // campos llegan a la base, así que lo que no esté acá se pierde en el
+      // primer guardado y la figura vuelve a meterse en una columna.
+      ...(v.anchoCompleto === true ? { anchoCompleto: true } : {}),
     };
   }
 

@@ -110,16 +110,21 @@ const nextConfig: NextConfig = {
   },
 
   /**
-   * `sharp` y `pdf.js` se cargan como paquetes de Node, no se empaquetan.
+   * `sharp`, `pdf.js` y el lienzo se cargan como paquetes de Node, no se
+   * empaquetan.
    *
    * `sharp` es un binario nativo y bundlearlo directamente no funciona.
-   * `pdfjs-dist` sí se podría, pero busca sus decodificadores por ruta relativa
-   * al paquete, así que sacarlo de `node_modules` le rompe esa búsqueda.
+   * `@napi-rs/canvas` también: es Skia compilado, y el `.node` que carga
+   * depende de la plataforma. `pdfjs-dist` sí se podría, pero busca sus
+   * decodificadores por ruta relativa al paquete, así que sacarlo de
+   * `node_modules` le rompe esa búsqueda.
    *
-   * Los dos los usa la digitalización del impreso, en el servidor
-   * (`src/lib/pdf/digitalizar-servidor.ts`).
+   * Los tres los usa la digitalización del impreso, en el servidor
+   * (`src/lib/pdf/digitalizar-servidor.ts`): el lienzo es con el que se
+   * rasterizan las infografías que el PDF dibuja con trazos en vez de traerlas
+   * como imagen.
    */
-  serverExternalPackages: ["sharp", "pdfjs-dist"],
+  serverExternalPackages: ["sharp", "pdfjs-dist", "@napi-rs/canvas"],
 
   /**
    * Archivos que hay que meter en la función a la fuerza.

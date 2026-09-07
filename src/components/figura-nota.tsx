@@ -36,6 +36,15 @@ export async function FiguraNota({
    *  de la página; acá va debajo del epígrafe, más chica y en versalitas, que
    *  es como la lleva un diario cuando no puede girarla. */
   credito,
+  /**
+   * Respeta la proporción real de la imagen en vez del recorte 8:5.
+   *
+   * Es para las infografías: el recorte apaisado les come un 6,7% del ancho, y
+   * en una infografía ese margen no es aire sino el borde del recuadro y el
+   * principio de los rótulos. Una foto sí se puede recortar —para eso está el
+   * 8:5 del impreso—; un gráfico no, porque lo que se corta es información.
+   */
+  sinRecorte = false,
 }: {
   alt: string;
   epigrafe: string;
@@ -45,6 +54,7 @@ export async function FiguraNota({
   prioridad?: boolean;
   sizes?: string;
   credito?: string;
+  sinRecorte?: boolean;
 }) {
   const real = imagenDisponible(src);
   const medidas = real && src ? await medirImagen(src) : null;
@@ -58,10 +68,14 @@ export async function FiguraNota({
         <div
           className={cn(
             "foto-editorial relative",
-            vertical ? "mx-auto w-full max-w-[22rem]" : cn("w-full", proporcion),
+            vertical
+              ? "mx-auto w-full max-w-[22rem]"
+              : sinRecorte && medidas
+                ? "w-full"
+                : cn("w-full", proporcion),
           )}
           style={
-            vertical && medidas
+            (vertical || sinRecorte) && medidas
               ? { aspectRatio: `${medidas.ancho} / ${medidas.alto}` }
               : undefined
           }
