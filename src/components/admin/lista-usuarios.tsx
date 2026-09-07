@@ -13,6 +13,20 @@ import type { UsuarioDelPanel } from "@/lib/repos/usuarios";
 import { cn } from "@/lib/utils";
 
 /**
+ * Una persona, como la ve esta pantalla.
+ *
+ * `delEntorno` lo resuelve el servidor y viaja como un booleano por fila, no
+ * como la lista de ids: acá adentro `process.env` no existe, y mandar la lista
+ * entera al navegador sería publicar quiénes son los administradores de
+ * emergencia para ahorrarse un `map`.
+ */
+export type UsuarioEnPantalla = UsuarioDelPanel & {
+  /** Administra desde la configuración del sistema. La tabla no lo puede
+   *  tocar: ni el rol ni el bloqueo tienen efecto sobre esta persona. */
+  delEntorno: boolean;
+};
+
+/**
  * La gente que entró, con sus filtros.
  *
  * **El orden principal es por fecha de registro**, no por último ingreso. Es lo
@@ -46,18 +60,23 @@ const FILTROS = [
     clave: "administran",
     nombre: "Administran",
     color: "var(--grafico-acento)",
-    pasa: (u: UsuarioDelPanel) => u.rol === "admin" && !u.bloqueado,
+    /* Los del entorno cuentan como que administran, aunque su fila diga
+       "lector": es lo que de verdad pueden hacer. Contar sólo la columna dejaba
+       a la pantalla llamando lectora a una persona que entra al panel. */
+    pasa: (u: UsuarioEnPantalla) =>
+      u.delEntorno || (u.rol === "admin" && !u.bloqueado),
   },
   {
     clave: "lectoras",
     nombre: "Lectoras",
-    pasa: (u: UsuarioDelPanel) => u.rol !== "admin" && !u.bloqueado,
+    pasa: (u: UsuarioEnPantalla) =>
+      !u.delEntorno && u.rol !== "admin" && !u.bloqueado,
   },
   {
     clave: "bloqueadas",
     nombre: "Bloqueadas",
     color: "var(--grafico-alerta)",
-    pasa: (u: UsuarioDelPanel) => u.bloqueado,
+    pasa: (u: UsuarioEnPantalla) => u.bloqueado,
   },
 ] as const;
 
@@ -67,12 +86,12 @@ const ORDENES = {
   registro: {
     nombre: "Por registro",
     ayuda: "La última persona que se sumó, arriba",
-    valor: (u: UsuarioDelPanel) => u.creadoEn,
+    valor: (u: UsuarioEnPantalla) => u.creadoEn,
   },
   ingreso: {
     nombre: "Por último ingreso",
     ayuda: "Quien entró hace menos, arriba",
-    valor: (u: UsuarioDelPanel) => u.ultimoIngreso,
+    valor: (u: UsuarioEnPantalla) => u.ultimoIngreso,
   },
 } as const;
 
@@ -91,7 +110,7 @@ export function ListaUsuarios({
   usuarios,
   yo,
 }: {
-  usuarios: UsuarioDelPanel[];
+  usuarios: UsuarioEnPantalla[];
   /** El `id_persona` de quien está mirando, para no ofrecerle bloquearse. */
   yo: string;
 }) {
@@ -283,7 +302,12 @@ export function ListaUsuarios({
           className="-mx-4 divide-y divide-panel-borde border-y border-panel-borde sm:-mx-5"
         >
           {enPantalla.map((u) => (
-            <FilaUsuario key={u.id} usuario={u} yo={yo} />
+            <FilaUsuario
+              key={u.id}
+              usuario={u}
+              yo={yo}
+              delEntorno={u.delEntorno}
+            />
           ))}
         </ul>
       )}

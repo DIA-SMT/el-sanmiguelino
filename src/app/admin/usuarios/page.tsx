@@ -35,9 +35,22 @@ const DIAS_RECIENTES = 7;
  */
 export default async function AdminUsuarios() {
   const sesion = await requerirAdmin();
-  const usuarios = await listarUsuarios();
 
-  const administran = usuarios.filter((u) => u.rol === "admin" && !u.bloqueado);
+  /* Quién administra desde la configuración se resuelve acá, del lado del
+     servidor, y baja como un booleano por fila: en el cliente `process.env` no
+     existe, y mandar la lista de ids sería publicar quiénes son los
+     administradores de emergencia. */
+  const usuarios = (await listarUsuarios()).map((u) => ({
+    ...u,
+    delEntorno: ADMINS_CIDITUC.has(u.id),
+  }));
+
+  /* Administra de hecho: la columna O la configuración. Contando sólo la
+     columna, la pantalla decía "3 administran" mientras había una cuarta
+     persona entrando al panel, y su fila la llamaba lectora. */
+  const administran = usuarios.filter(
+    (u) => u.delEntorno || (u.rol === "admin" && !u.bloqueado),
+  );
   const bloqueados = usuarios.filter((u) => u.bloqueado);
 
   /* `new Date()` y no `Date.now()`: es la misma hora y es lo que usan las otras

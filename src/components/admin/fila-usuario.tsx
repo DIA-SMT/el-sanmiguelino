@@ -27,16 +27,31 @@ import { cn, tiempoRelativo } from "@/lib/utils";
 export function FilaUsuario({
   usuario,
   yo,
+  delEntorno = false,
 }: {
   usuario: UsuarioDelPanel;
   /** El `id_persona` de quien está mirando, para no ofrecerle bloquearse. */
   yo: string;
+  /**
+   * Administra desde la configuración del sistema.
+   *
+   * A esa persona la fila **no le ofrece ninguna acción**, y no es una
+   * excepción de cortesía: `permisoDe()` ni siquiera le lee la fila, así que
+   * cambiarle el rol o bloquearla no tendría ningún efecto. El repo lo rechaza
+   * con "es-del-entorno" antes de tocar la base. Los botones estaban igual y el
+   * único destino posible era un cartel de error.
+   */
+  delEntorno?: boolean;
 }) {
   const router = useRouter();
   const [enCurso, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const esAdmin = usuario.rol === "admin";
+  /* Administra de hecho: por la tabla o por la configuración. La píldora mira
+     esto y no la columna, porque alguien de la lista del entorno tiene `rol =
+     "lector"` guardado y aun así entra al panel — la pantalla lo mostraba como
+     lectora, que es lo contrario de lo que pasa. */
+  const esAdmin = usuario.rol === "admin" || delEntorno;
   const superficie = usuario.bloqueado ? "hundida" : "tarjeta";
   const boton = clasesDeBoton({ tamano: "chico", sobre: superficie });
   const soyYo = usuario.id === yo;
@@ -94,6 +109,14 @@ export function FilaUsuario({
         </span>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          {delEntorno ? (
+            /* Nada que apretar, y dicho en palabras: sin esto la fila quedaba
+               muda y parecía que le faltaban los botones. */
+            <span className="text-panel-xs text-panel-tinta-3">
+              Su rol viene de la configuración del sistema
+            </span>
+          ) : (
+            <>
           <button
             type="button"
             disabled={enCurso}
@@ -133,6 +156,8 @@ export function FilaUsuario({
             )}
             {usuario.bloqueado ? "Permitir de nuevo" : "Bloquear"}
           </button>
+            </>
+          )}
         </div>
       </div>
 
