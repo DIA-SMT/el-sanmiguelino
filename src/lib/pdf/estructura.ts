@@ -107,10 +107,16 @@ export function camposDePagina(
     pagina.cuerpo.find((b) => b.tipo === "parrafo")?.texto ?? "";
   // Sin repetir: una galería puede traer dos fotos de la misma plaza, y
   // "Plaza 1º de Mayo, Plaza 1º de Mayo" leído en voz alta suena a error.
+  /* La infografía queda afuera, y no es un detalle de estilo: su epígrafe
+     explica un gráfico —«Qué incluye la renovación de plazas: árboles, plantas
+     y césped nuevos…»— y pegado detrás de los nombres de las plazas daba una
+     bajada que mezclaba dos cosas y terminaba con dos puntos finales. Los
+     epígrafes que sirven de bajada son los de la galería: son los nombres de lo
+     que la página muestra. */
   const epigrafes = [
     ...new Set(
       pagina.cuerpo
-        .filter((b) => b.tipo === "foto")
+        .filter((b) => b.tipo === "foto" && !b.anchoCompleto)
         .map((b) => (b.tipo === "foto" ? (b.epigrafe ?? "") : ""))
         .filter(Boolean),
     ),
@@ -238,6 +244,19 @@ const MUEBLERIA: RegExp[] = [
   /^municipalidad de san miguel de tucum[áa]n,/i,
   /^no arrojar en la v[íi]a p[úu]blica/i,
   /^publicaci[óo]n gratuita/i,
+  /*
+   * El resto del «N° 2» del sello, cuando el agrupado por altura no lo alcanza.
+   *
+   * `mueblesDe` junta el renglón entero para poder reconocerlo —el porqué está
+   * abajo, en su comentario— pero el «o» de «N°» viaja VOLADO, o sea a otra
+   * altura que el resto de la línea, así que a veces cae fuera del renglón y
+   * sobrevive con su número: «o 2». Sin este patrón eso aterriza como un
+   * párrafo de tres caracteres en el medio de la tapa, y así se publicó.
+   *
+   * Es deliberadamente angosto: sólo la o —o el ordinal— seguida de hasta tres
+   * dígitos y nada más. Ningún párrafo de un diario es eso.
+   */
+  /^[oº°]\s*\d{1,3}$/i,
 ];
 
 function esMueble(texto: string): boolean {
@@ -1189,13 +1208,37 @@ export function digitalizarPagina(cruda: PaginaPdfCruda): PaginaDigitalizada {
     });
   }
 
+  /*
+   * Última pasada de mueblería, sobre el bloque YA ARMADO.
+   *
+   * Los filtros de arriba miran ítems, renglones y líneas, y ahí la mueblería
+   * viaja partida: en la tapa el «N°» del sello se separa en la «N», la «o»
+   * volada y el «2», que caen en líneas distintas. Ninguna de las tres coincide
+   * con un patrón por su cuenta, pero al concatenarse en un párrafo el
+   * resultado es «o 2», y así se publicó: tres caracteres sueltos en el medio
+   * de la tapa.
+   *
+   * Filtrar acá, con el texto final en la mano, es lo que atrapa a los restos.
+   * Va sobre párrafos y subtítulos —no sobre citas ni fichas, que tienen
+   * estructura propia— y lo que saca queda anotado en `descartado`, para que la
+   * verificación lo pueda ver.
+   */
+  const cuerpoLimpio = cuerpo.filter((b) => {
+    const texto = b.tipo === "parrafo" || b.tipo === "subtitulo" ? b.texto : "";
+    if (texto && esMueble(texto)) {
+      descartado.push(texto);
+      return false;
+    }
+    return true;
+  });
+
   return {
     pagina: cruda.pagina,
     clase,
     titulo,
     bajada,
     imagen,
-    cuerpo,
+    cuerpo: cuerpoLimpio,
     descartado,
     avisos,
     depuracion: conRol.map((c) => ({
