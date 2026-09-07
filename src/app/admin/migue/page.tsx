@@ -1,9 +1,9 @@
 import Link from "next/link";
 import {
+  Bot,
   CalendarDays,
   CircleHelp,
   MessagesSquare,
-  Sparkles,
   Target,
 } from "lucide-react";
 import { requerirAdmin } from "@/lib/auth/dal";
@@ -12,8 +12,6 @@ import {
   type ResultadoEnTablero,
   type ResumenMigue,
 } from "@/lib/repos/migue";
-import { migueTieneModelo, modeloDeMigue } from "@/lib/migue/openrouter";
-import { consumoDeLaHora } from "@/lib/migue/tope";
 import { getIndice } from "@/lib/repos/edicion";
 import { tiempoRelativo } from "@/lib/utils";
 import { BotonActualizar } from "@/components/admin/boton-actualizar";
@@ -92,15 +90,19 @@ const GRACIA_SIN_RESPUESTA = 2;
  * Ninguna tarjeta de acá se dibuja a mano: todas salen de
  * `@/components/admin/piezas`. Si una pantalla inventa su propio borde, su
  * propio radio y su propia sombra, el panel deja de leerse como un panel.
+ *
+ * **Acá NO se cuenta con qué está armado esto.** Había dos tarjetas arriba de
+ * todo que decían con qué modelo contesta Migue, qué variable de entorno le
+ * falta a esta máquina, cuántas consultas van en la hora y cuál es el tope. Se
+ * fueron el 2026-09-07 y no vuelven: esta pantalla es para quien decide qué
+ * nota escribir el mes que viene, y el nombre de un modelo o el nombre de una
+ * variable no le sirven para eso —lo obligan a interpretar la infraestructura
+ * para leer un número—. Eso ahora vive en `docs/informe-tecnico.md`, que es
+ * donde lo busca quien de verdad lo necesita.
  */
 export default async function AdminMigue() {
   await requerirAdmin();
-  const [resumen, indice, consumo] = await Promise.all([
-    resumenMigue(30),
-    getIndice(),
-    consumoDeLaHora(),
-  ]);
-  const conModelo = migueTieneModelo();
+  const [resumen, indice] = await Promise.all([resumenMigue(30), getIndice()]);
   const tituloDe = new Map(indice.map((n) => [n.slug, n.titulo]));
 
   const cuenta = (clave: ResultadoEnTablero) =>
@@ -163,87 +165,10 @@ export default async function AdminMigue() {
           `sm:gap-6`— dos secciones vecinas nunca respiran igual y el tablero se
           lee como una pila de pantallas sueltas. */}
       <div className="grid gap-6">
-        {/* `[&>*]:min-w-0`: los hijos de un grid no se encogen por debajo de su
-            contenido salvo que se les diga. Sin esto, el ancho minimo del grafico
-            estira la columna y desborda la pagina entera. */}
-        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-          {/*
-           * Con qué está contestando **acá**, y por qué eso no es lo mismo que
-           * en producción.
-           *
-           * Esta pantalla mezcla dos cosas que vienen de lugares distintos, y
-           * decirlo importa: los números salen de la base, que es la misma que
-           * usa el sitio publicado, así que son los de los lectores de verdad.
-           * El cartel de abajo, en cambio, describe la máquina donde corre el
-           * panel —y el panel sólo corre en local, porque /admin no existe en
-           * producción mientras el login sea el mock.
-           *
-           * Sin esa aclaración el tablero dice "Sin modelo" con toda seguridad
-           * mientras Migue contesta perfecto en el sitio, que es exactamente la
-           * confusión que hubo.
-           */}
-          <TarjetaPanel>
-            <p className="text-panel-base text-panel-tinta-2">
-              {conModelo ? (
-                <>
-                  En esta computadora Migue responde con{" "}
-                  <code className="font-mono text-panel-sm text-panel-tinta">
-                    {modeloDeMigue()}
-                  </code>{" "}
-                  sobre las notas de la edición.
-                </>
-              ) : (
-                <>
-                  En esta computadora no hay modelo: Migue responde con el
-                  buscador por palabras clave, porque falta{" "}
-                  <code className="font-mono text-panel-sm text-panel-tinta">
-                    OPENROUTER_API_KEY
-                  </code>{" "}
-                  en{" "}
-                  <code className="font-mono text-panel-sm text-panel-tinta">
-                    .env.local
-                  </code>
-                  .
-                </>
-              )}
-            </p>
-            <p className="mt-2 text-panel-sm text-panel-tinta-3">
-              Eso describe <strong>esta máquina</strong>, no el sitio publicado:
-              el panel sólo corre acá.{" "}
-              {conModelo
-                ? "En producción la clave se configura aparte, en Vercel."
-                : "En producción la clave se configura en Vercel, y Migue puede estar contestando con el modelo aunque este cartel diga que no."}
-            </p>
-          </TarjetaPanel>
-
-          {/*
-           * El consumo de la hora sale de la base, que es la misma que usa el
-           * sitio publicado: son consultas de verdad, no de esta máquina. Por
-           * eso se muestra siempre y no sólo cuando ACÁ hay clave —esconderlo
-           * según la configuración local era mezclar otra vez las dos cosas.
-           */}
-          <TarjetaPanel>
-            <p className="text-panel-base text-panel-tinta-2">
-              Esta hora:{" "}
-              <strong className="tabular-nums text-panel-tinta">
-                {consumo.consultas}
-              </strong>{" "}
-              {consumo.consultas === 1 ? "consulta" : "consultas"} al modelo de{" "}
-              <span className="tabular-nums">{consumo.topeGlobal}</span>, de{" "}
-              <span className="tabular-nums">{consumo.personas}</span>{" "}
-              {consumo.personas === 1 ? "persona" : "personas"}.
-            </p>
-            <p className="mt-2 text-panel-sm text-panel-tinta-3">
-              Tope por persona: {consumo.topePersona} por hora. Pasarse no corta
-              a Migue: sigue con el buscador.
-            </p>
-          </TarjetaPanel>
-        </div>
-
         {resumen.total === 0 ? (
           <TarjetaPanel>
             <p className="flex items-center gap-2.5 text-panel-base text-panel-tinta-2">
-              <Sparkles
+              <Bot
                 className="h-4 w-4 shrink-0 text-panel-tinta-3"
                 aria-hidden="true"
               />

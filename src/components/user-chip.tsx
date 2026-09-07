@@ -6,7 +6,23 @@ import { LogOut } from "lucide-react";
 import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import type { Usuario } from "@/lib/types";
 
-export function UserChip({ usuario }: { usuario: Usuario }) {
+export function UserChip({
+  usuario,
+  soloMonograma = false,
+}: {
+  usuario: Usuario;
+  /**
+   * Deja el nombre para el lector de pantalla y muestra sólo el monograma, a
+   * cualquier ancho.
+   *
+   * Existe por la barra del panel plegada, que mide 80px: ahí el nombre no
+   * entra y `sm:not-sr-only` no ayuda, porque mira el ancho de la VENTANA y no
+   * el del hueco donde el chip está metido. Es una prop y no un selector CSS
+   * desde afuera a propósito — quien lo mete en un lugar angosto lo sabe, y una
+   * regla que alcance el marcado ajeno se rompe al primer cambio de acá.
+   */
+  soloMonograma?: boolean;
+}) {
   const router = useRouter();
   const [saliendo, setSaliendo] = useState(false);
 
@@ -38,7 +54,13 @@ export function UserChip({ usuario }: { usuario: Usuario }) {
   ).toLocaleUpperCase("es");
 
   return (
-    <div className="flex items-center gap-2">
+    /* `flex-wrap` con `max-w-full` y no una fila fija: los dos controles suman
+       80px de ancho, y en la barra plegada del panel el hueco es de 64 — ahí se
+       salían del borde. Envolviendo se apilan solos donde no entran y siguen en
+       fila donde sí, que es lo que hace que la misma pieza sirva en la cabecera
+       del diario, en un teléfono y en una barra de 80px sin que nadie le tenga
+       que decir en cuál está. */
+    <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
       {/* En el teléfono queda sólo el monograma. Con la franja institucional, el
           tema, el ingreso al panel y el cierre de sesión, el nombre completo era
           el cuarto elemento de una fila de 360px y la empujaba fuera de la
@@ -51,7 +73,13 @@ export function UserChip({ usuario }: { usuario: Usuario }) {
         >
           {iniciales}
         </span>
-        <span className="sr-only font-sans text-[0.7rem] font-medium text-ink sm:not-sr-only sm:max-w-[9rem] sm:truncate">
+        <span
+          className={
+            soloMonograma
+              ? "sr-only"
+              : "sr-only font-sans text-[0.7rem] font-medium text-ink sm:not-sr-only sm:max-w-[9rem] sm:truncate"
+          }
+        >
           {nombre}
         </span>
       </span>

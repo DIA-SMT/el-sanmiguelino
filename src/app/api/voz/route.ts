@@ -97,13 +97,11 @@ import {
  * una persona: son valores de espacios distintos —el otro es un HMAC de 32
  * caracteres— así que no se pisan nunca.
  *
- * **Deuda anotada, a propósito y no por descuido:** `tope.ts` suma la ventana
- * entera sin filtrar por clave (el `aggregate` de `contarConsultaAlModelo` y el
- * `findMany` de `consumoDeLaHora`), así que hoy las filas de la voz también
- * cuentan contra `MIGUE_TOPE_GLOBAL` y se ven en el tablero de Migue. En régimen
- * son nueve audios por edición —ruido— y bajo ráfaga son sesenta por hora como
- * mucho, pero es contaminación real y el arreglo es de un renglón por consulta:
- * `clave: { not: "voz" }`. Va en `tope.ts`, que esta tanda no toca.
+ * **Esa deuda ya está saldada.** Hubo un tiempo en que `tope.ts` sumaba la
+ * ventana entera sin filtrar por clave, así que las filas de la voz le comían a
+ * Migue sus llamadas de la hora. Hoy sus dos consultas excluyen
+ * `CLAVE_DE_LA_VOZ`, que por eso vive allá y no acá: si la constante estuviera
+ * del lado de quien escribe, un cambio de texto rompería el filtro en silencio.
  *
  * El tope por persona tampoco se copia, aunque desde el ingreso real de Cidituc
  * ya sería posible —cada sesión trae su `id_persona`, no la identidad única que

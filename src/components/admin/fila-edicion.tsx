@@ -137,6 +137,10 @@ export function FilaEdicion({
   const [error, setError] = useState<string | null>(null);
   const [fecha, setFecha] = useState(edicion.publicaEnLocal);
   const [tema, setTema] = useState(edicion.tema ?? "");
+  /* El número se edita como texto y se convierte al guardar. Con `number` el
+     campo se queda vacío mientras se borra para escribir otro, y un `0` o un
+     `NaN` intermedio llegaría a la acción. */
+  const [numero, setNumero] = useState(String(edicion.numero));
   const [borrando, setBorrando] = useState(false);
   const [tipeado, setTipeado] = useState("");
 
@@ -162,7 +166,7 @@ export function FilaEdicion({
         const res = await guardarEdicionAction({
           slug: edicion.slug,
           mes: edicion.mes,
-          numero: edicion.numero,
+          numero,
           anio: edicion.anio,
           etiqueta: edicion.etiqueta ?? "",
           publicaEn: fecha,
@@ -299,6 +303,30 @@ export function FilaEdicion({
                 placeholder="Historia de San Miguel de Tucumán"
               />
             </label>
+            {/* El número del ejemplar, que es un dato editorial y no un
+                identificador nuestro: El Sanmiguelino viene numerado desde el
+                impreso, así que una edición cargada al pasar el papel a digital
+                puede tener que ser la 908 y no la que siga en la cuenta. Sólo
+                se podía elegir al crearla, y después no había manera de
+                corregirlo sin borrar el número entero. */}
+            <label className="grid gap-1.5">
+              <span className="text-panel-sm font-medium text-panel-tinta-2">
+                Número de la edición
+              </span>
+              <input
+                value={numero}
+                onChange={(e) => setNumero(e.target.value)}
+                inputMode="numeric"
+                className={cn(
+                  clasesDeCampo("hundida"),
+                  "w-28 justify-self-start tabular-nums",
+                )}
+              />
+              <span className="text-panel-xs text-panel-tinta-3">
+                Es el que se ve en el diario y en el archivo. No puede repetirse
+                dentro del mismo año.
+              </span>
+            </label>
             <label className="grid gap-1.5">
               <span className="text-panel-sm font-medium text-panel-tinta-2">
                 Sale el (hora de Tucumán)
@@ -329,6 +357,7 @@ export function FilaEdicion({
                   setEditando(false);
                   setFecha(edicion.publicaEnLocal);
                   setTema(edicion.tema ?? "");
+                  setNumero(String(edicion.numero));
                   setError(null);
                 }}
                 className={BOTON_QUIETO}
@@ -388,7 +417,7 @@ export function FilaEdicion({
                 className={BOTON_SECUNDARIO}
               >
                 <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                Tema y fecha
+                Tema, número y fecha
               </button>
 
               {enFoco ? (

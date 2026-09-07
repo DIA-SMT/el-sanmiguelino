@@ -1511,3 +1511,136 @@ une y se corta; nunca se escribe.
   como imagen —su texto no, ése está entero—. Para recortarla hay que rasterizar
   la región, y `@napi-rs/canvas` ya está instalado para cuando se haga.
 - El conversor corre como script, no desde el panel.
+
+## Etapa 10 — moderación más firme, filtros y el panel sin explicaciones (2026-09-07)
+
+Diez pedidos de una sola vez, después de usar el panel con la edición de
+septiembre ya cargada. Lo que sigue es qué se hizo y por qué, en el orden en que
+importa.
+
+### La moderación pasó a tener tres estados
+
+El disparador fue un comentario que decía "Es una mierda" sobre una nota de la
+edición impresa. Con dos estados —publicado o de baja— el moderador tenía que
+elegir entre dejarlo a la vista o resolverlo de apuro, y el motivo de la baja era
+un campo de texto libre que cada uno llenaba como quería.
+
+- **`en_revision`** es el estado del medio: sale del diario y no decide nada
+  más. Entró **sin migración**, porque `Comentario.estado` es texto y no un enum
+  de Postgres justamente para esto. El lector no lo ve: `listar()` y
+  `ultimoDeEdicion()` filtran por `estado = "publicado"`, así que un comentario
+  en revisión tampoco queda destacado en la tapa. Las dos cosas están en el
+  contrato.
+- **Los motivos de baja se tipificaron** (`MOTIVOS_DE_BAJA` en `types.ts`):
+  insulto o agresión, datos personales, spam o publicidad, fuera de tema, otro.
+  El detalle libre sigue existiendo y se guarda al lado, como `"Motivo ·
+  detalle"`. Con texto libre, seis bajas por la misma razón quedan escritas de
+  seis maneras, y una moderación que no se puede contar tampoco se puede
+  sostener pareja.
+- **Se puede borrar de verdad**, y esto es lo que más se discutió consigo mismo.
+  El repo venía diciendo por escrito que un comentario no se borra nunca porque
+  una publicación oficial que esconde la palabra de un vecino tiene que poder
+  decir quién lo decidió. Sigue siendo cierto, y por eso `eliminar()` **sólo
+  acepta lo que ya está de baja**: primero queda escrito quién lo sacó y por qué,
+  y recién después se puede decidir que el diario no tiene por qué conservar una
+  agresión para siempre. La regla vive en los dos motores, no en la pantalla.
+- **Bloquear a quien escribió, desde el comentario.** Una agresión no es un
+  problema del texto sino de quien lo escribió, y antes había que anotarse el
+  nombre e ir a buscarlo a Usuarios. El botón sólo aparece si esa persona está en
+  el padrón: los comentarios de la época del login de mentira traen `usuarioId`
+  que no son de nadie. Una consulta (`bloqueosDe`) para toda la lista, no una por
+  fila.
+
+### Usuarios: fecha de alta, filtros y paginado
+
+- **Columna `creadoEn`** (migración `20260907120000_usuario_creado_en`). Con sólo
+  `ultimoIngreso`, que se pisa en cada entrada, la lista se rebarajaba sola cada
+  vez que alguien abría el diario y no había forma de contestar quién se sumó
+  esta semana. Las filas que ya existían **se rellenaron con su
+  `ultimoIngreso`**: es lo único que se puede afirmar —esa persona ya estaba
+  registrada ese día— y además conserva el invariante `creadoEn <= ultimoIngreso`.
+  Dejarles la hora de la migración habría mostrado "se registró hoy, entró hace
+  cuatro días".
+- El orden principal pasó a ser por alta. El otro sigue a un toque y se resuelve
+  en memoria: la lista llega entera igual, porque las cuentas de los chips la
+  necesitan.
+- Buscador por nombre (y por id, que es lo único que identifica al que aparece en
+  el rastro de "quién lo cambió"), cuatro chips —todas, administran, lectoras,
+  bloqueadas— y **paginado numerado**, 25 por página.
+
+### El paginado numerado es una pieza
+
+Estaba escrito adentro de `consultas-migue.tsx`. Al necesitarlo por segunda vez
+se mudó a `piezas.tsx` como `PaginadoNumerado`: el tramo del "…" es de una sola
+línea y dos copias se separan solas. Lo que queda del lado de cada pantalla es lo
+que de verdad es suyo: cuántas filas entran en una página y el resumen del tramo.
+
+### La barra lateral se pliega, y el logotipo vuelve al diario
+
+- En pantalla ancha se pliega a 80px, sólo iconos, con el nombre en el globito y
+  en el lector de pantalla. La preferencia se guarda en el navegador de cada uno
+  con `useSyncExternalStore` —el mismo patrón del `ThemeToggle`—, que es lo que
+  evita el parpadeo de 288 a 80 píxeles y el aviso de hidratación.
+- En pantalla angosta **no** hay plegado ni cajón: la barra sigue siendo dos
+  filas, con las secciones en una tira que se desplaza.
+- La marca ahora es un enlace a `/diario`. Apretar el logotipo de un panel para
+  volver al sitio es lo que hace todo el mundo, y acá no hacía nada.
+- `UserChip` aprendió `soloMonograma` y pasó a envolver con `flex-wrap`: en 80px
+  sus dos controles se apilan, y en un teléfono siguen en fila. Antes se salían
+  del borde.
+- El icono de Migue es un robot y no las chispas de "magia con inteligencia
+  artificial": Migue es el buscador del diario que además contesta.
+
+### La vista previa tiene vuelta
+
+La barra azul sólo ofrecía dejar de mirar la edición. Faltaba lo otro: volver al
+panel, que es de donde uno vino. Y como la vista previa dura hasta que se la
+apaga, el panel seguía diciendo "la estás viendo" sobre una edición que ya nadie
+miraba. Ahora los dos botones apagan la vista previa y se diferencian en a dónde
+llevan.
+
+De paso apareció un defecto viejo: `sinPuntoFinal()` usaba `/.$/` sin escapar, o
+sea que le comía el último carácter a cualquier frase que no terminara en punto.
+"todavía no tiene fecha de publicación" salía como "publicació".
+
+### El número de la edición se puede cambiar
+
+Sólo se elegía al crearla. El Sanmiguelino viene numerado desde el impreso, así
+que una edición cargada al pasar el papel a digital puede tener que ser la 908 y
+no la que siga en la cuenta. El choque con `@@unique([anio, numero])` se
+comprueba antes de escribir para poder decir qué mes ya tiene ese número; la
+restricción de Postgres sigue siendo la que manda.
+
+### Y el panel dejó de explicar con qué está hecho
+
+Se fueron de la pantalla: las dos tarjetas de Migue (el modelo, la variable que
+falta, el consumo de la hora y los topes), el nombre de `DATABASE_URL` en el
+aviso de sólo lectura, `CIDITUC_ADMINS` en el aviso de Usuarios y en el mensaje
+de error de la acción, la explicación del rol `editora` que no habilita nada, y
+el mecanismo del cambio de mes en Ediciones.
+
+Nada de eso era falso. El problema es que quien entra al panel entra a decidir
+qué nota escribir o qué comentario bajar, y para eso el nombre de un modelo no
+ayuda: obliga a interpretar la infraestructura para leer un número. El cartel del
+modelo encima invitaba a leer mal, porque describía *la computadora donde corre
+el panel* y decía "sin modelo" mientras Migue contestaba perfecto en producción.
+
+Todo eso vive ahora en **`docs/informe-tecnico.md`**. Si algo de eso vuelve a una
+pantalla del panel, es una regresión.
+
+### Cómo se verificó
+
+- `npm run verificar:comentarios` y `verificar:comentarios:pg`: el contrato con
+  las aserciones nuevas —revisión, borrado, motivo tipificado, votos que se van
+  con la fila— pasa **contra los dos motores**.
+- El runner de Postgres ya no usa los slugs del archivo semilla: los busca en la
+  base. Venía fallando en el primer `crear()` por la clave externa contra
+  `notas.slug`, así que ese contrato no verificaba nada desde que la edición en
+  la calle dejó de ser la del semillero.
+- `npx tsc --noEmit`, `eslint` de lo tocado y `npm run build`.
+- Lo visual se miró con un banco de pruebas temporal (una ruta con datos
+  inventados y `AUTH_CIDITUC=0`, borrado al terminar): el navegador integrado no
+  tiene sesión de Cidituc, así que `/admin` no se puede abrir desde ahí. Se
+  verificaron los tres estados del comentario, las dos ceremonias nuevas, los
+  filtros y el paginado, la barra plegada y desplegada, la ficha de edición y la
+  barra de vista previa, en claro y en oscuro, en escritorio y en teléfono.

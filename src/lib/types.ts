@@ -193,9 +193,23 @@ export interface EdicionSemilla extends EdicionResumen {
   notas: NotaSemilla[];
 }
 
-/** Un comentario oculto sigue existiendo: se conservan sus votos y queda el
- *  rastro de quién lo bajó. Nunca se borra. */
-export type EstadoComentario = "publicado" | "oculto";
+/**
+ * Los tres estados de un comentario.
+ *
+ * - `publicado`: se ve en el diario. Es el estado con el que nace, porque la
+ *   política acordada con el municipio es que los comentarios se publican
+ *   directo.
+ * - `en_revision`: **no se ve en el diario**, y todavía no hay decisión
+ *   tomada. Es el paso intermedio para lo que hay que mirar con calma —una
+ *   agresión, algo que puede ser un dato personal— sin dejarlo publicado
+ *   mientras tanto ni bajarlo de apuro.
+ * - `oculto`: dado de baja, con el motivo y el rastro de quién lo decidió.
+ *
+ * Un comentario en revisión o de baja sigue existiendo: conserva sus votos y
+ * su texto. Borrarlo de verdad es una acción aparte y explícita del
+ * administrador (`eliminar()`), no una consecuencia de bajarlo.
+ */
+export type EstadoComentario = "publicado" | "en_revision" | "oculto";
 
 export interface Comentario {
   id: string;
@@ -217,3 +231,26 @@ export interface ComentarioModerable extends Comentario {
   ocultadoEn?: string; // ISO
   motivoBaja?: string;
 }
+
+/**
+ * Los motivos con los que se da de baja un comentario.
+ *
+ * Son una lista y no un campo libre porque el motivo tiene que poder LEERSE
+ * DESPUÉS: con texto libre, seis bajas por la misma razón quedan escritas de
+ * seis maneras y no hay forma de contarlas ni de sostener un criterio parejo.
+ * El detalle libre sigue existiendo y se guarda al lado.
+ *
+ * "Insulto o agresión" va primero porque es el caso que motivó tipificarlos: un
+ * insulto no es una crítica ni una queja, y la moderación de una publicación
+ * oficial tiene que poder decirlo con esas palabras en vez de esconderlo atrás
+ * de un "no correspondía".
+ */
+export const MOTIVOS_DE_BAJA = [
+  "Insulto o agresión",
+  "Datos personales",
+  "Spam o publicidad",
+  "Fuera de tema",
+  "Otro",
+] as const;
+
+export type MotivoDeBaja = (typeof MOTIVOS_DE_BAJA)[number];

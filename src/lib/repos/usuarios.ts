@@ -27,6 +27,8 @@ export interface UsuarioDelPanel {
   nombre: string;
   rol: RolGuardado;
   bloqueado: boolean;
+  /** Cuándo se registró: la primera vez que entró. No se pisa nunca. */
+  creadoEn: string;
   /** ISO y no `Date`: es lo que cruza al cliente como JSON, y `tiempoRelativo`
    *  espera un string. */
   ultimoIngreso: string;
@@ -57,26 +59,86 @@ export async function permisoGuardado(
   });
 }
 
-/** Todos, del que entró más recién al más viejo. Para el panel. */
+/** Las columnas que el panel muestra de una persona. Escritas una vez porque
+ *  el listado y las dos escrituras tienen que devolver exactamente lo mismo:
+ *  si una se olvida un campo, la fila vuelve del servidor a medio llenar. */
+const COLUMNAS_DEL_PANEL = {
+  id: true,
+  nombre: true,
+  rol: true,
+  bloqueado: true,
+  creadoEn: true,
+  ultimoIngreso: true,
+  cambiadoPor: true,
+  cambiadoEn: true,
+} as const;
+
+/**
+ * Todos, del que se registró más recién al más viejo. Para el panel.
+ *
+ * **El orden es por fecha de registro y no por último ingreso**, que es lo que
+ * hacía antes. La diferencia importa: ordenada por ingreso, la lista se
+ * rebaraja sola cada vez que alguien abre el diario, así que volver a la
+ * persona que estabas mirando es buscarla de nuevo. Por alta, el orden es
+ * estable y contesta la pregunta que de verdad se le hace a esta pantalla:
+ * quién se sumó último.
+ *
+ * El otro orden no se pierde: la pantalla lo ofrece y lo resuelve en memoria,
+ * porque la lista llega entera igual —las cuentas de los chips la necesitan— y
+ * una segunda consulta para reordenar lo que ya está en la mano es un viaje al
+ * pedo.
+ */
 export async function listarUsuarios(): Promise<UsuarioDelPanel[]> {
   const filas = await db().usuario.findMany({
-    orderBy: { ultimoIngreso: "desc" },
-    select: {
-      id: true,
-      nombre: true,
-      rol: true,
-      bloqueado: true,
-      ultimoIngreso: true,
-      cambiadoPor: true,
-      cambiadoEn: true,
-    },
+    orderBy: { creadoEn: "desc" },
+    select: COLUMNAS_DEL_PANEL,
   });
-  return filas.map((f) => ({
-    ...f,
-    rol: normalizar(f.rol),
-    ultimoIngreso: f.ultimoIngreso.toISOString(),
-    cambiadoEn: f.cambiadoEn?.toISOString() ?? null,
-  }));
+  return filas.map(paraElPanel);
+}
+
+/** De la fila de Postgres a lo que cruza al cliente: los `Date` como ISO, y el
+ *  rol crudo validado contra los que este código conoce. */
+function paraElPanel(fila: {
+  id: string;
+  nombre: string;
+  rol: string;
+  bloqueado: boolean;
+  creadoEn: Date;
+  ultimoIngreso: Date;
+  cambiadoPor: string | null;
+  cambiadoEn: Date | null;
+}): UsuarioDelPanel {
+  return {
+    ...fila,
+    rol: normalizar(fila.rol),
+    creadoEn: fila.creadoEn.toISOString(),
+    ultimoIngreso: fila.ultimoIngreso.toISOString(),
+    cambiadoEn: fila.cambiadoEn?.toISOString() ?? null,
+  };
+}
+
+/**
+ * De un puñado de `id_persona`, cuáles están en el padrón y cuáles bloqueados.
+ *
+ * Existe para la pantalla de moderación, que ofrece bloquear a quien escribió
+ * un comentario y necesita saber dos cosas antes de dibujar el botón: si esa
+ * persona existe acá —los comentarios de la época del login de mentira traen
+ * ids que no son de nadie— y si no está bloqueada ya.
+ *
+ * Devuelve un mapa y no una lista: la pantalla pregunta por id, y "no está en
+ * el mapa" es exactamente "no está en el padrón". Una consulta sola para toda
+ * la lista, no una por comentario.
+ */
+export async function bloqueosDe(
+  ids: string[],
+): Promise<Map<string, boolean>> {
+  const unicos = [...new Set(ids)].filter(Boolean);
+  if (unicos.length === 0) return new Map();
+  const filas = await db().usuario.findMany({
+    where: { id: { in: unicos } },
+    select: { id: true, bloqueado: true },
+  });
+  return new Map(filas.map((f) => [f.id, f.bloqueado]));
 }
 
 /** Mismo criterio que `roles.ts`: lo desconocido cae a "lector", lo menos. */
@@ -114,12 +176,15 @@ export async function registrarIngreso(datos: {
   try {
     const fila = await db().usuario.upsert({
       where: { id: datos.id },
+      // `creadoEn` no se escribe: lo pone el default de la columna, y así queda
+      // claro que esta fecha se fija una sola vez.
       create: { id: datos.id, nombre: datos.nombre },
       // En el update van SÓLO estos dos campos. Sumar `rol` o `bloqueado` acá
       // haría que cada ingreso reponga el permiso de fábrica: un administrador
       // volvería a lector y un bloqueado se desbloquearía solo. Falla en
       // silencio —anda perfecto hasta que la persona vuelve a entrar— y deja el
-      // panel entero de adorno.
+      // panel entero de adorno. Y sumar `creadoEn` borraría la fecha de alta de
+      // todo el padrón, un ingreso por vez.
       update: { nombre: datos.nombre, ultimoIngreso: new Date() },
       select: { bloqueado: true },
     });
@@ -230,26 +295,10 @@ async function cambiar(
           cambiadoPor: quien,
           cambiadoEn: new Date(),
         },
-        select: {
-          id: true,
-          nombre: true,
-          rol: true,
-          bloqueado: true,
-          ultimoIngreso: true,
-          cambiadoPor: true,
-          cambiadoEn: true,
-        },
+        select: COLUMNAS_DEL_PANEL,
       });
 
-      return {
-        ok: true as const,
-        usuario: {
-          ...guardada,
-          rol: normalizar(guardada.rol),
-          ultimoIngreso: guardada.ultimoIngreso.toISOString(),
-          cambiadoEn: guardada.cambiadoEn?.toISOString() ?? null,
-        },
-      };
+      return { ok: true as const, usuario: paraElPanel(guardada) };
     },
     { isolationLevel: "Serializable" },
   );

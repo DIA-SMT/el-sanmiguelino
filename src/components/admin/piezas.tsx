@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -868,6 +868,147 @@ export function clasesDeBotonIcono(opciones?: {
   const { tono = "secundario", sobre = "tarjeta" } = opciones ?? {};
 
   return `${BOTON_BASE} h-8 w-8 shrink-0 rounded-panel-3 ${tonoDeBoton(tono, sobre)}`;
+}
+
+/* ---------------------------------------------------------------------------
+   Paginado numerado
+--------------------------------------------------------------------------- */
+
+/**
+ * Qué números dibuja el paginado: los bordes, los vecinos de la actual, y un
+ * hueco donde falten.
+ *
+ * Con dos páginas es "1 2" y sobra la ceremonia, pero con veinte es
+ * "1 … 9 10 11 … 20" y no una fila de veinte botones que se va de la tarjeta.
+ * Se escribe una vez acá y ninguna pantalla tiene que decidir nada.
+ */
+function tramosDePaginado(actual: number, total: number): (number | "hueco")[] {
+  const cerca = [1, total, actual - 1, actual, actual + 1]
+    .filter((n) => n >= 1 && n <= total)
+    .sort((a, b) => a - b);
+  const unicos = [...new Set(cerca)];
+  const salida: (number | "hueco")[] = [];
+  unicos.forEach((n, i) => {
+    if (i > 0 && n - unicos[i - 1] > 1) salida.push("hueco");
+    salida.push(n);
+  });
+  return salida;
+}
+
+/**
+ * **Páginas numeradas, que REEMPLAZAN las filas.**
+ *
+ * Es la forma de paginar que se decidió para el panel después de descartar las
+ * otras dos, y las dos fallaron por lo mismo. Primero un scroll infinito: la
+ * tanda siguiente llegaba justo cuando terminabas la anterior, así que bajando
+ * de corrido siempre acababas con la lista entera dibujada. Después un botón de
+ * "mostrar más": el corte se veía, pero las filas se ACUMULABAN, o sea que a la
+ * tercera vuelta volvía el scroll interminable.
+ *
+ * Un paginado numerado no tiene ninguno de los dos problemas: la tarjeta mide
+ * siempre lo mismo, se sabe cuántas páginas hay, y se puede volver a la 2 sin
+ * recorrer la 1. **Cualquier lista larga nueva del panel arranca con esto.**
+ *
+ * Nació en la tabla de consultas de Migue y vive acá desde que hizo falta por
+ * segunda vez, en la lista de usuarios: dos copias de un paginado son dos
+ * comportamientos que se separan: el tramo del "…" es de una sola línea y se
+ * escribe distinto cada vez.
+ *
+ * Lo que la pieza decide por vos:
+ *
+ * - **No se dibuja si hay una sola página.** Un paginado que dice "1" es ruido.
+ * - Los números son `ChipFiltro`, el control que ya existe para "uno de un
+ *   conjunto está elegido", con `aria-current="page"` pisando el `aria-pressed`
+ *   que la pieza trae: una página no se aprieta, se está en ella.
+ * - El hueco es decorativo (`aria-hidden`): lo que un lector de pantalla
+ *   necesita es en qué página está y cuántas hay, y eso lo dicen el
+ *   `aria-label` de cada número y el anuncio que pone la pantalla.
+ *
+ * Lo que NO decide y le toca a quien la usa: acotar la página al total —la
+ * página mostrada tiene que ser DERIVADA, porque un filtro puede achicar la
+ * lista abajo de donde estabas— y subir la vista al principio de la lista al
+ * cambiar de página.
+ *
+ * @param resumen El "31–60 de 380" del final. Opcional: en una lista corta el
+ *   número de página ya lo dice todo.
+ */
+export function PaginadoNumerado({
+  pagina,
+  totalPaginas,
+  alIr,
+  etiqueta,
+  superficie = "tarjeta",
+  resumen,
+}: {
+  pagina: number;
+  totalPaginas: number;
+  alIr: (destino: number) => void;
+  /** Para el `aria-label` de la nav: "Páginas de consultas". */
+  etiqueta: string;
+  superficie?: "pagina" | "tarjeta";
+  resumen?: React.ReactNode;
+}): React.ReactElement | null {
+  if (totalPaginas <= 1) return null;
+
+  const sobre = superficie === "pagina" ? "pagina" : "tarjeta";
+
+  return (
+    <nav
+      aria-label={etiqueta}
+      className="flex flex-wrap items-center gap-x-2 gap-y-2"
+    >
+      <button
+        type="button"
+        onClick={() => alIr(pagina - 1)}
+        disabled={pagina === 1}
+        className={clasesDeBotonIcono({ sobre })}
+        aria-label="Página anterior"
+      >
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+      </button>
+
+      {tramosDePaginado(pagina, totalPaginas).map((tramo, i) =>
+        tramo === "hueco" ? (
+          <span
+            key={`hueco-${i}`}
+            aria-hidden="true"
+            className="px-1 text-panel-sm text-panel-tinta-3"
+          >
+            …
+          </span>
+        ) : (
+          <ChipFiltro
+            key={tramo}
+            activo={tramo === pagina}
+            superficie={superficie}
+            onClick={() => alIr(tramo)}
+            aria-pressed={undefined}
+            aria-current={tramo === pagina ? "page" : undefined}
+            aria-label={`Página ${tramo}`}
+            className="tabular-nums"
+          >
+            {tramo}
+          </ChipFiltro>
+        ),
+      )}
+
+      <button
+        type="button"
+        onClick={() => alIr(pagina + 1)}
+        disabled={pagina === totalPaginas}
+        className={clasesDeBotonIcono({ sobre })}
+        aria-label="Página siguiente"
+      >
+        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+      </button>
+
+      {resumen ? (
+        <p className="ml-auto text-panel-xs tabular-nums text-panel-tinta-3">
+          {resumen}
+        </p>
+      ) : null}
+    </nav>
+  );
 }
 
 /* ---------------------------------------------------------------------------

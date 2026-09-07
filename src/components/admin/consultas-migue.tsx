@@ -1,23 +1,17 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Info,
-  Search,
-  ShieldCheck,
-} from "lucide-react";
+import { Info, Search, ShieldCheck } from "lucide-react";
 import type { ResultadoEnTablero, ResumenMigue } from "@/lib/repos/migue";
 import { cn } from "@/lib/utils";
 import {
   Aviso,
   ChipFiltro,
+  PaginadoNumerado,
   Pildora,
   TABLA,
   ZonaDeTabla,
   clasesDeBoton,
-  clasesDeBotonIcono,
   clasesDeCampo,
 } from "@/components/admin/piezas";
 
@@ -207,27 +201,6 @@ function normalizar(texto: string): string {
  * sobre lo dibujado, un chip diría 12 y al apretarlo aparecerían 40.
  */
 const POR_PAGINA = 30;
-
-/**
- * Qué números dibuja el paginado: los bordes, los vecinos de la actual, y un
- * hueco donde falten.
- *
- * Con dos páginas es "1 2" y sobra la ceremonia, pero con veinte es
- * "1 … 9 10 11 … 20" y no una fila de veinte botones que se va de la tarjeta.
- * Se escribe una vez acá y la pantalla no tiene que decidir nada.
- */
-function tramosDePaginado(actual: number, total: number): (number | "hueco")[] {
-  const cerca = [1, total, actual - 1, actual, actual + 1]
-    .filter((n) => n >= 1 && n <= total)
-    .sort((a, b) => a - b);
-  const unicos = [...new Set(cerca)];
-  const salida: (number | "hueco")[] = [];
-  unicos.forEach((n, i) => {
-    if (i > 0 && n - unicos[i - 1] > 1) salida.push("hueco");
-    salida.push(n);
-  });
-  return salida;
-}
 
 export function ConsultasMigue({
   consultas,
@@ -655,74 +628,25 @@ export function ConsultasMigue({
         </ZonaDeTabla>
       )}
 
-      {totalPaginas > 1 && (
-        <nav
-          aria-label="Páginas de consultas"
-          className="flex flex-wrap items-center gap-x-2 gap-y-2"
-        >
-          <button
-            type="button"
-            onClick={() => irA(paginaActual - 1)}
-            disabled={paginaActual === 1}
-            className={clasesDeBotonIcono({ sobre: "tarjeta" })}
-            aria-label="Página anterior"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </button>
-
-          {tramosDePaginado(paginaActual, totalPaginas).map((tramo, i) =>
-            tramo === "hueco" ? (
-              /* El hueco es decorativo: lo que un lector de pantalla necesita
-                 saber es en qué página está y cuántas hay, y eso lo dice el
-                 aria-label de cada número y el anuncio de abajo. */
-              <span
-                key={"hueco-" + i}
-                aria-hidden="true"
-                className="px-1 text-panel-sm text-panel-tinta-3"
-              >
-                …
-              </span>
-            ) : (
-              /* Es el chip del panel, el control que ya existe para "uno de un
-                 conjunto está elegido", así que el paginado no inventa un
-                 estilo. Lo único que se le pisa es la semántica: el chip pone
-                 aria-pressed —que es de interruptor— y una página no se
-                 aprieta, se está en ella. De ahí aria-current="page", que es lo
-                 que un lector de pantalla anuncia como "página actual". */
-              <ChipFiltro
-                key={tramo}
-                activo={tramo === paginaActual}
-                superficie="tarjeta"
-                onClick={() => irA(tramo)}
-                aria-pressed={undefined}
-                aria-current={tramo === paginaActual ? "page" : undefined}
-                aria-label={"Página " + tramo}
-                className="tabular-nums"
-              >
-                {tramo}
-              </ChipFiltro>
-            ),
-          )}
-
-          <button
-            type="button"
-            onClick={() => irA(paginaActual + 1)}
-            disabled={paginaActual === totalPaginas}
-            className={clasesDeBotonIcono({ sobre: "tarjeta" })}
-            aria-label="Página siguiente"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </button>
-
-          {/* Qué tramo se está viendo, en números. El paginado dice en qué
-              página estás; esto dice de qué filas se trata, que es lo que hace
-              falta para citarle una consulta a alguien. */}
-          <p className="ml-auto text-panel-xs text-panel-tinta-3 tabular-nums">
+      {/* El paginado del panel, ahora la pieza. Estaba escrito acá, y desde que
+          hizo falta por segunda vez —la lista de usuarios— vive en
+          `piezas.tsx`: el tramo del "…" es de una sola línea y dos copias se
+          separan solas. Lo que queda de este lado es lo que de verdad es de
+          esta pantalla: cuántas filas entran en una página y el tramo en
+          números, que es lo que hace falta para citarle una consulta a
+          alguien. */}
+      <PaginadoNumerado
+        pagina={paginaActual}
+        totalPaginas={totalPaginas}
+        alIr={irA}
+        etiqueta="Páginas de consultas"
+        resumen={
+          <>
             {primeraFila + 1}–{primeraFila + enPantalla.length} de{" "}
             {NUMERO.format(filtradas.length)}
-          </p>
-        </nav>
-      )}
+          </>
+        }
+      />
 
       {/*
         El anuncio de cuántas filas hay a la vista.

@@ -205,6 +205,22 @@ export const comentariosMockRepo = {
       .map((c) => proyectarModerable(c, moderadorId));
   },
 
+  /** Lo saca del diario mientras se decide. Ver el motor Postgres: el rastro
+   *  va en las mismas columnas que la baja y el motivo queda vacío, porque
+   *  todavía no hay ninguno. */
+  async enviarARevision(
+    comentarioId: string,
+    moderadorId: string,
+  ): Promise<ComentarioModerable | null> {
+    const row = store.comentarios.find((c) => c.id === comentarioId);
+    if (!row) return null;
+    row.estado = "en_revision";
+    row.ocultadoPor = moderadorId;
+    row.ocultadoEn = new Date().toISOString();
+    delete row.motivoBaja;
+    return proyectarModerable(row, moderadorId);
+  },
+
   async darDeBaja(
     comentarioId: string,
     moderadorId: string,
@@ -233,5 +249,23 @@ export const comentariosMockRepo = {
     delete row.ocultadoEn;
     delete row.motivoBaja;
     return proyectarModerable(row, moderadorId);
+  },
+
+  /** Lo borra de verdad, con sus votos. Sólo lo que ya está de baja: la regla
+   *  vive en el repo y no en la pantalla, igual que en Postgres. */
+  async eliminar(
+    comentarioId: string,
+    moderadorId: string,
+  ): Promise<ComentarioModerable | null | "no-estaba-de-baja"> {
+    const i = store.comentarios.findIndex((c) => c.id === comentarioId);
+    if (i === -1) return null;
+    const row = store.comentarios[i];
+    if (row.estado !== "oculto") return "no-estaba-de-baja";
+    const borrado = proyectarModerable(row, moderadorId);
+    store.comentarios.splice(i, 1);
+    for (const clave of store.votos.keys()) {
+      if (clave.startsWith(`${comentarioId}:`)) store.votos.delete(clave);
+    }
+    return borrado;
   },
 };

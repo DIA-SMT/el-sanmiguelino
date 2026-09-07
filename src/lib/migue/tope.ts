@@ -125,40 +125,6 @@ export async function contarConsultaAlModelo(
   }
 }
 
-/** Lo que consumió la hora en curso, para el tablero. */
-export async function consumoDeLaHora(): Promise<{
-  consultas: number;
-  personas: number;
-  topePersona: number;
-  topeGlobal: number;
-}> {
-  const vacio = {
-    consultas: 0,
-    personas: 0,
-    topePersona: TOPE_POR_PERSONA,
-    topeGlobal: TOPE_GLOBAL,
-  };
-  if (!process.env.DATABASE_URL) return vacio;
-
-  try {
-    // Mismo filtro que arriba, y acá importa por otra razón: `personas` se
-    // calcula como la cantidad de filas, y la fila de la voz no es una persona.
-    // Sin esto el tablero diría "de 1 persona" en una hora en que no preguntó
-    // nadie.
-    const filas = await db().consumoMigue.findMany({
-      where: { ventana: ventanaActual(), clave: { not: CLAVE_DE_LA_VOZ } },
-      select: { consultas: true },
-    });
-    return {
-      ...vacio,
-      consultas: filas.reduce((t, f) => t + f.consultas, 0),
-      personas: filas.length,
-    };
-  } catch {
-    return vacio;
-  }
-}
-
 /**
  * Borra las ventanas viejas.
  *

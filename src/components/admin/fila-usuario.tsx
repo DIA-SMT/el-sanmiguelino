@@ -82,8 +82,15 @@ export function FilaUsuario({
           </Pildora>
         )}
 
+        {/* Las dos fechas, y las dos hacen falta: la de alta dice desde cuándo
+            esta persona es parte del padrón y la de ingreso dice si sigue
+            viniendo. Con una sola columna —que era lo que había— alguien de
+            hace dos años que entró ayer se veía igual que alguien que se sumó
+            ayer. La de registro va primero porque es el orden por defecto de la
+            lista: la columna que ordena tiene que ser la que se lee. */}
         <span className="text-panel-xs text-panel-tinta-3">
-          Entró {tiempoRelativo(usuario.ultimoIngreso)}
+          Se registró {tiempoRelativo(usuario.creadoEn)} · entró{" "}
+          {tiempoRelativo(usuario.ultimoIngreso)}
         </span>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">

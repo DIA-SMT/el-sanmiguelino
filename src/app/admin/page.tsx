@@ -108,14 +108,17 @@ export default async function AdminNotas() {
         {puedeEditar ? (
           <Aviso icono={AlertTriangle} tono="var(--grafico-diario)">
             Lo que se guarda acá sale publicado al instante: todavía no hay
-            borradores ni historial de versiones. La moderación de comentarios y
-            el tablero de Migue son los próximos pasos.
+            borradores ni historial de versiones.
           </Aviso>
         ) : (
+          /* Qué falta configurar no se escribe en la pantalla: quien carga una
+             nota no puede hacer nada con el nombre de una variable de entorno,
+             y el que sí puede lo busca en `docs/informe-tecnico.md`. Lo que la
+             pantalla tiene que decir es qué se puede y qué no. */
           <Aviso icono={AlertTriangle} tono="var(--grafico-alerta)">
-            Sólo lectura: no hay base de datos configurada, así que el diario
-            está sirviendo el archivo semilla y cualquier cambio se perdería.
-            Falta <code className="font-mono">DATABASE_URL</code>.
+            Sólo lectura: esta instalación no tiene base de datos, así que el
+            diario está sirviendo el archivo de ejemplo y cualquier cambio se
+            perdería. Avisale a quien administra el servidor.
           </Aviso>
         )}
 

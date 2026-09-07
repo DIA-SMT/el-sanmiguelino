@@ -21,6 +21,7 @@ import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
 import { comentariosRepo } from "@/lib/repos/comentarios";
 import { cambiarBloqueo, cambiarRol } from "@/lib/repos/usuarios";
+import { MOTIVOS_DE_BAJA } from "@/lib/types";
 import type { BloqueNota, NotaBorrador } from "@/lib/types";
 
 /**
@@ -230,26 +231,47 @@ export async function guardarNotaAction(
 
 
 /**
- * Moderación de un comentario.
+ * Moderación de un comentario: mandarlo a revisión, darlo de baja o
+ * restituirlo.
  *
  * El moderador sale de la sesión, nunca del formulario: quien dio de baja algo
  * es un dato de auditoría, y un campo que manda el cliente no lo es.
  *
- * No hay acción de borrar, y no es un olvido. Un comentario dado de baja se
- * oculta y conserva su texto, sus votos y el rastro de quién lo bajó. Una
- * publicación oficial que esconde la palabra de un vecino tiene que poder
- * decir quién lo decidió, y eso es imposible sobre una fila borrada.
+ * **Ninguna de las tres borra.** Un comentario moderado conserva su texto, sus
+ * votos y el rastro de quién lo tocó: una publicación oficial que esconde la
+ * palabra de un vecino tiene que poder decir quién lo decidió, y eso es
+ * imposible sobre una fila borrada. Borrar existe —lo pidió el municipio para
+ * no tener que conservar una agresión para siempre— pero es una acción aparte
+ * y explícita: `eliminarComentarioAction`, acá abajo.
+ *
+ * El motivo llega tipificado (`MOTIVOS_DE_BAJA`) más un detalle libre, y se
+ * guarda como una sola cadena: "Insulto o agresión · el detalle". Es texto en
+ * la base y sigue siéndolo; lo que cambia es que el prefijo es uno de cinco, y
+ * eso es lo que permite después contar por motivo en vez de leer doscientas
+ * frases distintas.
  */
+function motivoGuardado(motivo: unknown, detalle: unknown): string | undefined {
+  const tipificado =
+    textoNoVacio(motivo) &&
+    (MOTIVOS_DE_BAJA as readonly string[]).includes(motivo)
+      ? motivo
+      : undefined;
+  const libre = textoNoVacio(detalle) ? detalle.trim().slice(0, 300) : undefined;
+  if (tipificado && libre) return `${tipificado} · ${libre}`;
+  return tipificado ?? libre;
+}
+
 export async function moderarComentarioAction(
   comentarioId: unknown,
   accion: unknown,
   motivo?: unknown,
+  detalle?: unknown,
 ): Promise<{ ok: boolean; error?: string }> {
   const { usuario } = await requerirAdmin();
 
   try {
     if (!textoNoVacio(comentarioId)) throw new Error("Falta el comentario.");
-    if (accion !== "bajar" && accion !== "restituir") {
+    if (accion !== "bajar" && accion !== "restituir" && accion !== "revisar") {
       throw new Error("Acción desconocida.");
     }
 
@@ -258,9 +280,11 @@ export async function moderarComentarioAction(
         ? await comentariosRepo.darDeBaja(
             comentarioId,
             usuario.id,
-            textoNoVacio(motivo) ? motivo : undefined,
+            motivoGuardado(motivo, detalle),
           )
-        : await comentariosRepo.restituir(comentarioId, usuario.id);
+        : accion === "revisar"
+          ? await comentariosRepo.enviarARevision(comentarioId, usuario.id)
+          : await comentariosRepo.restituir(comentarioId, usuario.id);
 
     if (!resultado) throw new Error("Ese comentario ya no existe.");
 
@@ -275,6 +299,51 @@ export async function moderarComentarioAction(
     return {
       ok: false,
       error: e instanceof Error ? e.message : "No se pudo moderar.",
+    };
+  }
+}
+
+/**
+ * Borra un comentario para siempre, con sus votos.
+ *
+ * **Es la única acción del panel que destruye la palabra de un vecino**, y por
+ * eso está separada de la moderación en vez de ser un tercer botón de la misma
+ * acción. Dos cosas la sostienen:
+ *
+ * 1. **Sólo borra lo que ya está de baja.** La regla la comprueba el repo,
+ *    dentro del motor, y no esta acción: así también vale para cualquier otro
+ *    camino que se agregue después. El efecto es que borrar siempre es una
+ *    segunda decisión sobre algo que ya fue moderado con su motivo escrito.
+ * 2. **Se pierde el rastro.** No queda registro de que ese comentario existió,
+ *    y eso es exactamente lo que se pidió: que una agresión no quede guardada
+ *    en el registro del diario. La pantalla lo dice antes de dejar apretar.
+ */
+export async function eliminarComentarioAction(
+  comentarioId: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  const { usuario } = await requerirAdmin();
+
+  try {
+    if (!textoNoVacio(comentarioId)) throw new Error("Falta el comentario.");
+
+    const resultado = await comentariosRepo.eliminar(comentarioId, usuario.id);
+    if (resultado === null) throw new Error("Ese comentario ya no existe.");
+    if (resultado === "no-estaba-de-baja") {
+      throw new Error(
+        "Primero hay que darlo de baja: así queda escrito por qué se lo sacó " +
+          "antes de borrarlo.",
+      );
+    }
+
+    revalidatePath("/admin/comentarios");
+    revalidatePath("/diario");
+    revalidatePath(`/nota/${resultado.notaSlug}`);
+
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo borrar.",
     };
   }
 }
@@ -327,6 +396,28 @@ export async function guardarEdicionAction(datos: unknown): Promise<{
       // la barra del diario decide con "hay tema o no", y "" es un tema.
       tema: textoNoVacio(tema) ? tema.trim() : null,
     };
+
+    /*
+     * El número no se puede repetir dentro del mismo año: es lo que dice
+     * `@@unique([anio, numero])` en el esquema, y ahora se puede EDITAR, así
+     * que el choque dejó de ser hipotético.
+     *
+     * Se comprueba acá antes de escribir para poder explicarlo con nombre y
+     * apellido. La restricción de Postgres sigue siendo la que manda —dos
+     * pedidos simultáneos pueden pasar los dos por este chequeo— pero su
+     * mensaje es "Unique constraint failed on the fields: (`anio`,`numero`)",
+     * que en la pantalla de un redactor no dice nada.
+     */
+    const choque = await db().edicion.findFirst({
+      where: { anio: a, numero: n, slug: { not: slug } },
+      select: { mes: true },
+    });
+    if (choque) {
+      throw new Error(
+        `El número ${n} ya lo tiene ${choque.mes}. Dentro de un mismo año no ` +
+          `puede haber dos ediciones con el mismo número.`,
+      );
+    }
 
     const existente = await db().edicion.findUnique({
       where: { slug },
@@ -440,7 +531,7 @@ function explicar(motivo: "inexistente" | "es-del-entorno" | "ultimo-admin" | "u
     case "inexistente":
       return "Esa persona ya no está en la lista.";
     case "es-del-entorno":
-      return "Su rol viene de CIDITUC_ADMINS, así que se cambia en las variables de entorno y no acá.";
+      return "Su rol viene de la configuración del sistema, así que no se cambia desde esta pantalla. Pedíselo a quien administra el servidor.";
     case "ultimo-admin":
       return "Es el último administrador: dejarías al diario sin nadie que pueda entrar al panel.";
     case "uno-mismo":

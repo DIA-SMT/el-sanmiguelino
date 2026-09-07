@@ -215,11 +215,16 @@ export default async function AdminEdiciones() {
             estaba copiado carácter por carácter —filete, cuadrado del icono y
             la fórmula de `color-mix` incluida— y no había forma de cambiarlo en
             un lado sin que los dos se separaran. */}
+        {/* Lo que queda es lo que le sirve a quien carga una edición: poné la
+            fecha y sale sola, en hora de Tucumán. Cómo lo resuelve el diario
+            por dentro —que sirve la más reciente con fecha cumplida, que no hay
+            ningún trabajo programado que pueda fallar el día 1— es cierto, pero
+            es una explicación de la máquina y no cambia nada de lo que esta
+            persona tiene que hacer. Está en `docs/informe-tecnico.md`. */}
         <Aviso icono={CalendarClock} tono="var(--grafico-nota)">
-          El cambio de mes es automático y no lo dispara nada: el diario sirve
-          la edición más reciente cuya fecha ya pasó. Poné la fecha con la
-          anticipación que quieras y a esa hora sale sola. Las fechas se
-          escriben y se muestran en{" "}
+          Poné la fecha con la anticipación que quieras: a esa hora la edición
+          sale sola, sin que nadie tenga que hacer nada. Las fechas se escriben
+          y se muestran en{" "}
           <strong className="font-semibold text-panel-tinta">
             hora de Tucumán
           </strong>

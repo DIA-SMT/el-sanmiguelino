@@ -204,13 +204,26 @@ model Comentario {
   texto String
   fecha DateTime @default(now())
 
-  /// "publicado" | "oculto". Es texto y no enum de Postgres para que agregar
-  /// un estado más adelante no sea una migración con lock de tabla.
+  /// "publicado" | "en_revision" | "oculto". Es texto y no enum de Postgres
+  /// para que agregar un estado más adelante no sea una migración con lock de
+  /// tabla — y el 2026-09-07 esa previsión se cobró: `en_revision` entró sin
+  /// tocar el esquema.
+  ///
+  /// **`en_revision` no se ve en el diario.** Es el estado de "todavía no
+  /// decidí": el comentario sale de la vista del lector mientras se resuelve,
+  /// porque en una publicación oficial la precaución corre para el lado de no
+  /// dejar publicado lo que se está discutiendo. Se llega a él desde
+  /// `publicado` y se sale hacia `publicado` o hacia `oculto`.
   estado String @default("publicado")
 
-  /// Rastro de la baja. Un comentario oculto no se borra: una publicación
-  /// oficial que esconde la palabra de un vecino tiene que poder decir quién
-  /// lo decidió.
+  /// Rastro de la baja. Un comentario oculto no se borra por su cuenta: una
+  /// publicación oficial que esconde la palabra de un vecino tiene que poder
+  /// decir quién lo decidió.
+  ///
+  /// Borrarlo de verdad **sí se puede**, y es una decisión aparte que el
+  /// administrador toma después de la baja (ver `eliminar()` en los repos): el
+  /// registro es para poder explicar una moderación, no para obligar al
+  /// municipio a conservar para siempre una agresión.
   ocultadoPor String?
   ocultadoEn  DateTime?
   motivoBaja  String?
@@ -387,6 +400,23 @@ model Usuario {
   /// obligaría a adivinarlo de nuevo.
   bloqueado Boolean @default(false)
 
+  /// Cuándo se registró: la primera vez que entró por Cidituc.
+  ///
+  /// **Se escribe una vez y no se toca nunca más.** Es la contracara exacta de
+  /// `ultimoIngreso`, que se pisa en cada entrada, y por eso hacen falta las
+  /// dos: con una sola columna no hay forma de distinguir a alguien que se
+  /// sumó ayer de alguien que entró ayer después de dos años. El panel ordena
+  /// por ésta, que es la que dice cómo fue creciendo el padrón.
+  ///
+  /// Va en el `create` del upsert y **nunca en el `update`**, por lo mismo que
+  /// `rol` y `bloqueado`: si entrara ahí, cada ingreso reescribiría la fecha de
+  /// alta y todos se verían recién registrados.
+  ///
+  /// Las filas anteriores a esta columna traen su `ultimoIngreso` copiado, que
+  /// es lo más cercano que se puede afirmar sin inventar: la persona se
+  /// registró ese día o antes.
+  creadoEn DateTime @default(now())
+
   /// La última vez que entró. Se pisa; no hay historial (ver arriba).
   ///
   /// No es `@updatedAt`: ningún modelo del esquema lo usa, y acá además mentiría.
@@ -401,7 +431,9 @@ model Usuario {
   cambiadoPor String?
   cambiadoEn  DateTime?
 
-  /// El listado del panel: los que entraron hace menos, primero.
+  /// El listado del panel, que ordena por fecha de registro.
+  @@index([creadoEn])
+  /// El otro orden que ofrece la pantalla: los que entraron hace menos.
   @@index([ultimoIngreso])
   @@map("usuarios")
 }

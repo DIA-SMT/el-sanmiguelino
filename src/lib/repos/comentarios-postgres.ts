@@ -33,6 +33,7 @@ interface ClienteComentarios {
     findUnique(args: unknown): Promise<FilaComentario | null>;
     create(args: unknown): Promise<FilaComentario>;
     update(args: unknown): Promise<FilaComentario>;
+    delete(args: unknown): Promise<FilaComentario>;
   };
   voto: {
     findMany(args: unknown): Promise<FilaVoto[]>;
@@ -208,6 +209,36 @@ export function crearComentariosPostgresRepo(db: ClienteComentarios) {
       return filas.map((f) => proyectarModerable(f, moderadorId));
     },
 
+    /**
+     * Lo saca del diario mientras se decide qué hacer con él.
+     *
+     * Escribe quién y cuándo en las mismas columnas que la baja —no hay un
+     * segundo juego de columnas para esto— porque son el mismo dato: quién
+     * tocó este comentario por última vez y en qué momento. El motivo se deja
+     * en `null`: todavía no hay ninguno, y ese es justamente el punto del
+     * estado.
+     */
+    async enviarARevision(
+      comentarioId: string,
+      moderadorId: string,
+    ): Promise<ComentarioModerable | null> {
+      const existe = await db.comentario.findUnique({
+        where: { id: comentarioId },
+      });
+      if (!existe) return null;
+      const fila = await db.comentario.update({
+        where: { id: comentarioId },
+        data: {
+          estado: "en_revision",
+          ocultadoPor: moderadorId,
+          ocultadoEn: new Date(),
+          motivoBaja: null,
+        },
+        include: CON_VOTOS,
+      });
+      return proyectarModerable(fila, moderadorId);
+    },
+
     async darDeBaja(
       comentarioId: string,
       moderadorId: string,
@@ -252,6 +283,35 @@ export function crearComentariosPostgresRepo(db: ClienteComentarios) {
         include: CON_VOTOS,
       });
       return proyectarModerable(fila, moderadorId);
+    },
+
+    /**
+     * Lo borra de verdad. La fila desaparece y sus votos se van con ella por la
+     * cascada del esquema.
+     *
+     * **Sólo se puede borrar lo que ya está dado de baja**, y la regla vive acá
+     * y no en la pantalla: primero se baja —lo que deja escrito quién lo
+     * decidió y por qué— y recién después se borra. Así el borrado es siempre
+     * una segunda decisión sobre algo ya moderado, y no un atajo para hacer
+     * desaparecer un comentario sin dejar rastro de que existió.
+     *
+     * Devuelve el comentario borrado para que el panel pueda decir qué se
+     * llevó, y `null` si no existía. `"no-estaba-de-baja"` es lo que distingue
+     * "no lo encontré" de "no te lo dejo": son dos respuestas distintas y la
+     * pantalla las explica distinto.
+     */
+    async eliminar(
+      comentarioId: string,
+      moderadorId: string,
+    ): Promise<ComentarioModerable | null | "no-estaba-de-baja"> {
+      const existe = await db.comentario.findUnique({
+        where: { id: comentarioId },
+        include: CON_VOTOS,
+      });
+      if (!existe) return null;
+      if (existe.estado !== "oculto") return "no-estaba-de-baja";
+      await db.comentario.delete({ where: { id: comentarioId } });
+      return proyectarModerable(existe, moderadorId);
     },
   };
 }
