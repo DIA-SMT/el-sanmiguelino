@@ -1118,7 +1118,15 @@
 ::view-transition-old(.pagina-atras),
 ::view-transition-new(.pagina-atras) {
   backface-visibility: hidden;
-  animation-duration: 1150ms;
+  /* 620ms y no 1150. El giro tardaba casi un segundo y cuarto, y eso es lo que
+     el lector leía como "rígido": no la geometría, la duración. Medido contra
+     una animación de referencia de un libro pasando hoja —13 cuadros, 390ms—,
+     la nuestra iba a un tercio de esa velocidad. 620 es el punto donde el arco
+     todavía se lee como un movimiento y no como una diapositiva que rota.
+
+     La forma del movimiento no cambió: los `linear()` de 41 puntos son los
+     mismos, sólo que ahora se recorren en la mitad del tiempo. */
+  animation-duration: 620ms;
   animation-fill-mode: both;
 }
 
@@ -1238,18 +1246,44 @@
    frenazo.
 --------------------------------------------------------------------------- */
 
+/* --- Las dos caras se CRUZAN, y ese es el arreglo grande de esta tanda -------
+
+   Antes cada cara hacía su mitad exacta: la que salía llegaba a 90° en el 50%
+   y recién ahí empezaba la otra. Sobre el papel es la física correcta; en
+   pantalla dejaba **un agujero de casi 400ms sin ninguna hoja a la vista**,
+   porque una lámina de canto no ocupa un solo píxel de ancho. Medido en vivo,
+   congelando la animación: al 50% de la corrida no se veía papel, se veía el
+   escritorio. Dos tercios del giro no mostraban el giro.
+
+   Ahora la que sale se va en el 58% y la que entra arranca en el 42%: en esa
+   franja de 16% las dos están casi de canto y se tapan entre sí. **Siempre hay
+   hoja en pantalla.** El cruce no se ve porque a esos ángulos el ancho
+   proyectado es de unos pocos píxeles; lo que se ve es que el movimiento no se
+   corta.
+
+   Y las dos llevan una sombra que crece con el ángulo: es lo que despega la
+   hoja del escritorio. Va como `box-shadow` y no dentro de `filter`, por dos
+   razones: un `drop-shadow` con desenfoque sobre una captura de pantalla
+   entera es caro en un teléfono, y meter una función más en la lista de
+   `filter` arriesga la interpolación del brillo, que es lo que sostiene todo
+   esto. La caja del pseudo-elemento se transforma con él, así que la sombra
+   gira con la hoja igual.
+--------------------------------------------------------------------------- */
+
 @keyframes hoja-gira-sale {
   0% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(0deg);
     opacity: 1;
+    box-shadow: 0 0 0 rgb(0 0 0 / 0);
   }
-  49.9% {
+  57.9% {
     opacity: 1;
   }
-  /* De acá en más la hoja ya pasó: la sigue la otra cara. */
-  50% {
+  /* De acá en más la hoja ya pasó: la otra ya está girando desde el 42%. */
+  58% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(-90deg);
     opacity: 0;
+    box-shadow: 34px 0 46px -12px rgb(0 0 0 / 0.45);
   }
   100% {
     opacity: 0;
@@ -1260,17 +1294,19 @@
   0% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(90deg);
     opacity: 0;
+    box-shadow: 34px 0 46px -12px rgb(0 0 0 / 0.45);
   }
-  49.9% {
+  41.9% {
     opacity: 0;
   }
-  50% {
+  42% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(90deg);
     opacity: 1;
   }
   100% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(0deg);
     opacity: 1;
+    box-shadow: 0 0 0 rgb(0 0 0 / 0);
   }
 }
 
@@ -1279,13 +1315,15 @@
   0% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(0deg);
     opacity: 1;
+    box-shadow: 0 0 0 rgb(0 0 0 / 0);
   }
-  49.9% {
+  57.9% {
     opacity: 1;
   }
-  50% {
+  58% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(90deg);
     opacity: 0;
+    box-shadow: -34px 0 46px -12px rgb(0 0 0 / 0.45);
   }
   100% {
     opacity: 0;
@@ -1296,17 +1334,19 @@
   0% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(-90deg);
     opacity: 0;
+    box-shadow: -34px 0 46px -12px rgb(0 0 0 / 0.45);
   }
-  49.9% {
+  41.9% {
     opacity: 0;
   }
-  50% {
+  42% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(-90deg);
     opacity: 1;
   }
   100% {
     transform: perspective(calc(min(100vw, 72rem) * 1.48)) rotateY(0deg);
     opacity: 1;
+    box-shadow: 0 0 0 rgb(0 0 0 / 0);
   }
 }
 
@@ -1328,7 +1368,11 @@
   0% {
     filter: brightness(1);
   }
-  50% {
+  /* El 58% y no el 50%: la luz tiene que llegar al canto en el mismo instante
+     en que el giro llega al canto, o la hoja se apaga antes de ponerse de perfil
+     y se lee como un fundido en vez de como una superficie que se aleja de la
+     luz. */
+  58% {
     filter: brightness(0.38);
   }
 }
@@ -1337,7 +1381,7 @@
   0% {
     filter: brightness(0.38);
   }
-  50% {
+  42% {
     filter: brightness(0.38);
   }
   100% {

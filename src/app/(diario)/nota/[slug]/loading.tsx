@@ -1,32 +1,51 @@
+import { ViewTransition } from "react";
+import { transicionPagina } from "@/lib/transiciones";
+
+/**
+ * El esqueleto de carga **también gira**, y sin esto el giro se veía cortado por
+ * la mitad.
+ *
+ * Cuando la nota tarda en llegar, lo que Next dibuja del otro lado es esto. Como
+ * no llevaba el nombre de transición, no existía `::view-transition-new`: la
+ * hoja vieja giraba, se iba, y la nueva aparecía de golpe por el fundido del
+ * root. Medido congelando la animación cuadro a cuadro, la segunda mitad del
+ * giro no mostraba ninguna hoja — el papel se iba y quedaba el escritorio.
+ *
+ * Con el envoltorio, la hoja que entra gira aunque todavía esté en blanco, que
+ * es exactamente lo que hace un diario de papel cuando pasás la hoja antes de
+ * empezar a leerla.
+ */
 export default function LoadingNota() {
   return (
-    <div className="hoja grano mx-auto w-full max-w-6xl">
-      <main
-        className="mx-auto w-full max-w-6xl animate-pulse px-4 py-10 sm:px-6"
-        aria-busy="true"
-      >
-        <p className="sr-only" role="status">
-          Cargando la nota
-        </p>
-        <div aria-hidden="true">
-          <div className="mx-auto h-3 w-24 bg-line" />
-          <div className="mx-auto mt-5 h-11 w-3/4 bg-line" />
-          <div className="mx-auto mt-3 h-11 w-1/2 bg-line" />
-          <div className="mx-auto mt-6 h-4 w-2/3 bg-line" />
-          <div className="mx-auto mt-9 aspect-[8/5] w-full max-w-4xl bg-line" />
-          <div className="mt-9 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="space-y-3">
-                <div className="h-3 w-full bg-line" />
-                <div className="h-3 w-full bg-line" />
-                <div className="h-3 w-4/5 bg-line" />
-                <div className="h-3 w-full bg-line" />
-                <div className="h-3 w-2/3 bg-line" />
-              </div>
-            ))}
+    <ViewTransition {...transicionPagina}>
+      <div className="hoja grano mx-auto w-full max-w-6xl">
+        <main
+          className="mx-auto w-full max-w-6xl animate-pulse px-4 py-10 sm:px-6"
+          aria-busy="true"
+        >
+          <p className="sr-only" role="status">
+            Cargando la nota
+          </p>
+          <div aria-hidden="true">
+            <div className="mx-auto h-3 w-24 bg-line" />
+            <div className="mx-auto mt-5 h-11 w-3/4 bg-line" />
+            <div className="mx-auto mt-3 h-11 w-1/2 bg-line" />
+            <div className="mx-auto mt-6 h-4 w-2/3 bg-line" />
+            <div className="mx-auto mt-9 aspect-[8/5] w-full max-w-4xl bg-line" />
+            <div className="mt-9 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="space-y-3">
+                  <div className="h-3 w-full bg-line" />
+                  <div className="h-3 w-full bg-line" />
+                  <div className="h-3 w-4/5 bg-line" />
+                  <div className="h-3 w-full bg-line" />
+                  <div className="h-3 w-2/3 bg-line" />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </ViewTransition>
   );
 }
