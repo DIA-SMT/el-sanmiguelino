@@ -252,6 +252,73 @@ model Voto {
   @@map("votos")
 }
 
+/// Qué hizo cada administrador en el panel.
+///
+/// Existe porque el 2026-09-07 desapareció un comentario y **no hubo dónde
+/// mirar**: el diario sabía que ya no estaba y nada más. Con el borrado
+/// definitivo recién estrenado eso deja de ser tolerable — una publicación
+/// oficial tiene que poder decir quién sacó qué y cuándo, sobre todo cuando lo
+/// sacado no se puede recuperar.
+///
+/// **No guarda el CONTENIDO de lo que se moderó, y es la decisión que sostiene
+/// todo lo demás.** Anota que se borró un comentario, de qué nota era y quién lo
+/// escribió; el texto no. Guardarlo convertiría el borrado en una mudanza: el
+/// insulto que el municipio decidió no conservar seguiría acá, sólo que en otra
+/// tabla y sin que nadie lo vea. Lo mismo con los datos de una suscripción: se
+/// anota que alguien descargó el padrón, no el padrón.
+///
+/// **Sin claves externas hacia nada**, y no es un olvido: el registro tiene que
+/// sobrevivir justamente a lo que describe. Una FK contra `comentarios` haría
+/// que la cascada se llevara el registro del borrado en el mismo instante en que
+/// se vuelve útil. El objeto se identifica por su slug o su id desnormalizado,
+/// como `ConsultaMigue.notaSlug`.
+///
+/// **Es un registro, no un historial de versiones**: dice qué pasó, no permite
+/// deshacerlo. Reconstruir un comentario borrado sigue siendo imposible, y así
+/// tiene que ser.
+model RegistroPanel {
+  id    String   @id @default(cuid())
+  fecha DateTime @default(now())
+
+  /// El `id_persona` de quien lo hizo y su nombre, desnormalizado.
+  ///
+  /// El nombre se congela como en `Comentario.usuarioNombre`: es con quién era
+  /// esa persona el día que tomó la decisión. Y el id va aparte porque es lo
+  /// único que no cambia — el rastro de `Usuario.cambiadoPor` guarda ids, así
+  /// que las dos cosas se pueden cruzar.
+  autorId     String
+  autorNombre String
+
+  /// Qué pasó, en clave: "comentario.baja", "edicion.borrado", "usuario.rol".
+  /// Texto y no enum, por lo mismo que `Comentario.estado`: sumar una acción no
+  /// puede ser una migración con lock, y una acción desconocida se muestra
+  /// cruda en vez de romper la pantalla.
+  accion String
+
+  /// Sobre qué clase de cosa: "comentario", "nota", "edicion", "usuario",
+  /// "suscripciones". Es lo que hace útiles los filtros de la pantalla.
+  objeto String
+
+  /// El slug o el id de eso, si tiene. Queda aunque la fila original ya no
+  /// exista: es la única forma de rastrear algo borrado.
+  objetoId String?
+
+  /// La línea que se lee en la pantalla, ya escrita: "Dio de baja el comentario
+  /// de Juan Pérez". Se guarda armada y no se compone al mostrar porque los
+  /// datos con los que se compondría son justamente los que pueden haberse
+  /// borrado.
+  resumen String
+
+  /// Lo que ayude a entender, sin contenido sensible: el motivo de una baja, el
+  /// número anterior de una edición, cuántas páginas se llevó un borrado.
+  detalle Json?
+
+  /// La pantalla: lo último primero, y el filtro por clase de objeto.
+  @@index([fecha])
+  @@index([objeto, fecha])
+  @@map("registro_panel")
+}
+
 /// Una pregunta que alguien le hizo a Migue.
 ///
 /// **No guarda quién preguntó, y es deliberado.** El tablero existe para saber

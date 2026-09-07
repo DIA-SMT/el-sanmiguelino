@@ -7,6 +7,7 @@ import {
   Bot,
   CalendarClock,
   FileText,
+  History,
   Mailbox,
   MessageSquare,
   Newspaper,
@@ -42,6 +43,9 @@ const SECCIONES = [
   { href: "/admin/migue", icono: Bot, texto: "Migue" },
   { href: "/admin/suscripciones", icono: Mailbox, texto: "Suscripciones" },
   { href: "/admin/usuarios", icono: Users, texto: "Usuarios" },
+  // Última y no primera: no se entra al panel a mirar el registro, se entra a
+  // trabajar. Se va a buscar cuando algo no cierra.
+  { href: "/admin/auditoria", icono: History, texto: "Auditoría" },
 ] as const;
 
 /**

@@ -1,5 +1,6 @@
 import { requerirAdmin } from "@/lib/auth/dal";
 import { listarSuscripciones } from "@/lib/repos/suscripciones";
+import { anotar } from "@/lib/repos/auditoria";
 
 /**
  * La lista de suscripciones, para pasársela a quien reparte.
@@ -28,8 +29,19 @@ function campo(valor: string | number | null): string {
 }
 
 export async function GET() {
-  await requerirAdmin();
+  const { usuario } = await requerirAdmin();
   const suscripciones = await listarSuscripciones();
+
+  /* La única LECTURA que se anota, y por eso mismo: acá los datos personales de
+     los vecinos —nombre, correo y domicilio— salen del sistema en un archivo
+     que después vive en la computadora de alguien. Que eso pase sin dejar
+     rastro es lo que no puede ser. Se anota cuántas filas se llevó, nunca
+     cuáles. */
+  await anotar(usuario, {
+    accion: "suscripciones.descarga",
+    resumen: `Descargó el padrón de suscripciones (${suscripciones.length} ${suscripciones.length === 1 ? "vecino" : "vecinos"})`,
+    detalle: { filas: suscripciones.length },
+  });
 
   const filas = [
     ["nombre", "edad", "email", "direccion", "fecha"],

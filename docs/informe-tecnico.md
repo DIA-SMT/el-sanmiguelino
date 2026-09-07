@@ -129,6 +129,24 @@ comentar, votar y abrir sesión nueva, pero quien ya tenga una sesión abierta
 puede seguir leyendo el diario hasta que se le venza (8 horas). Chequearlo en
 cada vista de página costaría una consulta por cada lector y por cada página.
 
+## El registro de auditoría
+
+Desde el 2026-09-07, **toda escritura del panel deja un renglón** en
+`registro_panel`, y se lee en `/admin/auditoria`. También lo deja la descarga del
+padrón de suscripciones, que es una lectura pero saca datos personales del
+sistema.
+
+Lo que hay que saber para usarlo:
+
+- Guarda quién, qué y cuándo. **No guarda el contenido de lo moderado**: de un
+  comentario borrado quedan la nota, quién lo escribió, sus votos y el motivo de
+  la baja, nunca el texto.
+- No se limpia, y no tiene por qué: son unos pocos renglones por día.
+- No ve lo que pasa fuera del panel. Una fila borrada con acceso directo a la
+  base no deja rastro acá; eso sólo lo tiene el registro de Supabase.
+- Si se agrega una Server Action y no llama a `anotar()`, queda un hueco
+  silencioso. La regla está escrita en `src/lib/repos/auditoria.ts`.
+
 ## Dónde mirar si algo no cierra
 
 - `docs/panel-administracion.md` — el plan y la historia del panel, etapa por

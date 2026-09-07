@@ -21,6 +21,8 @@ import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
 import { comentariosRepo } from "@/lib/repos/comentarios";
 import { cambiarBloqueo, cambiarRol } from "@/lib/repos/usuarios";
+import { anotar } from "@/lib/repos/auditoria";
+import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import { MOTIVOS_DE_BAJA } from "@/lib/types";
 import type { BloqueNota, NotaBorrador } from "@/lib/types";
 
@@ -37,6 +39,12 @@ import type { BloqueNota, NotaBorrador } from "@/lib/types";
  * ejecución: quien conozca la URL puede mandar cualquier JSON. Es el precio de
  * guardar el cuerpo como Json en la base —al leer no se valida, así que lo que
  * entra acá es lo que después se sirve—.
+ *
+ * **Y cada una anota lo que hizo** (`anotar()`, en `repos/auditoria.ts`),
+ * después de que la escritura salió bien y con el autor sacado de la sesión.
+ * Una acción nueva que no anote no rompe nada: deja un agujero en el registro,
+ * que es justamente lo que el registro vino a evitar. Antes de dar por
+ * terminada una acción nueva: ¿anota?
  */
 
 export interface ResultadoGuardar {
@@ -151,7 +159,7 @@ const SLUG_VALIDO = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export async function guardarNotaAction(
   borrador: unknown,
 ): Promise<ResultadoGuardar> {
-  await requerirAdmin();
+  const { usuario } = await requerirAdmin();
 
   try {
     if (!esObjeto(borrador)) throw new Error("Falta la nota.");
@@ -205,6 +213,20 @@ export async function guardarNotaAction(
     };
 
     const guardada = await guardarNota(limpio);
+
+    const esNueva = !textoNoVacio(slugOriginal);
+    await anotar(usuario, {
+      accion: "nota.guardada",
+      objetoId: guardada.slug,
+      resumen: `${esNueva ? "Creó" : "Editó"} la nota «${titulo}»`,
+      detalle: {
+        nueva: esNueva,
+        ...(esNueva || slugOriginal === guardada.slug
+          ? {}
+          : { slugAnterior: slugOriginal }),
+        ...(textoNoVacio(edicionSlug) ? { edicion: edicionSlug } : {}),
+      },
+    });
 
     // Todo lo que muestra esta nota o el índice: la tapa, la nota, su sección,
     // el buscador y el panel. Es más barato invalidar de más que dejar una
@@ -288,6 +310,31 @@ export async function moderarComentarioAction(
 
     if (!resultado) throw new Error("Ese comentario ya no existe.");
 
+    /* El resumen nombra a quien escribió y en qué nota, y **no dice qué decía**:
+       ese es el criterio del registro entero. El motivo sí va, porque es la
+       decisión del municipio y no la palabra del vecino. */
+    const firma = nombreDeDiario(resultado.usuarioNombre);
+    await anotar(usuario, {
+      accion:
+        accion === "bajar"
+          ? "comentario.baja"
+          : accion === "revisar"
+            ? "comentario.revision"
+            : "comentario.restitucion",
+      objetoId: resultado.id,
+      resumen:
+        accion === "bajar"
+          ? `Dio de baja el comentario de ${firma}`
+          : accion === "revisar"
+            ? `Mandó a revisión el comentario de ${firma}`
+            : `Volvió a publicar el comentario de ${firma}`,
+      detalle: {
+        nota: resultado.notaSlug,
+        autor: firma,
+        ...(resultado.motivoBaja ? { motivo: resultado.motivoBaja } : {}),
+      },
+    });
+
     // La tapa destaca el último comentario visible, así que bajar uno la
     // cambia. Y la nota muestra su columna del lector.
     revalidatePath("/admin/comentarios");
@@ -335,6 +382,24 @@ export async function eliminarComentarioAction(
       );
     }
 
+    /* La anotación más importante del registro: es la única acción del panel
+       cuyo resultado no se puede mirar después, porque la fila ya no está.
+       Guarda quién lo escribió, de qué nota era y con qué motivo se lo había
+       bajado —lo que hace falta para explicarle a un vecino qué pasó con su
+       comentario— y **no guarda el texto**: conservarlo acá sería mudar el
+       insulto de tabla en vez de borrarlo. */
+    await anotar(usuario, {
+      accion: "comentario.borrado",
+      objetoId: resultado.id,
+      resumen: `Borró para siempre el comentario de ${nombreDeDiario(resultado.usuarioNombre)}`,
+      detalle: {
+        nota: resultado.notaSlug,
+        autor: nombreDeDiario(resultado.usuarioNombre),
+        ...(resultado.motivoBaja ? { motivo: resultado.motivoBaja } : {}),
+        votos: resultado.likes + resultado.dislikes,
+      },
+    });
+
     revalidatePath("/admin/comentarios");
     revalidatePath("/diario");
     revalidatePath(`/nota/${resultado.notaSlug}`);
@@ -359,7 +424,7 @@ export async function guardarEdicionAction(datos: unknown): Promise<{
   ok: boolean;
   error?: string;
 }> {
-  await requerirAdmin();
+  const { usuario } = await requerirAdmin();
 
   try {
     if (!esObjeto(datos)) throw new Error("Faltan los datos de la edición.");
@@ -419,9 +484,12 @@ export async function guardarEdicionAction(datos: unknown): Promise<{
       );
     }
 
+    /* El número y la fecha de ANTES, para que el registro pueda decir qué
+       cambió y no sólo que alguien tocó algo. Se leen en la misma consulta que
+       ya se hacía para saber si la edición existe. */
     const existente = await db().edicion.findUnique({
       where: { slug },
-      select: { id: true },
+      select: { id: true, numero: true, publicaEn: true, mes: true },
     });
 
     if (esNueva === true) {
@@ -433,6 +501,25 @@ export async function guardarEdicionAction(datos: unknown): Promise<{
       if (!existente) throw new Error("Esa edición ya no existe.");
       await db().edicion.update({ where: { slug }, data: campos });
     }
+
+    const cambios: Record<string, unknown> = {};
+    if (existente && existente.numero !== n) {
+      cambios.numeroAnterior = existente.numero;
+      cambios.numeroNuevo = n;
+    }
+    if (existente && existente.publicaEn?.toISOString() !== instante?.toISOString()) {
+      cambios.fechaAnterior = existente.publicaEn?.toISOString() ?? null;
+      cambios.fechaNueva = instante?.toISOString() ?? null;
+    }
+    await anotar(usuario, {
+      accion: esNueva === true ? "edicion.creada" : "edicion.editada",
+      objetoId: slug,
+      resumen:
+        esNueva === true
+          ? `Creó la edición ${mes} (N.º ${n})`
+          : `Editó la edición ${existente?.mes ?? mes}`,
+      detalle: { numero: n, ...cambios },
+    });
 
     revalidatePath("/admin/ediciones");
     revalidatePath("/admin");
@@ -556,6 +643,17 @@ export async function cambiarRolAction(
     const resultado = await cambiarRol(id, rol, usuario.id);
     if (!resultado.ok) throw new Error(explicar(resultado.motivo));
 
+    const quien = nombreDeDiario(resultado.usuario.nombre);
+    await anotar(usuario, {
+      accion: "usuario.rol",
+      objetoId: resultado.usuario.id,
+      resumen:
+        rol === "admin"
+          ? `Hizo administradora a ${quien}`
+          : `Le quitó la administración a ${quien}`,
+      detalle: { persona: quien, rol },
+    });
+
     revalidatePath("/admin/usuarios");
     return { ok: true };
   } catch (e) {
@@ -578,6 +676,14 @@ export async function cambiarBloqueoAction(
 
     const resultado = await cambiarBloqueo(id, bloqueado, usuario.id);
     if (!resultado.ok) throw new Error(explicar(resultado.motivo));
+
+    const quien = nombreDeDiario(resultado.usuario.nombre);
+    await anotar(usuario, {
+      accion: bloqueado ? "usuario.bloqueo" : "usuario.desbloqueo",
+      objetoId: resultado.usuario.id,
+      resumen: bloqueado ? `Bloqueó a ${quien}` : `Desbloqueó a ${quien}`,
+      detalle: { persona: quien },
+    });
 
     revalidatePath("/admin/usuarios");
     return { ok: true };
@@ -654,7 +760,7 @@ export async function guardarPdfEdicionAction(datos: unknown): Promise<{
   borradas?: number;
   notasBorradas?: number;
 }> {
-  await requerirAdmin();
+  const { usuario } = await requerirAdmin();
 
   try {
     if (!esObjeto(datos)) throw new Error("Faltan los datos del PDF.");
@@ -674,6 +780,18 @@ export async function guardarPdfEdicionAction(datos: unknown): Promise<{
       // un `"false"`, un `1` o un `{}` que llegue por la URL de la acción no
       // puede valer por un sí.
       reemplazarNotasEscritas: reemplazarNotasEscritas === true,
+    });
+
+    await anotar(usuario, {
+      accion: "edicion.pdf",
+      objetoId: slug,
+      resumen: `Cargó el PDF de ${slug} (${resultado.paginas} páginas)`,
+      detalle: {
+        paginas: resultado.paginas,
+        ...(resultado.notasBorradas
+          ? { notasEscritasBorradas: resultado.notasBorradas }
+          : {}),
+      },
     });
 
     // El diario entero cambia: la tapa, cada página, el archivo y el índice que
@@ -716,7 +834,7 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
   segundos?: number;
   avisos?: { pagina: number; texto: string }[];
 }> {
-  await requerirAdmin();
+  const { usuario } = await requerirAdmin();
 
   try {
     if (!esObjeto(datos)) throw new Error("Faltan los datos de la edición.");
@@ -746,6 +864,18 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
       // estar publicado, así que un `"false"` o un `1` que llegue por la
       // petición de la acción no puede valer por un sí.
       confirmarPublicada: confirmarPublicada === true,
+    });
+
+    await anotar(usuario, {
+      accion: "edicion.digitalizada",
+      objetoId: slug,
+      resumen: `Digitalizó el PDF de ${slug} (${paginas.length} páginas)`,
+      detalle: {
+        paginas: paginas.length,
+        figuras,
+        segundos,
+        sobrePublicada: confirmarPublicada === true,
+      },
     });
 
     revalidatePath("/diario");
@@ -783,7 +913,7 @@ export async function quitarPdfEdicionAction(datos: unknown): Promise<{
   borradas?: number;
   comentariosBorrados?: number;
 }> {
-  await requerirAdmin();
+  const { usuario } = await requerirAdmin();
 
   try {
     // Antes recibía el slug pelado. Pasa a recibir un objeto porque ahora hay
@@ -800,6 +930,20 @@ export async function quitarPdfEdicionAction(datos: unknown): Promise<{
       // bandera borra comentarios de vecinos, así que un `"false"` o un `1`
       // que llegue por la URL de la acción no puede valer por un sí.
       confirmarComentarios: confirmarComentarios === true,
+    });
+
+    /* Ésta borra comentarios de vecinos por la cascada, y hasta ahora no dejaba
+       rastro de eso en ningún lado: era una de las formas en que un comentario
+       podía desaparecer sin que nadie pudiera después decir por qué. */
+    await anotar(usuario, {
+      accion: "edicion.pdf.quitado",
+      objetoId: slug,
+      resumen:
+        `Quitó el PDF de ${slug}` +
+        (comentariosBorrados > 0
+          ? ` (se llevó ${comentariosBorrados} ${comentariosBorrados === 1 ? "comentario" : "comentarios"})`
+          : ""),
+      detalle: { paginasBorradas: borradas, comentariosBorrados },
     });
 
     revalidatePath("/diario");
@@ -835,7 +979,7 @@ export async function borrarEdicionAction(datos: unknown): Promise<{
   error?: string;
   borrado?: { mes: string; notas: number; paginas: number; comentarios: number };
 }> {
-  await requerirAdmin();
+  const { usuario } = await requerirAdmin();
 
   try {
     if (!esObjeto(datos)) throw new Error("Faltan los datos de la edición.");
@@ -858,6 +1002,24 @@ export async function borrarEdicionAction(datos: unknown): Promise<{
      * el slug de la cookie no está— pero la barra de vista previa seguiría
      * diciendo que está mirando un número que borró. Se limpia acá.
      */
+    /* La otra forma en que desaparecen comentarios de vecinos: la cascada de
+       una edición borrada. Queda anotada con la cuenta de lo que se llevó. */
+    await anotar(usuario, {
+      accion: "edicion.borrada",
+      objetoId: slug,
+      resumen:
+        `Borró la edición ${perdido.mes}` +
+        (perdido.comentarios > 0
+          ? ` (se llevó ${perdido.comentarios} ${perdido.comentarios === 1 ? "comentario" : "comentarios"})`
+          : ""),
+      detalle: {
+        mes: perdido.mes,
+        notas: perdido.notas,
+        paginas: perdido.paginas,
+        comentarios: perdido.comentarios,
+      },
+    });
+
     const jar = await cookies();
     if (jar.get(COOKIE_EDICION)?.value === slug) {
       jar.delete(COOKIE_EDICION);

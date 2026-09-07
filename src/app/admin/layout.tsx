@@ -54,9 +54,9 @@ export default async function AdminLayout({
       {/*
         Saltar la navegación (WCAG 2.4.1, nivel A).
 
-        La barra pone nueve paradas de tabulación —seis secciones, ver el diario, tema,
-        usuario— antes de que se llegue al contenido, y las pone en las CINCO
-        pantallas. En el editor, que es la más larga, eso se paga en cada vuelta
+        La barra pone once paradas de tabulación —siete secciones, plegar, ver el
+        diario, tema, usuario— antes de que se llegue al contenido, y las pone en
+        TODAS las pantallas. En el editor, que es la más larga, eso se paga en cada vuelta
         al formulario. Va primero en el DOM porque tiene que ser la primera
         parada de todas; si estuviera después de la barra no serviría para nada.
 

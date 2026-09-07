@@ -1644,3 +1644,79 @@ pantalla del panel, es una regresión.
   verificaron los tres estados del comentario, las dos ceremonias nuevas, los
   filtros y el paginado, la barra plegada y desplegada, la ficha de edición y la
   barra de vista previa, en claro y en oscuro, en escritorio y en teléfono.
+
+## Etapa 11 — el registro de auditoría (2026-09-07)
+
+Salió de una pregunta que no se pudo contestar. Al recorrer el panel con datos
+reales apareció que un comentario que estaba a la mañana ya no estaba, y **no
+hubo dónde mirar**: el diario sabía que la fila no existía y nada más. Se
+descartó que fuera la cascada de una re-digitalización —las páginas de septiembre
+datan del 2 y del 4— y se descartó el runner del contrato contra Postgres, con un
+comentario testigo ajeno que sobrevivió intacto a una corrida completa. Con eso
+alcanzó para saber que la respuesta no existía en ningún lado.
+
+Con el borrado definitivo recién estrenado, esa duda dejó de ser tolerable.
+
+### Qué guarda, y sobre todo qué NO
+
+`RegistroPanel` anota **quién** hizo **qué** y **cuándo**, con una frase ya
+escrita (`resumen`) y un `detalle` en JSON.
+
+**No guarda el contenido de lo moderado, y esa es la decisión que sostiene todo
+lo demás.** De un comentario borrado quedan la nota, quién lo escribió, cuántos
+votos tenía y con qué motivo se lo había bajado. El texto no. Guardarlo
+convertiría el borrado en una mudanza: el insulto que el municipio decidió no
+conservar seguiría ahí, en otra tabla y sin que nadie lo vea, y el pedido que
+originó el borrado —"que no me quede en el registro"— quedaría incumplido por la
+puerta de atrás. Lo mismo con las suscripciones: se anota que alguien descargó el
+padrón y cuántas filas se llevó, nunca las filas.
+
+**Sin claves externas hacia nada.** El registro tiene que sobrevivir justamente a
+lo que describe: una FK contra `comentarios` haría que la cascada se llevara el
+registro del borrado en el mismo instante en que se vuelve útil. El objeto se
+identifica por su slug o su id desnormalizado, como ya hacía `ConsultaMigue`.
+
+### Dónde se anota
+
+En las Server Actions, con `anotar()` de `src/lib/repos/auditoria.ts`, después de
+que la escritura salió bien y con el autor sacado de la **sesión** —nunca del
+formulario, por lo mismo que el moderador de una baja—.
+
+Quedaron instrumentadas las once escrituras del panel: las tres de moderación más
+el borrado, rol y bloqueo, guardar nota, crear/editar/borrar edición, cargar,
+quitar y digitalizar un PDF. Y una lectura, la única: **la descarga del padrón de
+suscripciones**, porque ahí los datos personales de los vecinos salen del sistema
+en un archivo que después vive en la computadora de alguien.
+
+`anotar()` **nunca tira**, igual que `registrarIngreso()`: si la base rechaza el
+renglón, la moderación ya ocurrió, y fallar después de haber escrito dejaría al
+administrador creyendo que no pasó nada sobre algo que sí pasó. El compromiso
+está aceptado y escrito: puede faltar un renglón, no puede sobrar una mentira.
+
+**El agujero conocido es el olvido.** Una Server Action nueva que no llame a
+`anotar()` no rompe nada y no avisa: deja un hueco. La regla está escrita arriba
+del módulo y arriba de `acciones.ts` —*antes de dar por terminada una acción
+nueva: ¿anota?*— y no hay nada en el tipo que la obligue. Un envoltorio del estilo
+`conAdmin()` que anotara solo sería el arreglo de verdad, y no se hizo en esta
+tanda porque cambia las once acciones a la vez.
+
+### Lo que la pantalla NO puede contestar
+
+Está dicho en la propia pantalla, antes de que alguien lo busque y no lo
+encuentre:
+
+- **No explica lo que pasó antes de que existiera.** Arranca vacía; el comentario
+  que originó todo esto no va a aparecer nunca.
+- **No deshace nada.** Es un registro, no un historial de versiones.
+- **No ve lo que pasa fuera del panel.** Quien tenga acceso directo a la base
+  puede borrar una fila sin dejar renglón. Contra eso no alcanza una tabla en la
+  misma base: hace falta el registro del proveedor.
+
+### Cómo se verificó
+
+Con el flujo real y datos reales: se creó un comentario propio sobre una página
+de septiembre —edición programada, que ningún lector ve—, se lo mandó a revisión,
+se lo dio de baja con motivo tipificado y se lo borró desde el panel. Los tres
+renglones aparecieron en la auditoría con su hora, su autor, la nota, el id del
+comentario y el motivo; el borrado, marcado como "se llevó algo"; y en ninguno el
+texto del comentario.
