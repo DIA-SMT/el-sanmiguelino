@@ -245,12 +245,23 @@ export async function digitalizarPdf(
         let fuente = it.fontName;
         try {
           const objeto = (await pagina.commonObjs.get(it.fontName)) as {
-            name?: string;
+            name?: unknown;
           } | null;
-          // El PDF nombra a las tipografías con un prefijo de subconjunto de
-          // seis letras y un `+`: `RPMMEK+Poppins-Bold`. No dice nada y cambia
-          // entre archivos.
-          fuente = objeto?.name?.replace(/^[A-Z]{6}\+/, "") ?? it.fontName;
+          /*
+           * El PDF nombra a las tipografías con un prefijo de subconjunto de
+           * seis letras y un `+`: `RPMMEK+Poppins-Bold`. No dice nada y cambia
+           * entre archivos, así que se lo saca.
+           *
+           * **El nombre no siempre es texto.** Para algunas fuentes pdf.js
+           * devuelve un número —un id interno— y ahí `name.replace` no existe:
+           * la digitalización entera se cortaba con «55876.replace is not a
+           * function», con el PDF ya bajado y las figuras ya subidas. Pasó en
+           * producción al volver a digitalizar agosto, y no aparecía en la
+           * consola con el mismo archivo. Si no es texto se usa el nombre
+           * interno, que es exactamente lo que hace el `catch` de abajo.
+           */
+          const nombre = typeof objeto?.name === "string" ? objeto.name : null;
+          fuente = nombre?.replace(/^[A-Z]{6}\+/, "") ?? it.fontName;
         } catch {
           /* se queda con el nombre interno */
         }

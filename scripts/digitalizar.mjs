@@ -245,8 +245,13 @@ for (let n = 1; n <= documento.numPages; n++) {
       const objeto = await pagina.commonObjs.get(it.fontName);
       // El PDF nombra a las tipografías con un prefijo de subconjunto de seis
       // letras y un `+`: `RPMMEK+Poppins-Bold`. No dice nada y cambia entre
-      // archivos.
-      fuente = objeto?.name?.replace(/^[A-Z]{6}\+/, "") ?? it.fontName;
+      // archivos, así que se lo saca.
+      //
+      // El nombre no siempre es texto: para algunas fuentes pdf.js devuelve un
+      // número y ahí `replace` no existe. El porqué largo está en
+      // `digitalizar-servidor.ts`, que es donde reventó.
+      const nombre = typeof objeto?.name === "string" ? objeto.name : null;
+      fuente = nombre?.replace(/^[A-Z]{6}\+/, "") ?? it.fontName;
     } catch {
       /* se queda con el nombre interno */
     }
