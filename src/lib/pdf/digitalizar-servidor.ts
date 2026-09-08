@@ -31,12 +31,63 @@ import "server-only";
 import { createRequire } from "node:module";
 import {
   digitalizarPagina,
+  lineasDePagina,
   type FiguraPagina,
   type ItemTexto,
   type PaginaDigitalizada,
 } from "@/lib/pdf/estructura";
+import { maquetarConModelo } from "@/lib/pdf/maquetador";
+import {
+  consultaOpenRouter,
+  maquetadorHabilitado,
+} from "@/lib/pdf/maquetador-openrouter";
 import { zonasDeInfografia, type ZonaVectorial } from "@/lib/pdf/vectores";
 import { subirImagen } from "@/lib/storage";
+
+/**
+ * Cuándo vale la pena gastar una llamada al modelo en una página.
+ *
+ * En el panel el tiempo es el que manda: la acción corre con sesenta segundos y
+ * una página lleva entre veinte y cuarenta. Llamar por las ocho no entra, así
+ * que se llama sólo donde la heurística suele equivocarse.
+ *
+ * La señal es la que dejó la página 5 de agosto: **varios subtítulos seguidos**.
+ * Un recuadro de datos mal resuelto se ve exactamente así —los encabezados de
+ * las entradas apilados, porque quedaron en una columna y sus textos en otra— y
+ * una nota normal no encadena tres títulos sin una línea de texto en el medio.
+ */
+function necesitaMaqueta(pagina: PaginaDigitalizada): boolean {
+  let seguidos = 0;
+  for (const b of pagina.cuerpo) {
+    if (b.tipo === "subtitulo") {
+      seguidos++;
+      if (seguidos >= 3) return true;
+    } else if (b.tipo !== "foto") {
+      seguidos = 0;
+    }
+  }
+  return false;
+}
+
+/** La página entera como PNG en base64, que es lo que el modelo mira. 1.400 px
+ *  de ancho: alcanza para distinguir una negrita y una sangría. */
+async function paginaComoPng(
+  pagina: PaginaDibujable,
+  anchoDeLaPagina: number,
+): Promise<string> {
+  const { createCanvas } = await import("@napi-rs/canvas");
+  const escala = 1400 / anchoDeLaPagina;
+  const vp = pagina.getViewport({ scale: escala }) as {
+    width: number;
+    height: number;
+  };
+  const lienzo = createCanvas(Math.round(vp.width), Math.round(vp.height));
+  const ctx = lienzo.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+  await pagina.render({ canvasContext: ctx, viewport: vp, canvas: lienzo }).promise;
+  return lienzo.toBuffer("image/png").toString("base64");
+}
 
 /** Debajo de esto no es una figura: es un logo, una viñeta o un filete. En
  *  puntos cuadrados; la foto más chica del diario mide 296×171 = 50.616. */
@@ -389,15 +440,54 @@ export async function digitalizarPdf(
         });
       }
 
-      paginas.push(
-        digitalizarPagina({
+      const armada = digitalizarPagina({
+        pagina: n,
+        ancho: vista.width,
+        alto: vista.height,
+        items,
+        figuras,
+      });
+
+      /*
+       * El maquetador con modelo, si está prendido. Mismo criterio que el
+       * script de consola: sólo el texto, sólo las páginas de prosa, y si algo
+       * no cierra queda lo que armó la heurística.
+       *
+       * Acá pesa un límite que en la consola no existe: la acción del panel
+       * corre con `maxDuration = 60`. Una página tarda entre veinte y cuarenta
+       * segundos, así que ocho no entran. Por eso el maquetador del panel se
+       * salta las páginas que la heurística ya resuelve bien y sólo mira las
+       * que tienen un recuadro sospechoso —lo dice `necesitaMaqueta()`—, y aun
+       * así conviene digitalizar desde la consola cuando el número es largo.
+       */
+      if (maquetadorHabilitado() && armada.clase === "prosa" && necesitaMaqueta(armada)) {
+        const lineas = lineasDePagina({
           pagina: n,
           ancho: vista.width,
           alto: vista.height,
           items,
           figuras,
-        }),
-      );
+        });
+        const maqueta = await maquetarConModelo({
+          lineas,
+          imagenBase64: await paginaComoPng(
+            pagina as unknown as PaginaDibujable,
+            vista.width,
+          ),
+          pagina: n,
+          consultar: consultaOpenRouter(),
+        });
+        if (maqueta.ok && maqueta.cuerpo) {
+          const fotos = armada.cuerpo.filter((b) => b.tipo === "foto");
+          armada.cuerpo = [...maqueta.cuerpo, ...fotos];
+          if (maqueta.titulo) armada.titulo = maqueta.titulo;
+          if (maqueta.bajada) armada.bajada = maqueta.bajada;
+        } else if (maqueta.motivo) {
+          armada.avisos.push(`El maquetador no se pudo usar: ${maqueta.motivo}`);
+        }
+      }
+
+      paginas.push(armada);
     }
   } finally {
     // Son varios megas parseados y un worker propio detrás. Va en `finally`

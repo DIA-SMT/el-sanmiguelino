@@ -12,6 +12,18 @@
       "autoPort": true
     },
     {
+      "name": "el-sanmiguelino-3005",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3005"
+      ],
+      "port": 3005
+    },
+    {
       "name": "derivador",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

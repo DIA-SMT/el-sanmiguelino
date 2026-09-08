@@ -768,6 +768,68 @@ function epigrafeDe(figura: FiguraPagina, epigrafes: Grupo[]): Grupo | null {
 /**
  * Convierte una página del impreso en los bloques de una nota.
  */
+/**
+ * Las líneas de una página, tal como las ve el conversor, sin clasificar.
+ *
+ * Existe para el maquetador con modelo (`maquetador.ts`). La heurística arma
+ * grupos —junta líneas contiguas del mismo estilo y columna— y ahí está el
+ * problema que el modelo viene a resolver: cuando un recuadro tiene DOS
+ * columnas propias adentro de una página de tres, el agrupado mete las cuatro
+ * descripciones de la columna izquierda en un solo párrafo de mil caracteres y
+ * deja sus cuatro encabezados sueltos, uno detrás del otro. Medido en la página
+ * 5 de agosto.
+ *
+ * Por eso el modelo tiene que ver **líneas** y no grupos: sobre un grupo ya
+ * pegado no se puede deshacer nada, sólo reordenar el daño. Con las líneas
+ * puede decidir qué va con qué, que es exactamente lo que un humano hace
+ * mirando la página.
+ *
+ * Devuelve lo mismo que consume la heurística: sin la mueblería, con la columna
+ * que le tocó a cada una y con su estilo, que es lo que permite hablar de
+ * negritas y de tamaños sin volver a medirlos.
+ */
+export function lineasDePagina(cruda: PaginaPdfCruda): LineaExpuesta[] {
+  const conTexto = cruda.items.filter((i) => !i.rotado && i.texto.trim());
+  const muebles = mueblesDe(conTexto);
+  const utiles = conTexto.filter((i) => !muebles.has(i));
+  const columnas = columnasDe(utiles);
+  return lineasDe(utiles, columnas)
+    .filter((l) => !esMueble(l.texto))
+    .sort(enLectura)
+    .map((l, i) => ({
+      i,
+      texto: l.texto.trim(),
+      columna: l.columna,
+      x: Math.round(l.x),
+      y: Math.round(l.y),
+      ancho: Math.round(l.ancho),
+      tam: Math.round(l.tam * 10) / 10,
+      negrita: esNegrita(l.fuente) || esSemiNegrita(l.fuente),
+      fuente: familiaDe(l.fuente),
+    }));
+}
+
+/** Una línea como la ve el maquetador. El índice es la única referencia que el
+ *  modelo puede devolver: así el texto sale siempre de acá y no de él. */
+export interface LineaExpuesta {
+  i: number;
+  texto: string;
+  columna: number;
+  x: number;
+  y: number;
+  ancho: number;
+  tam: number;
+  negrita: boolean;
+  fuente: string;
+}
+
+/** Pega dos textos resolviendo el corte de palabra al final del renglón. Es la
+ *  misma unión que usa el agrupado, expuesta para que el maquetador arme el
+ *  texto de un bloque exactamente igual que la heurística. */
+export function pegarTextos(a: string, b: string): string {
+  return pegar(a, b);
+}
+
 export function digitalizarPagina(cruda: PaginaPdfCruda): PaginaDigitalizada {
   const descartado: string[] = [];
   const avisos: string[] = [];

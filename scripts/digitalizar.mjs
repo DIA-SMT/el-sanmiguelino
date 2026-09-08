@@ -38,10 +38,25 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { config as cargarEnv } from "dotenv";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import { createCanvas } from "@napi-rs/canvas";
-import { digitalizarPagina } from "../src/lib/pdf/estructura.ts";
+import {
+  digitalizarPagina,
+  lineasDePagina,
+} from "../src/lib/pdf/estructura.ts";
+import { maquetarConModelo } from "../src/lib/pdf/maquetador.ts";
+import {
+  consultaOpenRouter,
+  maquetadorHabilitado,
+  modeloQueMaqueta,
+} from "../src/lib/pdf/maquetador-openrouter.ts";
 import { zonasDeInfografia } from "../src/lib/pdf/vectores.ts";
+
+/* El maquetador con modelo necesita la clave, y este script corre fuera de
+   Next, que es quien normalmente lee este archivo. Sin esto, MAQUETADOR=1 no
+   hacía nada y no se notaba: el conversor seguía de largo con la heurística. */
+cargarEnv({ path: ".env.local", quiet: true });
 
 const require = createRequire(import.meta.url);
 const sharp = require("sharp");
@@ -96,6 +111,18 @@ console.log(
   `\n${path.basename(archivo)} — ${documento.numPages} páginas\n` +
     `Salida: ${salida}\n`,
 );
+
+/* Que el maquetador esté prendido o apagado tiene que decirse. Pedirlo y que no
+   pase nada —porque falta la clave— es el tipo de silencio que hace perder una
+   tarde: la conversión termina bien, con la maquetación de siempre. */
+if (process.env.MAQUETADOR === "1" && !maquetadorHabilitado()) {
+  console.log(
+    "  ⚠ Se pidió el maquetador y falta OPENROUTER_API_KEY.\n" +
+      "    La conversión sigue con la heurística de siempre.\n",
+  );
+} else if (maquetadorHabilitado()) {
+  console.log(`  Maquetando las páginas de prosa con ${modeloQueMaqueta()}\n`);
+}
 
 /** Multiplica dos matrices de transformación del PDF. */
 function componer(m, o) {
@@ -175,6 +202,26 @@ async function rasterizar(pagina, zona) {
     .webp({ quality: 82 })
     .toBuffer();
   return { buffer, ancho, alto };
+}
+
+/**
+ * La página entera como PNG en base64, para que el modelo la MIRE.
+ *
+ * 1.400 px de ancho: alcanza para leer el encabezado de un recuadro y la
+ * sangría de un párrafo, que es lo que hay que distinguir, y no infla el
+ * pedido. Va en PNG y no en WebP porque es lo que toda API de visión acepta sin
+ * discutir.
+ */
+async function imagenDeLaPagina(pagina, vista) {
+  const escala = 1400 / vista.width;
+  const vp = pagina.getViewport({ scale: escala });
+  const lienzo = createCanvas(Math.round(vp.width), Math.round(vp.height));
+  const contexto = lienzo.getContext("2d");
+  contexto.fillStyle = "#ffffff";
+  contexto.fillRect(0, 0, lienzo.width, lienzo.height);
+  await pagina.render({ canvasContext: contexto, viewport: vp, canvas: lienzo })
+    .promise;
+  return lienzo.toBuffer("image/png").toString("base64");
 }
 
 const paginas = [];
@@ -334,6 +381,44 @@ for (let n = 1; n <= documento.numPages; n++) {
     items,
     figuras,
   });
+
+  /*
+   * El maquetador con modelo, cuando está prendido.
+   *
+   * Sólo toca el TEXTO y sólo en las páginas de prosa. Las figuras las sigue
+   * resolviendo el camino de siempre —el modelo no ve imágenes recortadas, ve
+   * la página— y una galería no tiene nada que reordenar.
+   *
+   * Si el modelo no está, no contesta o su reparto no pasa el control, la
+   * página queda como la armó la heurística. Nunca se pierde una carga por
+   * esto.
+   */
+  if (maquetadorHabilitado() && resultado.clase === "prosa") {
+    const lineas = lineasDePagina({
+      pagina: n,
+      ancho: vista.width,
+      alto: vista.height,
+      items,
+    });
+    const maqueta = await maquetarConModelo({
+      lineas,
+      imagenBase64: await imagenDeLaPagina(pagina, vista),
+      pagina: n,
+      consultar: consultaOpenRouter(),
+    });
+    if (maqueta.ok) {
+      // Las fotos las pone la heurística y se conservan tal cual, detrás del
+      // texto: el modelo reparte líneas, no figuras.
+      const fotos = resultado.cuerpo.filter((b) => b.tipo === "foto");
+      resultado.cuerpo = [...maqueta.cuerpo, ...fotos];
+      if (maqueta.titulo) resultado.titulo = maqueta.titulo;
+      if (maqueta.bajada) resultado.bajada = maqueta.bajada;
+      console.log(`     ✓ maquetada con ${modeloQueMaqueta()}`);
+    } else {
+      resultado.avisos.push(`El maquetador no se pudo usar: ${maqueta.motivo}`);
+      console.log(`     · sin maquetador: ${maqueta.motivo}`);
+    }
+  }
 
   paginas.push({ ...resultado, figuras });
 
