@@ -75,6 +75,16 @@ export const ACCIONES = {
     grave: true,
   },
   "edicion.digitalizada": { objeto: "edicion", nombre: "Digitalizó un PDF" },
+  /* El fallo también se anota. Una digitalización que revienta deja la edición
+     como estaba, así que no se ve en ningún lado: el administrador ve un cartel
+     rojo que se va con la próxima recarga y nadie más se entera. Y es
+     justamente el caso donde hace falta saber qué pasó, porque el error nace
+     dentro del PDF y no se puede reproducir mirando la pantalla. */
+  "edicion.digitalizada.fallo": {
+    objeto: "edicion",
+    nombre: "Falló al digitalizar",
+    grave: true,
+  },
   "suscripciones.descarga": {
     objeto: "suscripciones",
     nombre: "Descargó el padrón",

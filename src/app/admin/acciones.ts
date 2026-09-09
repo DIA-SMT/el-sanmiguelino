@@ -902,6 +902,27 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
       ),
     };
   } catch (e) {
+    /*
+     * Un fallo acá queda anotado, con el lugar donde nació.
+     *
+     * El error se genera adentro del PDF —una tipografía sin nombre, una imagen
+     * que no se decodifica— y no se reproduce mirando la pantalla: hay que
+     * saber en qué archivo y en qué línea. Sin esto, lo único que quedaba era un
+     * cartel rojo que se iba con la próxima recarga.
+     *
+     * Del stack se guardan las tres primeras líneas: alcanza para ubicarlo y no
+     * llena el registro con el volcado entero.
+     */
+    const stack =
+      e instanceof Error && e.stack
+        ? e.stack.split("\n").slice(0, 3).join(" | ").slice(0, 500)
+        : "";
+    await anotar(usuario, {
+      accion: "edicion.digitalizada.fallo",
+      objetoId: typeof datos === "object" && datos && "slug" in datos ? String(datos.slug) : null,
+      resumen: `No se pudo digitalizar: ${e instanceof Error ? e.message : "error desconocido"}`,
+      ...(stack ? { detalle: { origen: stack } } : {}),
+    });
     return {
       ok: false,
       error:

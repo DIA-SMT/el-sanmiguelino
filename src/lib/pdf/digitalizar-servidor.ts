@@ -271,7 +271,17 @@ export async function digitalizarPdf(
           y: Math.round((vista.height - f) * 10) / 10,
           ancho: it.width,
           tam: Math.round(Math.hypot(b, d) * 10) / 10,
-          fuente,
+          /*
+           * A texto, siempre.
+           *
+           * `it.fontName` tampoco es necesariamente una cadena: cuando el
+           * nombre de la tipografía no se pudo resolver, pdf.js deja acá su id
+           * interno, que es un número. Ese valor viaja hasta `estructura.ts`,
+           * donde se lo trata como texto para decidir la familia y el peso, y
+           * ahí revienta lejos de donde nació. `String()` corta esa cadena en el
+           * único lugar que la conoce.
+           */
+          fuente: String(fuente ?? ""),
           texto: it.str,
           // Girada: la matriz no tiene componente horizontal. En el impreso lo
           // está el crédito del fotógrafo, contra el borde de la página.
