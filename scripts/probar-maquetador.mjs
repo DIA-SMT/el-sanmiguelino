@@ -120,6 +120,12 @@ for (const [i, b] of r.cuerpo.entries()) {
     }
     continue;
   }
+  if (b.tipo === "lista") {
+    console.log(`${String(i).padStart(2)} lista      ${b.titulo ? "«"+b.titulo+"» " : ""}${b.items.length} ítems`);
+    for (const it of b.items.slice(0, 6)) console.log(`      · ${it}`);
+    if (b.items.length > 6) console.log(`      · … y ${b.items.length - 6} más`);
+    continue;
+  }
   if (b.tipo === "cita") {
     console.log(`${String(i).padStart(2)} cita       «${b.texto.slice(0, 60)}…» — ${b.autor}`);
     continue;

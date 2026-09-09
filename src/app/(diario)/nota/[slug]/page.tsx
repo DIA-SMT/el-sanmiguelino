@@ -128,6 +128,34 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
           sizes="(min-width: 1100px) 340px, (min-width: 768px) 50vw, 100vw"
         />
       );
+    case "lista":
+      /* La enumeración del impreso: un ítem por renglón.
+         En la página 4 son los nombres de las 67 plazas, que al costado del
+         mapa van uno debajo del otro y en la web terminaban en un párrafo
+         corrido de 1.515 caracteres.
+
+         **Se parte entre columnas a propósito.** `.note-columns > *` trae
+         `break-inside: avoid-column` para que una foto o una ficha no queden
+         cortadas al medio, pero una lista de sesenta y siete nombres que no se
+         puede partir arma una columna altísima al lado de dos vacías. Una lista
+         fluye como el texto, que es lo que hace el papel. */
+      return (
+        <div className="my-5 [break-inside:auto]">
+          {bloque.titulo ? (
+            <p className="volanta mb-2 text-ink">{bloque.titulo}</p>
+          ) : null}
+          <ul className="grid gap-y-1">
+            {bloque.items.map((item, i) => (
+              <li
+                key={i}
+                className="font-serif text-[0.92rem] leading-[1.45] text-ink"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
     default:
       return (
         <p className="texto-diario font-serif text-[0.97rem] leading-[1.72] text-ink">

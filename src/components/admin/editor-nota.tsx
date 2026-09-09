@@ -93,7 +93,11 @@ function convertirBloque(
       ? bloque.titulo
       : bloque.tipo === "foto"
         ? (bloque.epigrafe ?? "")
-        : bloque.texto;
+        : bloque.tipo === "lista"
+          ? // Una lista que se convierte en otra cosa vuelve a ser sus ítems,
+            // uno por renglón: es como se escribió y como se vuelve a editar.
+            bloque.items.join("\n")
+          : bloque.texto;
 
   switch (tipo) {
     case "cita":
@@ -113,6 +117,17 @@ function convertirBloque(
       // párrafo en foto no puede inventar una imagen. Se guarda recién cuando
       // el editor sube una, que es lo que exige `validarBloque`.
       return { tipo: "foto", src: "", alt: texto, epigrafe: texto };
+    case "lista":
+      // Un renglón, un ítem. Es la forma natural de escribir una lista en un
+      // campo de texto, y la inversa exacta de lo que hace la conversión de
+      // vuelta.
+      return {
+        tipo: "lista",
+        items: texto
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean),
+      };
     default:
       return { tipo, texto };
   }
@@ -1087,6 +1102,40 @@ function CamposBloque({
             placeholder="Quién la sacó (opcional)"
           />
         </div>
+      </div>
+    );
+  }
+
+  if (bloque.tipo === "lista") {
+    /* Una lista se edita como texto, un ítem por renglón. Es la forma en que
+       cualquiera escribe una lista sin pensarlo, y evita inventar una interfaz
+       de filas con su botón de agregar y su botón de borrar para algo que en el
+       impreso son nombres sueltos. Los renglones vacíos se descartan al
+       guardar, así que sobra un Enter de más. */
+    return (
+      <div className="mt-3 space-y-3">
+        <textarea
+          value={bloque.items.join("\n")}
+          onChange={(e) =>
+            onCambio({
+              items: e.target.value
+                .split("\n")
+                .map((l) => l.trim())
+                .filter(Boolean),
+            })
+          }
+          rows={Math.min(14, Math.max(4, bloque.items.length + 1))}
+          aria-label={`Ítems del bloque ${indice + 1}, uno por renglón`}
+          className={cn(campo, "resize-y")}
+          placeholder={"Un ítem por renglón"}
+        />
+        <input
+          value={bloque.titulo ?? ""}
+          onChange={(e) => onCambio({ titulo: e.target.value })}
+          aria-label={`Título de la lista del bloque ${indice + 1}`}
+          className={campo}
+          placeholder="Título de la lista (opcional)"
+        />
       </div>
     );
   }

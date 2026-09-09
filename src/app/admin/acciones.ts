@@ -118,6 +118,23 @@ function validarBloque(v: unknown, i: number): BloqueNota {
     return { tipo: "ficha", titulo: v.titulo, entradas };
   }
 
+  if (tipo === "lista") {
+    if (!Array.isArray(v.items) || v.items.length === 0) {
+      throw new Error(`La lista del bloque ${i + 1} no tiene ítems.`);
+    }
+    const items = v.items
+      .filter((x): x is string => textoNoVacio(x))
+      .map((x) => x.trim());
+    if (!items.length) {
+      throw new Error(`La lista del bloque ${i + 1} está vacía.`);
+    }
+    return {
+      tipo: "lista",
+      items,
+      ...(textoNoVacio(v.titulo) ? { titulo: v.titulo } : {}),
+    };
+  }
+
   if (tipo === "foto") {
     if (!textoNoVacio(v.src)) {
       throw new Error(

@@ -58,6 +58,12 @@ export function textoDeBloque(bloque: BloqueNota): string {
       // El crédito SÍ va: "¿de quién son las fotos de las plazas?" es una
       // pregunta razonable, y la respuesta está impresa en la página.
       return [bloque.epigrafe, bloque.credito].filter(Boolean).join(" ");
+    case "lista":
+      // Los ítems se unen con punto y no con espacio: son unidades sueltas, y
+      // pegadas con espacio quedan «Plaza Belgrano Plaza Lola Mora», que es
+      // exactamente la sopa que este bloque vino a deshacer. El buscador corta
+      // fragmentos sobre esta misma cadena, así que ahí se ve.
+      return [bloque.titulo, ...bloque.items].filter(Boolean).join(". ");
     default: {
       const _exhaustivo: never = bloque;
       return _exhaustivo;

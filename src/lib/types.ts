@@ -67,6 +67,28 @@ export type BloqueNota =
       tipo: "ficha";
       titulo: string;
       entradas: { lead: string; texto: string }[];
+    }
+  /**
+   * Una enumeración: ítems cortos, uno por renglón.
+   *
+   * Existe por la página 4 del número de agosto. Al costado del mapa, el
+   * impreso lista los nombres de las 67 plazas revalorizadas, uno debajo del
+   * otro. Sin este bloque eso terminaba en un párrafo corrido de 1.515
+   * caracteres donde «Plaza 130 Viviendas 2 Plaza 130 Viviendas 1» se lee como
+   * una sopa, y en un teléfono son quince renglones de nombres pegados.
+   *
+   * **No es una ficha.** Una ficha tiene un encabezado y una descripción por
+   * entrada; acá cada ítem es sólo un nombre, y forzarlo a ficha obligaba a
+   * inventar la mitad de cada fila. Tampoco es un párrafo: lo que ordena la
+   * lectura es el corte de renglón, no la coma.
+   *
+   * `titulo` es opcional porque en el impreso esta lista no tiene ninguno: es
+   * la leyenda del mapa que tiene al lado.
+   */
+  | {
+      tipo: "lista";
+      items: string[];
+      titulo?: string;
     };
 
 export interface ImagenNota {

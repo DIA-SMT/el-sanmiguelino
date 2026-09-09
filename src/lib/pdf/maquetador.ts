@@ -61,6 +61,7 @@ export interface MaquetaPropuesta {
 export type BloquePropuesto =
   | { tipo: "parrafo" | "subtitulo" | "destacado"; lineas: number[] }
   | { tipo: "cita"; lineas: number[]; autor: number[]; cargo?: number[] }
+  | { tipo: "lista"; items: number[][]; titulo?: number[] }
   | {
       tipo: "ficha";
       titulo: number[];
@@ -116,7 +117,8 @@ Devolvé un JSON con esta forma exacta:
     {"tipo": "subtitulo", "lineas": [n, ...]},
     {"tipo": "destacado", "lineas": [n, ...]},
     {"tipo": "cita", "lineas": [n, ...], "autor": [n], "cargo": [n]},
-    {"tipo": "ficha", "titulo": [n], "entradas": [{"lead": [n], "texto": [n, ...]}]}
+    {"tipo": "ficha", "titulo": [n], "entradas": [{"lead": [n], "texto": [n, ...]}]},
+    {"tipo": "lista", "items": [[n], [n], [n, n]], "titulo": [n]}
   ]
 }
 
@@ -131,11 +133,16 @@ Reglas:
 - Un RECUADRO DE DATOS —un marco con un título y varias entradas, cada una con
   su encabezado EN NEGRITA y su descripción— es UNA ficha con todas sus
   entradas, aunque en el papel esté en dos columnas. Es el caso que más importa.
-- UNA LISTA CON VIÑETAS NO ES UNA FICHA. Si los ítems empiezan con • o con un
-  guión y no tienen un encabezado en negrita propio, es un párrafo: mandá la
-  lista entera como uno o varios "parrafo". Una entrada de ficha se reconoce
-  porque su encabezado está en negrita y termina en dos puntos, no porque el
-  ítem ocupe dos renglones.
+- UNA ENUMERACIÓN es "lista": ítems cortos, uno por renglón, sin una
+  descripción propia. En la página 4 del impreso, al costado del mapa, están los
+  nombres de las 67 plazas uno debajo del otro: eso es una lista de 67 ítems, no
+  un párrafo. Cada ítem es un arreglo de líneas, porque un nombre largo puede
+  ocupar dos renglones. El "titulo" es opcional y va sólo si la lista lo tiene
+  impreso encima.
+- UNA LISTA CON VIÑETAS NO ES UNA FICHA: es "lista". Si los ítems empiezan con •
+  o con un guión y no tienen un encabezado en negrita propio, cada ítem es un
+  ítem de la lista. Una entrada de ficha se reconoce porque su encabezado está
+  en negrita y termina en dos puntos, no porque el ítem ocupe dos renglones.
 - NUNCA partas un ítem en encabezado y descripción por dónde cae el corte del
   renglón. Si al hacerlo te queda una palabra cortada al medio —«la restauración
   de los monu» / «mentos a Jorge Luis Borges»— es la señal de que no era una
@@ -172,6 +179,9 @@ function textoDeBloqueArmado(b: BloqueNota): string {
     return [b.texto, b.autor, b.cargo].filter(Boolean).join(" ");
   }
   if (b.tipo === "foto") return [b.alt, b.epigrafe].filter(Boolean).join(" ");
+  if (b.tipo === "lista") {
+    return [b.titulo, ...b.items].filter(Boolean).join(" ");
+  }
   return b.texto;
 }
 
@@ -182,6 +192,9 @@ function idsDe(m: MaquetaPropuesta): number[] {
     if (b.tipo === "ficha") {
       ids.push(...b.titulo);
       for (const e of b.entradas) ids.push(...e.lead, ...e.texto);
+    } else if (b.tipo === "lista") {
+      ids.push(...(b.titulo ?? []));
+      for (const item of b.items) ids.push(...item);
     } else if (b.tipo === "cita") {
       ids.push(...b.lineas, ...b.autor, ...(b.cargo ?? []));
     } else {
@@ -351,6 +364,15 @@ Tu respuesta anterior no se pudo usar: ${ultimoMotivo}.
         titulo: textoDe(lineas, b.titulo) || "Datos",
         entradas,
       });
+      continue;
+    }
+    if (b.tipo === "lista") {
+      const items = b.items
+        .map((ids) => textoDe(lineas, ids))
+        .filter(Boolean);
+      if (!items.length) continue;
+      const titulo = b.titulo ? textoDe(lineas, b.titulo) : "";
+      cuerpo.push({ tipo: "lista", items, ...(titulo ? { titulo } : {}) });
       continue;
     }
     if (b.tipo === "cita") {
