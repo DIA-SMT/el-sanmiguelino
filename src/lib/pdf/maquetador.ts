@@ -80,6 +80,69 @@ export interface ResultadoMaqueta {
   motivo?: string;
 }
 
+/** El modelo puede devolver `null` en un campo opcional aunque el contrato
+ * pida un arreglo. Se valida antes de usar spreads o `for...of`: un JSON
+ * defectuoso tiene que activar el segundo intento, nunca tumbar la acción. */
+function validarForma(m: MaquetaPropuesta): string | null {
+  const ids = (valor: unknown, nombre: string): string | null => {
+    if (!Array.isArray(valor)) return `${nombre} no es un arreglo`;
+    if (valor.some((i) => !Number.isInteger(i))) return `${nombre} contiene un id inválido`;
+    return null;
+  };
+  for (const [nombre, valor] of [["titulo", m.titulo], ["bajada", m.bajada]] as const) {
+    const error = ids(valor, nombre);
+    if (error) return error;
+  }
+  if (!Array.isArray(m.bloques)) return "faltan los bloques";
+  for (const [i, bloque] of m.bloques.entries()) {
+    if (!bloque || typeof bloque !== "object" || typeof bloque.tipo !== "string") {
+      return `el bloque ${i + 1} no tiene tipo`;
+    }
+    if (bloque.tipo === "ficha") {
+      const error = ids(bloque.titulo, `bloques[${i}].titulo`);
+      if (error) return error;
+      if (!Array.isArray(bloque.entradas)) return `bloques[${i}].entradas no es un arreglo`;
+      for (const [j, entrada] of bloque.entradas.entries()) {
+        if (!entrada || typeof entrada !== "object") return `bloques[${i}].entradas[${j}] inválida`;
+        for (const campo of ["lead", "texto"] as const) {
+          const error = ids(entrada[campo], `bloques[${i}].entradas[${j}].${campo}`);
+          if (error) return error;
+        }
+      }
+      continue;
+    }
+    if (bloque.tipo === "lista") {
+      if (!Array.isArray(bloque.items)) return `bloques[${i}].items no es un arreglo`;
+      if (bloque.titulo !== undefined) {
+        const error = ids(bloque.titulo, `bloques[${i}].titulo`);
+        if (error) return error;
+      }
+      for (const [j, item] of bloque.items.entries()) {
+        const error = ids(item, `bloques[${i}].items[${j}]`);
+        if (error) return error;
+      }
+      continue;
+    }
+    if (bloque.tipo === "cita") {
+      for (const campo of ["lineas", "autor"] as const) {
+        const error = ids(bloque[campo], `bloques[${i}].${campo}`);
+        if (error) return error;
+      }
+      if (bloque.cargo !== undefined) {
+        const error = ids(bloque.cargo, `bloques[${i}].cargo`);
+        if (error) return error;
+      }
+      continue;
+    }
+    if (!["parrafo", "subtitulo", "destacado"].includes(bloque.tipo)) {
+      return `tipo de bloque desconocido: ${bloque.tipo}`;
+    }
+    const error = ids(bloque.lineas, `bloques[${i}].lineas`);
+    if (error) return error;
+  }
+  return null;
+}
+
 /** Cómo se le habla al modelo. Lo pone quien llama. */
 export type Consulta = (peticion: {
   instrucciones: string;
@@ -321,6 +384,11 @@ Tu respuesta anterior no se pudo usar: ${ultimoMotivo}.
       if (!Array.isArray(propuesta.bloques)) throw new Error("faltan los bloques");
       propuesta.titulo ??= [];
       propuesta.bajada ??= [];
+      const forma = validarForma(propuesta);
+      if (forma) {
+        ultimoMotivo = forma;
+        continue;
+      }
       const problema = revisar(propuesta, lineas);
       if (problema) {
         ultimoMotivo = problema;

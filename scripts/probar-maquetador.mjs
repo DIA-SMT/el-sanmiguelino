@@ -132,4 +132,4 @@ for (const [i, b] of r.cuerpo.entries()) {
   }
   console.log(`${String(i).padStart(2)} ${b.tipo.padEnd(10)} ${b.texto.slice(0, 76)}`);
 }
-console.log(`\nMuebleria descartada: ${r.descartado.length} líneas`);
+console.log(`\nMuebleria descartada: ${r.descartado?.length ?? 0} líneas`);
