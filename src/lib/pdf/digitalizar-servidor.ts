@@ -28,7 +28,7 @@ import "server-only";
  * son binarios nativos y empaquetarlos no funciona.
  */
 
-import { createRequire } from "node:module";
+import path from "node:path";
 import {
   digitalizarPagina,
   type FiguraPagina,
@@ -64,16 +64,15 @@ const TIMEOUT_MS = 30_000;
 /**
  * Dónde están los decodificadores y las tipografías que pdf.js pide por ruta.
  *
- * Se resuelve desde el paquete y no con `process.cwd()` porque en una función
- * de Vercel el directorio de trabajo no es el del repositorio. Y para que estos
- * archivos EXISTAN allá hay que forzarlos en `outputFileTracingIncludes`
- * (`next.config.ts`): pdf.js los abre por ruta en tiempo de ejecución, así que
- * el trazado automático de Next no los ve y no los empaqueta. Sin ellos el PDF
- * se parsea igual pero las fotos salen vacías, **sin ningún error**.
+ * En Vercel `process.cwd()` es `/var/task`, que es justamente la raíz de la
+ * función donde Next deja los paquetes externos. Los archivos de datos se
+ * fuerzan además en `outputFileTracingIncludes` (`next.config.ts`): pdf.js los
+ * abre por ruta en tiempo de ejecución, así que el trazado automático no los
+ * ve y no los empaqueta. Sin ellos el PDF se parsea igual pero las fotos salen
+ * vacías, **sin ningún error**.
  */
 function raizDePdfjs(): string {
-  const require = createRequire(import.meta.url);
-  return require.resolve("pdfjs-dist/package.json").replace(/[\\/]package\.json$/, "");
+  return path.join(process.cwd(), "node_modules", "pdfjs-dist");
 }
 
 /** Multiplica dos matrices de transformación del PDF. */
@@ -314,12 +313,9 @@ export async function digitalizarPdf(
            * entre archivos, así que se lo saca.
            *
            * **El nombre no siempre es texto.** Para algunas fuentes pdf.js
-           * devuelve un número —un id interno— y ahí `name.replace` no existe:
-           * la digitalización entera se cortaba con «55876.replace is not a
-           * function», con el PDF ya bajado y las figuras ya subidas. Pasó en
-           * producción al volver a digitalizar agosto, y no aparecía en la
-           * consola con el mismo archivo. Si no es texto se usa el nombre
-           * interno, que es exactamente lo que hace el `catch` de abajo.
+           * devuelve un número —un id interno—. Si no es texto se usa ese id
+           * convertido a cadena, sin dejar que un `.replace()` sobre el valor
+           * crudo corte la digitalización.
            */
           fuente = nombreDeFuente(objeto?.name ?? it.fontName);
         } catch {
