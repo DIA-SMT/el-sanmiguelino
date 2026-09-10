@@ -27,9 +27,9 @@ const MODELO_POR_DEFECTO = "anthropic/claude-sonnet-5";
  * la acción: si el proveedor no responde, la acción termina con el mensaje
  * genérico "An unexpected response was received from the server" aunque el
  * PDF ya haya sido procesado. Hay un segundo intento en `maquetador.ts`, por
- * eso dos timeouts de 15 s siguen dejando margen para guardar y revalidar.
+ * por eso un timeout de 25 s sigue dejando margen para guardar y revalidar.
  */
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = 25_000;
 
 /** El reparto de una página de ciento treinta líneas es largo. Quedarse corto
  *  acá se ve como un JSON cortado a la mitad, que el control rechaza. */
