@@ -5,6 +5,8 @@ import type { DireccionPagina } from "@/lib/deslizar-paginas";
 import type { CapturaPapel, crearSuperficie } from "./superficie";
 
 const DURACION = 760;
+const ESPERA_MAXIMA_CAPTURA = 900;
+const DURACION_FALLBACK = 700;
 type Superficie = NonNullable<ReturnType<typeof crearSuperficie>>;
 type Motor = typeof import("./captura") & typeof import("./superficie");
 let motor: Promise<Motor> | undefined;
@@ -74,8 +76,10 @@ export function usePasoPapel(pathname: string) {
     };
     const invalidar = () => { invalidarRevision(); cache.current = null; programar(); };
     const alScroll = () => {
-      if (pendiente.current?.animando) terminar();
-      programar();
+      // Next puede hacer scroll al cambiar de ruta. Ese scroll es parte de la
+      // navegación y no debe desmontar la superficie que está cubriendo el
+      // cambio de página.
+      if (!pendiente.current?.animando) programar();
     };
     const alResize = () => { terminar(); invalidar(); };
     const alOcultar = () => { if (document.hidden) terminar(); else programar(); };
@@ -105,28 +109,22 @@ export function usePasoPapel(pathname: string) {
     const paso = pendiente.current;
     if (!paso) return;
     if (paso.destino !== pathname) { terminar(); return; }
-    const esperarContenido = () => {
+    // La captura vieja ya está encima de la pantalla. Esperar a que Next
+    // reemplace exactamente el nodo `.hoja` deja la animación atada a detalles
+    // de renderizado y a veces la hace quedar esperando hasta el timeout.
+    frame.current = requestAnimationFrame(() => {
       if (pendiente.current !== paso) return;
-      const nueva = document.querySelector<HTMLElement>(".hoja");
-      if (!nueva || nueva === paso.hoja || nueva.dataset.papelCargando !== undefined) {
-        frame.current = requestAnimationFrame(esperarContenido);
-        return;
-      }
-      // Dejar que Next termine de colocar la nueva página y ajustar el scroll.
-      frame.current = requestAnimationFrame(() => {
-        const inicio = performance.now();
-        paso.animando = true;
-        const animar = (ahora: number) => {
-          const t = Math.min(1, (ahora - inicio) / DURACION);
-          const avance = t * t * (3 - 2 * t);
-          paso.superficie.dibujar(avance);
-          if (t < 1) frame.current = requestAnimationFrame(animar);
-          else { terminar(); void preparar(); }
-        };
-        frame.current = requestAnimationFrame(animar);
-      });
-    };
-    frame.current = requestAnimationFrame(esperarContenido);
+      const inicio = performance.now();
+      paso.animando = true;
+      const animar = (ahora: number) => {
+        const t = Math.min(1, (ahora - inicio) / DURACION);
+        const avance = t * t * (3 - 2 * t);
+        paso.superficie.dibujar(avance);
+        if (t < 1) frame.current = requestAnimationFrame(animar);
+        else { terminar(); void preparar(); }
+      };
+      frame.current = requestAnimationFrame(animar);
+    });
   }, [pathname, terminar, preparar]);
 
   const pasar = useCallback(async (
@@ -138,7 +136,7 @@ export function usePasoPapel(pathname: string) {
     const tarea = preparar();
     enCurso.current = true;
     document.documentElement.dataset.papelOcupado = "true";
-    if (tarea) await Promise.race([tarea, new Promise((r) => setTimeout(r, 180))]);
+    if (tarea) await Promise.race([tarea, new Promise((r) => setTimeout(r, ESPERA_MAXIMA_CAPTURA))]);
     if (!montado.current) return;
     const hoja = document.querySelector<HTMLElement>(".hoja");
     const lista = cache.current;
@@ -157,7 +155,7 @@ export function usePasoPapel(pathname: string) {
       // Una ruta que tarda o falla nunca deja una hoja inmóvil encima del error.
       plazo.current = setTimeout(terminar, 3000);
     } else {
-      plazo.current = setTimeout(terminar, 450);
+      plazo.current = setTimeout(terminar, DURACION_FALLBACK);
     }
     navegar(Boolean(superficie));
   }, [preparar, terminar]);

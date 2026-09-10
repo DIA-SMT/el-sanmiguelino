@@ -3,6 +3,13 @@ import type { CapturaPapel } from "./superficie";
 
 let fuentes: Promise<string> | undefined;
 
+// Si un CDN externo no responde a tiempo, html-to-image puede abortar toda la
+// captura. Un píxel transparente permite conservar la animación y deja que la
+// página real siga cargando por debajo del papel.
+const IMAGEN_FALLBACK = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" viewBox="0 0 1 1"><rect width="1" height="1" fill="transparent"/></svg>',
+)}`;
+
 /** Captura sólo la franja visible, incluso en notas de varias pantallas.
  * Todo ocurre en el navegador: no se envía el contenido a ningún servicio. */
 export async function capturarPapel(hoja: HTMLElement): Promise<CapturaPapel> {
@@ -20,6 +27,7 @@ export async function capturarPapel(hoja: HTMLElement): Promise<CapturaPapel> {
     pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
     fontEmbedCSS: await fuentes,
     includeQueryParams: true,
+    imagePlaceholder: IMAGEN_FALLBACK,
     style: {
       width: `${rect.width}px`,
       height: `${rect.height}px`,
