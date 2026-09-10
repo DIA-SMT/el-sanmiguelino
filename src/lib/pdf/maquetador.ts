@@ -143,6 +143,33 @@ function validarForma(m: MaquetaPropuesta): string | null {
   return null;
 }
 
+/** Quita null de campos opcionales antes de validar. JSON permite representar
+ * un campo ausente como null, pero el resto del conversor trabaja con arreglos
+ * reales. Los IDs siguen pasando por `validarForma`, así que esto no puede
+ * ocultar una línea perdida. */
+function normalizarOpcionales(m: MaquetaPropuesta): MaquetaPropuesta {
+  return {
+    ...m,
+    bloques: Array.isArray(m.bloques)
+      ? m.bloques.map((bloque) => {
+          if (!bloque || typeof bloque !== "object") return bloque;
+          if (bloque.tipo === "ficha" && bloque.titulo == null) {
+            return { ...bloque, titulo: [] };
+          }
+          if (bloque.tipo === "lista" && bloque.titulo == null) {
+            const { titulo: _titulo, ...sinTitulo } = bloque;
+            return sinTitulo;
+          }
+          if (bloque.tipo === "cita" && bloque.cargo == null) {
+            const { cargo: _cargo, ...sinCargo } = bloque;
+            return sinCargo;
+          }
+          return bloque;
+        })
+      : m.bloques,
+  };
+}
+
 /** Cómo se le habla al modelo. Lo pone quien llama. */
 export type Consulta = (peticion: {
   instrucciones: string;
@@ -186,7 +213,8 @@ Devolvé un JSON con esta forma exacta:
 }
 
 Reglas:
-- Emití JSON compacto, sin sangría ni explicación alrededor.
+- Emití JSON compacto, sin sangría ni explicación alrededor. Cuando un campo
+  opcional no corresponda, omitilo: no uses null.
 - CADA línea tiene que aparecer exactamente una vez: en el título, en la bajada
   o en un bloque. Ninguna dos veces y NINGUNA AFUERA.
 - No hay dónde descartar. Las líneas que te paso ya vienen limpias: el folio, el
@@ -380,7 +408,7 @@ Tu respuesta anterior no se pudo usar: ${ultimoMotivo}.
     }
 
     try {
-      const propuesta = comoJson(crudo) as MaquetaPropuesta;
+      const propuesta = normalizarOpcionales(comoJson(crudo) as MaquetaPropuesta);
       if (!Array.isArray(propuesta.bloques)) throw new Error("faltan los bloques");
       propuesta.titulo ??= [];
       propuesta.bajada ??= [];
