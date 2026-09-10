@@ -88,6 +88,12 @@ function componer(m: number[], o: number[]): number[] {
   ];
 }
 
+/** pdf.js puede entregar el id numérico de una fuente en vez de su nombre. */
+function nombreDeFuente(valor: unknown): string {
+  const texto = typeof valor === "string" ? valor : String(valor ?? "");
+  return texto.replace(/^[A-Z]{6}\+/, "");
+}
+
 interface ImagenCruda {
   width: number;
   height: number;
@@ -306,10 +312,10 @@ export async function digitalizarPdf(
            * consola con el mismo archivo. Si no es texto se usa el nombre
            * interno, que es exactamente lo que hace el `catch` de abajo.
            */
-          const nombre = typeof objeto?.name === "string" ? objeto.name : null;
-          fuente = nombre?.replace(/^[A-Z]{6}\+/, "") ?? it.fontName;
+          fuente = nombreDeFuente(objeto?.name ?? it.fontName);
         } catch {
-          /* se queda con el nombre interno */
+          /* se queda con el nombre interno, ya normalizado como texto */
+          fuente = nombreDeFuente(it.fontName);
         }
         items.push({
           x: e,

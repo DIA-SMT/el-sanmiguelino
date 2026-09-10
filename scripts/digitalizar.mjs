@@ -81,6 +81,12 @@ const ANCHO_MAXIMO = 1600;
  *  nada, porque el vector se ve nítido bastante antes. */
 const ESCALA_MAXIMA = 4;
 
+/** pdf.js puede entregar el id numérico de una fuente en vez de su nombre. */
+function nombreDeFuente(valor) {
+  const texto = typeof valor === "string" ? valor : String(valor ?? "");
+  return texto.replace(/^[A-Z]{6}\+/, "");
+}
+
 const [, , archivoArg, salidaArg] = process.argv;
 
 if (!archivoArg) {
@@ -256,10 +262,10 @@ for (let n = 1; n <= documento.numPages; n++) {
       // El nombre no siempre es texto: para algunas fuentes pdf.js devuelve un
       // número y ahí `replace` no existe. El porqué largo está en
       // `digitalizar-servidor.ts`, que es donde reventó.
-      const nombre = typeof objeto?.name === "string" ? objeto.name : null;
-      fuente = nombre?.replace(/^[A-Z]{6}\+/, "") ?? it.fontName;
+      fuente = nombreDeFuente(objeto?.name ?? it.fontName);
     } catch {
-      /* se queda con el nombre interno */
+      /* se queda con el nombre interno, ya normalizado como texto */
+      fuente = nombreDeFuente(it.fontName);
     }
     items.push({
       x: e,
