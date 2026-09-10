@@ -919,6 +919,8 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
   paginas?: number;
   figuras?: number;
   segundos?: number;
+  maquetadas?: number;
+  modeloMaquetado?: string | null;
   avisos?: { pagina: number; texto: string }[];
 }> {
   const { usuario } = await requerirAdmin();
@@ -941,7 +943,7 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
       );
     }
 
-    const { paginas, figuras, segundos } = await digitalizarPdf(
+    const { paginas, figuras, segundos, maquetadas, modeloMaquetado } = await digitalizarPdf(
       edicion.pdfUrl,
       slug,
     );
@@ -961,6 +963,8 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
         paginas: paginas.length,
         figuras,
         segundos,
+        maquetadas,
+        modeloMaquetado,
         sobrePublicada: confirmarPublicada === true,
       },
     });
@@ -977,6 +981,8 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
       paginas: paginas.length,
       figuras,
       segundos,
+      maquetadas,
+      modeloMaquetado,
       // Los avisos son lo que hay que mirar primero en la revisión: páginas sin
       // título propio, citas que se quedaron sin autor, recuadros raros.
       avisos: paginas.flatMap((p) =>

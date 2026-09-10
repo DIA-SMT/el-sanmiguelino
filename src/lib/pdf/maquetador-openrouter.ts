@@ -21,9 +21,15 @@ import type { Consulta } from "./maquetador.ts";
  *  poder comparar dos sobre la misma edición y quedarse con el que acierte. */
 const MODELO_POR_DEFECTO = "anthropic/claude-sonnet-5";
 
-/** Una página densa con su imagen y su reparto lleva su tiempo, y no hay nadie
- *  esperando del otro lado: esto corre en una carga, no en un pedido. */
-const TIMEOUT_MS = 120_000;
+/**
+ * La digitalización corre dentro de una Server Action de Vercel. No podemos
+ * dejar que una página esperando al proveedor consuma todo el presupuesto de
+ * la acción: si el proveedor no responde, la acción termina con el mensaje
+ * genérico "An unexpected response was received from the server" aunque el
+ * PDF ya haya sido procesado. Hay un segundo intento en `maquetador.ts`, por
+ * eso dos timeouts de 15 s siguen dejando margen para guardar y revalidar.
+ */
+const TIMEOUT_MS = 15_000;
 
 /** El reparto de una página de ciento treinta líneas es largo. Quedarse corto
  *  acá se ve como un JSON cortado a la mitad, que el control rechaza. */

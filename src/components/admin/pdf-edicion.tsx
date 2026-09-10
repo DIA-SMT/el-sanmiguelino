@@ -107,6 +107,8 @@ export function PdfEdicion({
     paginas: number;
     figuras: number;
     segundos: number;
+    maquetadas: number;
+    modeloMaquetado: string | null;
     avisos: { pagina: number; texto: string }[];
   } | null>(null);
 
@@ -268,6 +270,8 @@ export function PdfEdicion({
         paginas: res.paginas ?? 0,
         figuras: res.figuras ?? 0,
         segundos: res.segundos ?? 0,
+        maquetadas: res.maquetadas ?? 0,
+        modeloMaquetado: res.modeloMaquetado ?? null,
         avisos: res.avisos ?? [],
       });
       router.refresh();
@@ -589,6 +593,11 @@ export function PdfEdicion({
             {resultado.figuras}{" "}
             {resultado.figuras === 1 ? "imagen" : "imágenes"}, en{" "}
             {resultado.segundos} s.
+          </p>
+          <p className="text-panel-xs text-panel-tinta-3">
+            {resultado.modeloMaquetado
+              ? `${resultado.maquetadas} ${resultado.maquetadas === 1 ? "página reordenada" : "páginas reordenadas"} con ${resultado.modeloMaquetado}.`
+              : "Maquetador con visión no ejecutado: revisá OPENROUTER_API_KEY y MAQUETADOR en producción."}
           </p>
           {resultado.avisos.length > 0 ? (
             <>

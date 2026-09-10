@@ -246,6 +246,10 @@ export interface ResultadoDigitalizacion {
   figuras: number;
   /** Cuánto tardó, para poder ver si se está acercando al tope de la función. */
   segundos: number;
+  /** Cuántas páginas pudo reordenar el maquetador con visión. */
+  maquetadas: number;
+  /** Modelo usado, o null si la variable de producción no está configurada. */
+  modeloMaquetado: string | null;
 }
 
 /**
@@ -294,6 +298,7 @@ export async function digitalizarPdf(
 
   const paginas: PaginaDigitalizada[] = [];
   let figurasSubidas = 0;
+  let paginasMaquetadas = 0;
   const tareasDeMaquetado: Promise<void>[] = [];
 
   try {
@@ -618,6 +623,7 @@ export async function digitalizarPdf(
                 figuras,
                 resultado: paginaGuardada,
               });
+              paginasMaquetadas++;
             } catch (error) {
               paginaGuardada.avisos.push(
                 `El maquetador no pudo usarse: ${error instanceof Error ? error.message : "error desconocido"}.`,
@@ -639,5 +645,7 @@ export async function digitalizarPdf(
     paginas,
     figuras: figurasSubidas,
     segundos: Math.round((Date.now() - arranque) / 100) / 10,
+    maquetadas: paginasMaquetadas,
+    modeloMaquetado: maquetadorDelPanelHabilitado() ? modeloQueMaqueta() : null,
   };
 }
