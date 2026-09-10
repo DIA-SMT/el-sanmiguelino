@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { PaginaEdicion } from "@/lib/data/paginas";
+import { usePasoPapel } from "@/lib/papel/usar-paso-papel";
 import {
   useDeslizarPaginas,
   type DireccionPagina,
@@ -46,7 +47,7 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
   const router = useRouter();
 
   // Mantener apretada la flecha (o encadenar gestos) dejaba giros a medio hacer
-  const enCurso = useRef(false);
+  const { pasar: animarPaso, enCurso } = usePasoPapel(pathname);
   // Adónde va el scroll suave que el teclado ya pidió. Sin esto, pulsaciones
   // encadenadas leen `scrollY` a mitad de la animación: cada una avanza medio
   // paso, y la decisión de "ya estoy al final" se toma con la posición vieja.
@@ -74,20 +75,13 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
     (direccion: DireccionPagina) => {
       const destino = direccion === "adelante" ? siguiente : anterior;
       if (!destino || enCurso.current) return;
-      anclarEje("vieja");
-      enCurso.current = true;
-      // Tiene que cubrir el giro completo de la hoja (1150ms en globals.css) o
-      // se encadenan vueltas a medio hacer.
-      window.setTimeout(() => {
-        enCurso.current = false;
-      }, 1180);
-      router.push(destino.href, {
-        transitionTypes: [
-          direccion === "adelante" ? "pagina-adelante" : "pagina-atras",
-        ],
+      void animarPaso(destino.href, direccion, (curvado) => {
+        router.push(destino.href, {
+          transitionTypes: curvado ? [] : [`pagina-${direccion}`],
+        });
       });
     },
-    [anterior, siguiente, router],
+    [anterior, siguiente, router, animarPaso, enCurso],
   );
 
   useDeslizarPaginas({ hayDestino, alPasar: pasar, pistaAtras, pistaAdelante });
@@ -100,6 +94,27 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
     if (anterior) router.prefetch(anterior.href);
     if (siguiente) router.prefetch(siguiente.href);
   }, [anterior, siguiente, router]);
+
+  // Los enlaces conservan href, prefetch y abrir en otra pestaña. Sólo su
+  // navegación ordinaria comparte el mismo bloqueo que el teclado y el gesto.
+  useEffect(() => {
+    const alClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element
+        ? event.target.closest<HTMLAnchorElement>("a[data-pagina-direccion]") : null;
+      if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
+      const direccion = link.dataset.paginaDireccion;
+      if (direccion !== "adelante" && direccion !== "atras") return;
+      event.preventDefault();
+      void animarPaso(link.pathname + link.search, direccion, (curvado) => {
+        router.push(link.pathname + link.search, {
+          transitionTypes: curvado ? [] : [`pagina-${direccion}`],
+        });
+      });
+    };
+    document.addEventListener("click", alClick, true);
+    return () => document.removeEventListener("click", alClick, true);
+  }, [animarPaso, router]);
 
   // El eje de la cara que ENTRA: la hoja nueva siempre aterriza arriba de todo,
   // así que se calcula al cambiar de ruta. Corre durante la transición, pero
@@ -133,7 +148,7 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
     };
     document.addEventListener("pointerdown", alApoyar, true);
     return () => document.removeEventListener("pointerdown", alApoyar, true);
-  }, []);
+  }, [enCurso]);
 
   // Las flechas del teclado hacen doble trabajo: desplazan la hoja de a una
   // pantalla y, recién en el borde, pasan de página. Es lo que pide un mando
@@ -201,7 +216,7 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
 
     window.addEventListener("keydown", alPresionar);
     return () => window.removeEventListener("keydown", alPresionar);
-  }, [hayDestino, pasar]);
+  }, [hayDestino, pasar, enCurso]);
 
   if (!enPagina) return null;
 
@@ -234,6 +249,7 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
         {anterior ? (
           <Link
             href={anterior.href}
+            data-pagina-direccion="atras"
             transitionTypes={["pagina-atras"]}
             prefetch
             rel="prev"
@@ -248,6 +264,7 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
         {siguiente ? (
           <Link
             href={siguiente.href}
+            data-pagina-direccion="adelante"
             transitionTypes={["pagina-adelante"]}
             prefetch
             rel="next"

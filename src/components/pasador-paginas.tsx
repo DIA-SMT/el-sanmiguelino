@@ -29,6 +29,7 @@ export function PasadorPaginas({
         {anterior ? (
           <Link
             href={anterior.href}
+            data-pagina-direccion="atras"
             transitionTypes={["pagina-atras"]}
             prefetch
             className={claseBoton}
@@ -53,6 +54,7 @@ export function PasadorPaginas({
         {siguiente ? (
           <Link
             href={siguiente.href}
+            data-pagina-direccion="adelante"
             transitionTypes={["pagina-adelante"]}
             prefetch
             className={claseBoton}

@@ -1120,6 +1120,38 @@
   pointer-events: none;
 }
 
+/* La captura WebGL queda por encima del contenido vivo durante el giro. La
+   navegación sigue siendo HTML debajo y vuelve a tomar el control al terminar. */
+.papel-en-movimiento {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict;
+}
+
+.papel-en-movimiento canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.papel-sombra-pliegue {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgb(14 12 9 / 0.42), transparent 68%);
+  filter: blur(14px);
+  mix-blend-mode: multiply;
+  transform: translateZ(2px);
+}
+
+html[data-papel-ocupado="true"] {
+  cursor: progress;
+}
+
 /* La hoja gira sobre el lomo, así que las dos caras comparten el eje.
    La perspectiva NO va en px fijos: va atada al ancho real de la hoja
    (`w-full max-w-6xl` = min(100vw, 72rem)). 1152 x 1.48 = 1705, o sea que en
