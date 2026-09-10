@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { LogoDireccionIA, LogoHoja } from "@/components/brand/logos";
+import { LogoDireccionIA, LogoSanmiguelino } from "@/components/brand/logos";
 import { SuscripcionPapel } from "@/components/suscripcion-papel";
 
 export function SiteFooter() {
   return (
     <footer className="mt-auto border-t-[3px] border-double border-ink bg-paper-2">
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[auto_1fr_auto] md:items-center md:gap-12">
-        <div className="flex items-center gap-3.5">
-          <LogoHoja className="h-11 w-11 shrink-0" />
-          <p className="bandera text-[1.1rem] text-ink">El Sanmiguelino</p>
+        <div className="flex items-center">
+          <LogoSanmiguelino className="w-full max-w-[13rem] text-ink" />
         </div>
 
         <div className="border-line md:border-x md:px-12 md:text-center">

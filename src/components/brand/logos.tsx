@@ -1,17 +1,129 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * Los logotipos, en dos familias que conviene no mezclar.
+ *
+ * **El logotipo del diario** —`LogoSanmiguelino`, y su hoja suelta
+ * `HojaSanmiguelino`— sale del archivo original de imprenta. Hasta acá la
+ * bandera se dibujaba con Archivo Black, elegida en `layout.tsx` como "lo más
+ * cercano que hay libre" al logotipo impreso: era una imitación, y ahora está
+ * el original. Va monocromo y hereda `currentColor`, así que el mismo trazo da
+ * la versión negra y la azul del manual sin duplicar el dibujo, y además sigue
+ * al tema en vez de quedar clavado en un color de modo claro.
+ *
+ * **El logotipo de la Municipalidad** —`LogoHoja`, la hoja tricolor con el
+ * sol— es otra marca y NO es intercambiable con la anterior. Se queda donde el
+ * que firma es el municipio y no el diario: la franja institucional de la
+ * portada y el isologotipo de la Dirección de IA en el pie.
+ */
+
+/* Las curvas vienen tal cual del original de Illustrator —guardado en
+   `scripts/marca/logo-sanmiguelino-negro.svg`, junto con la variante azul—,
+   coordenadas incluidas: el arte vive en un rincón de un lienzo de 1920×1080 y
+   el recorte se hace por `viewBox`, no moviendo los trazos. El día que llegue
+   una revisión del archivo se pega el `d` y no hay cuenta que rehacer.
+
+   Las dos variantes que entregaron son el MISMO dibujo con otro relleno
+   (#141414 y #06f), así que acá hay una sola copia y el color lo pone quien
+   la usa. */
+const TRAZO_PALABRA =
+  "M1211.454,467.416c3.85,0,6.865,1.245,9.047,3.734,2.182,2.491,3.273,5.891,3.273,10.203,0,4.21-1.105,7.572-3.311,10.087-2.208,2.516-5.211,3.773-9.009,3.773-3.85,0-6.88-1.257-9.086-3.773-2.208-2.515-3.311-5.877-3.311-10.087,0-4.312,1.103-7.712,3.311-10.203,2.206-2.489,5.236-3.734,9.086-3.734M1211.454,453.402c-5.082,0-9.754,1.194-14.014,3.581-4.262,2.386-7.623,5.711-10.087,9.971-2.464,4.261-3.696,9.061-3.696,14.399s1.232,10.139,3.696,14.399c2.464,4.261,5.825,7.585,10.087,9.971,4.26,2.387,8.932,3.581,14.014,3.581s9.74-1.194,13.975-3.581c4.235-2.386,7.585-5.71,10.049-9.971,2.464-4.26,3.696-9.06,3.696-14.399s-1.22-10.138-3.658-14.399c-2.438-4.26-5.775-7.585-10.01-9.971-4.235-2.387-8.92-3.581-14.052-3.581M1178.73,454.326h-15.169v30.8l-20.02-30.8h-15.169v54.439h15.169v-30.415l20.02,30.415h15.169v-54.439ZM1106.735,508.765h15.169v-54.516h-15.169v54.516ZM1085.946,454.249h-15.169v54.516h32.186v-11.473h-17.017v-43.043h0ZM1065.773,466.338v-12.089h-35.112v54.516h35.112v-12.089h-19.943v-9.856h17.633v-11.473h-17.633v-9.009h19.943ZM977.762,454.249v31.108c0,5.185.975,9.574,2.926,13.167,1.951,3.594,4.659,6.289,8.124,8.085,3.465,1.797,7.456,2.695,11.973,2.695s8.573-.911,12.166-2.734c3.593-1.821,6.43-4.529,8.509-8.123,2.079-3.593,3.118-7.956,3.118-13.09v-31.108h-15.092v31.108c0,3.029-.706,5.39-2.117,7.084-1.413,1.694-3.504,2.541-6.276,2.541s-4.839-.834-6.198-2.503c-1.361-1.667-2.041-4.042-2.041-7.122v-31.108h-15.092ZM947.502,453.787c-5.544,0-10.37,1.168-14.476,3.503-4.107,2.337-7.276,5.596-9.509,9.78s-3.35,8.97-3.35,14.36,1.117,10.19,3.35,14.399c2.233,4.21,5.428,7.482,9.586,9.818s9.009,3.503,14.553,3.503c6.519,0,11.922-1.604,16.209-4.813,4.285-3.207,7.404-7.07,9.355-11.588v-15.015h-27.643v10.78h15.092c-1.13,2.413-2.67,4.235-4.62,5.467-1.951,1.232-4.21,1.848-6.776,1.848-4.518,0-7.944-1.219-10.279-3.658-2.337-2.437-3.504-6.018-3.504-10.741,0-4.158,1.09-7.481,3.273-9.972,2.181-2.489,5.12-3.734,8.816-3.734,2.156,0,4.029.437,5.621,1.309,1.591.873,2.797,2.054,3.619,3.542h15.939c-.924-5.749-3.619-10.318-8.085-13.706s-10.19-5.082-17.171-5.082M900.07,508.765h15.169v-54.516h-15.169v54.516ZM875.2,454.48l-13.013,35.266-13.398-35.266h-18.557v54.285h15.169v-30.8l10.087,30.8h13.013l10.087-30.8v30.8h15.015v-54.285h-18.403,0ZM823.765,454.326h-15.169v30.8l-20.02-30.8h-15.169v54.439h15.169v-30.415l20.02,30.415h15.169v-54.439ZM736.293,488.283l5.929-17.71,5.852,17.71h-11.781ZM754.85,508.765h16.016l-19.866-54.285h-17.479l-19.943,54.285h15.939l3.003-9.086h19.327l3.003,9.086ZM712.731,493.057c0-3.593-.822-6.519-2.464-8.778-1.643-2.258-3.594-3.978-5.852-5.159-2.259-1.18-5.108-2.387-8.547-3.619-3.132-1.078-5.428-2.053-6.891-2.926-1.463-.872-2.195-2.079-2.195-3.619,0-1.232.333-2.156,1.001-2.772.667-.616,1.591-.924,2.772-.924,1.386,0,2.503.411,3.35,1.232.847.822,1.372,2.079,1.578,3.773h16.247c-.36-5.338-2.4-9.483-6.121-12.435-3.723-2.952-8.715-4.428-14.977-4.428-3.85,0-7.29.629-10.318,1.887-3.029,1.258-5.416,3.106-7.161,5.544-1.746,2.438-2.618,5.351-2.618,8.739,0,3.542.809,6.443,2.426,8.701,1.617,2.259,3.542,3.953,5.775,5.082,2.233,1.13,5.068,2.285,8.508,3.465,3.234,1.078,5.595,2.067,7.084,2.965,1.488.898,2.233,2.169,2.233,3.811,0,1.232-.373,2.182-1.116,2.849-.745.668-1.785,1.001-3.119,1.001-1.489,0-2.747-.462-3.773-1.386-1.027-.924-1.617-2.335-1.771-4.235h-16.093c.359,5.596,2.58,9.908,6.661,12.936,4.081,3.029,9.278,4.543,15.592,4.543,4.158,0,7.725-.718,10.703-2.156,2.977-1.437,5.236-3.388,6.776-5.852s2.31-5.21,2.31-8.239M638.966,454.249h-15.169v54.516h32.186v-11.473h-17.017v-43.043h0ZM618.793,466.338v-12.089h-35.112v54.516h35.112v-12.089h-19.943v-9.856h17.633v-11.473h-17.633v-9.009h19.943Z";
+
+const TRAZOS_HOJA = [
+  "M1305.892,472.972c-5.312-14.174-16.686-25.585-31.724-29.821l-3.543,13.729c-6.907,26.764,8.025,54.244,33.351,61.378-6.968-15.076-5.708-31.906,1.916-45.286",
+  "M1331.739,453.206h0c-9.278,4.396-16.522,11.409-21.284,19.767-7.624,13.38-8.884,30.209-1.916,45.285h0c24.133-11.434,34.52-40.559,23.2-65.052",
+  "M1318.036,448.821c0,4.261-3.454,7.715-7.715,7.715s-7.716-3.454-7.716-7.715,3.455-7.715,7.716-7.715,7.715,3.454,7.715,7.715",
+] as const;
+
+/* Calce del arte dentro de ese lienzo, medido sobre las curvas y no a ojo. Sin
+   esto el logo se dibuja como una mota: en el lienzo original ocupa el 4% del
+   alto y está corrido a la derecha. */
+/** 752,8 × 77,3 — casi 10:1. Se le da el ANCHO y el alto sale solo. */
+const CALCE_LOGOTIPO = "583.6 441 752.8 77.3";
+/** 67,5 × 77,3 — apenas más alta que ancha. Se le da el ALTO. */
+const CALCE_HOJA = "1268.9 441 67.5 77.3";
+
+type PropsMarca = {
+  className?: string;
+  title?: string;
+  /** true cuando el logo acompaña un texto que ya lo nombra: dentro de un
+   *  enlace con `aria-label`, o al lado del nombre escrito. */
+  decorativo?: boolean;
+};
+
+/**
+ * El logotipo completo del diario: la palabra y la hoja, en un solo bloque.
+ *
+ * La hoja va A LA DERECHA de la palabra y pegada a ella porque así viene
+ * armado el original. No es un sello aparte que se pueda separar ni recolocar.
+ *
+ * **Se dimensiona por el ancho.** Es una pieza de casi 10:1, así que darle una
+ * altura en `em` —como se hacía cuando la bandera era texto— deja el ancho
+ * librado al azar; darle el ancho lo ata a la caja donde vive, que es lo que
+ * uno mira. Por eso las llamadas usan `w-full max-w-[…]` y no `h-…`.
+ */
+export function LogoSanmiguelino({
+  className,
+  title = "El Sanmiguelino",
+  decorativo = false,
+}: PropsMarca) {
+  return (
+    <svg
+      viewBox={CALCE_LOGOTIPO}
+      role={decorativo ? undefined : "img"}
+      aria-label={decorativo ? undefined : title}
+      aria-hidden={decorativo || undefined}
+      fill="currentColor"
+      className={cn("h-auto w-full", className)}
+    >
+      {!decorativo && <title>{title}</title>}
+      <path d={TRAZO_PALABRA} />
+      {TRAZOS_HOJA.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * La hoja del logotipo, sola.
+ *
+ * Sólo para huecos donde el logotipo entero no entra sin volverse ilegible: la
+ * barra del panel, que se pliega hasta quedar del ancho de un ícono. Donde
+ * haya ancho va `LogoSanmiguelino`, que es la marca de verdad.
+ */
+export function HojaSanmiguelino({
+  className,
+  title = "El Sanmiguelino",
+  decorativo = false,
+}: PropsMarca) {
+  return (
+    <svg
+      viewBox={CALCE_HOJA}
+      role={decorativo ? undefined : "img"}
+      aria-label={decorativo ? undefined : title}
+      aria-hidden={decorativo || undefined}
+      fill="currentColor"
+      className={cn("h-8 w-auto", className)}
+    >
+      {!decorativo && <title>{title}</title>}
+      {TRAZOS_HOJA.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
+
 /** Logo hoja de la Municipalidad de San Miguel de Tucumán:
- *  dos pétalos (azul y celeste) con el sol amarillo. */
+ *  dos pétalos (azul y celeste) con el sol amarillo.
+ *
+ *  NO es el logotipo del diario —para eso está `LogoSanmiguelino`—. Va donde
+ *  el que firma es el municipio. */
 export function LogoHoja({
   className,
   title = "Municipalidad de San Miguel de Tucumán",
   decorativo = false,
-}: {
-  className?: string;
-  title?: string;
-  /** true cuando el logo acompaña un texto que ya lo nombra (p. ej. dentro de un h1) */
-  decorativo?: boolean;
-}) {
+}: PropsMarca) {
   return (
     <svg
       viewBox="0 0 240 240"

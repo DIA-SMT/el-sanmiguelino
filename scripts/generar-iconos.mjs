@@ -7,11 +7,15 @@
  * volverlos a hacer sin adivinar recortes ni márgenes.
  *
  * La fuente es `scripts/marca/logo-muni-iso.png`, el asset original que entregó
- * la Dirección de IA (235x235, RGBA). **No se usa la recreación en SVG de
+ * la Dirección de IA (235x235, RGBA). **No se usa `LogoHoja` de
  * `src/components/brand/logos.tsx`**: esa está dibujada a mano con curvas
- * bezier aproximadas y sirve perfecto dentro de la página, al lado del nombre
- * del diario, pero el favicon es la marca del municipio a 16 píxeles y ahí va el
- * original.
+ * bezier aproximadas y sirve perfecto dentro de la página, pero el favicon es
+ * la marca del municipio a 16 píxeles y ahí va el original.
+ *
+ * Ojo con el otro SVG de ese archivo: `LogoSanmiguelino` NO es una recreación,
+ * es el logotipo del diario tal cual salió de imprenta
+ * (`scripts/marca/logo-sanmiguelino-*.svg`). Es otra marca y va monocromo, así
+ * que tampoco sirve para estos iconos, que son los del municipio.
  *
  * ## Lo que produce, y por qué cada uno
  *

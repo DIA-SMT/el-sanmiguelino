@@ -6,7 +6,7 @@ import {
   Newspaper,
   ThumbsUp,
 } from "lucide-react";
-import { LogoHoja } from "@/components/brand/logos";
+import { LogoHoja, LogoSanmiguelino } from "@/components/brand/logos";
 import { DiarioEnPerspectiva } from "@/components/landing/diario-en-perspectiva";
 import { VistaPrevia } from "@/components/landing/vista-previa";
 import { VitrinaSecciones } from "@/components/landing/vitrina-secciones";
@@ -83,8 +83,8 @@ export default async function Landing() {
               <p className="volanta text-accent-strong">
                 Diario digital · Una edición por mes
               </p>
-              <h1 className="bandera mt-4 text-[clamp(2.6rem,8vw,5rem)] text-ink">
-                El Sanmiguelino
+              <h1 className="mt-5">
+                <LogoSanmiguelino className="w-full max-w-[32rem] text-ink" />
               </h1>
               <div className="rule-double mt-6 mb-[7px] max-w-xl py-2">
                 <p className="meta text-ink">

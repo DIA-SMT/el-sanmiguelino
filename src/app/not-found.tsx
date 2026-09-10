@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { LogoHoja } from "@/components/brand/logos";
+import { LogoSanmiguelino } from "@/components/brand/logos";
 
 export default function NotFound() {
   return (
     <main className="escritorio grano flex flex-1 items-center justify-center px-4 py-24">
       <div className="fade-up hoja grano max-w-md px-8 py-12 text-center sm:px-10">
-        <LogoHoja className="mx-auto h-12 w-12 opacity-70" />
+        <LogoSanmiguelino className="mx-auto w-full max-w-[15rem] text-ink opacity-70" />
         <p className="volanta mt-6 text-accent">Error 404</p>
         <h1 className="titular mt-3 text-[clamp(1.5rem,5vw,2.1rem)] leading-tight text-ink">
           Esta página no está en la edición

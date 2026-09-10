@@ -15,7 +15,7 @@ import {
   PanelLeftOpen,
   Users,
 } from "lucide-react";
-import { LogoHoja } from "@/components/brand/logos";
+import { HojaSanmiguelino } from "@/components/brand/logos";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
 import type { Usuario } from "@/lib/types";
@@ -291,7 +291,9 @@ export function BarraLateralPanel({ usuario }: { usuario: Usuario }) {
           title="Ir al diario"
           className="pressable flex min-w-0 items-center gap-2.5 rounded-panel-2 text-left hover:text-accent focus-visible:outline-offset-4"
         >
-          <LogoHoja className="h-8 w-8 shrink-0" />
+          {/* La hoja sola y no el logotipo entero: esta barra se pliega hasta
+              el ancho de un ícono, y una pieza de 10:1 ahí no entra. */}
+          <HojaSanmiguelino decorativo className="h-8 shrink-0" />
           <span className={cn("min-w-0", plegada && "lg:hidden")}>
             <span className="block text-panel-base font-semibold text-panel-tinta">
               Administración

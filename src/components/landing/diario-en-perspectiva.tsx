@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { LogoHoja } from "@/components/brand/logos";
+import { LogoSanmiguelino } from "@/components/brand/logos";
 import {
   getCompletas,
   getIndice,
@@ -72,12 +72,10 @@ export async function DiarioEnPerspectiva() {
               <span className="font-sans text-[0.42rem] uppercase tracking-[0.16em] text-ink-3">
                 Edición N.º {edicion.numero}
               </span>
-              <span className="flex items-center gap-1.5">
-                <LogoHoja className="h-3 w-3" decorativo />
-                <span className="bandera text-[0.95rem] text-ink sm:text-[1.15rem]">
-                  El Sanmiguelino
-                </span>
-              </span>
+              <LogoSanmiguelino
+                decorativo
+                className="w-[8.4rem] shrink-0 text-ink sm:w-[10.2rem]"
+              />
               <span className="font-sans text-[0.42rem] uppercase tracking-[0.16em] text-ink-3">
                 {edicion.mes}
               </span>

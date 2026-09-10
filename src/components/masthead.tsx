@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LayoutDashboard } from "lucide-react";
-import { LogoHoja } from "@/components/brand/logos";
+import { LogoSanmiguelino } from "@/components/brand/logos";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
 import { SeccionesNav } from "@/components/secciones-nav";
@@ -118,13 +118,16 @@ export async function Masthead({
             <div className="border-y border-ink py-1.5">
               <Link
                 href="/diario"
-                className="group flex items-center justify-center gap-[0.3em]"
+                className="group flex items-center justify-center"
                 aria-label="Ir a la portada"
               >
-                <span className="bandera text-[clamp(0.85rem,2.4vw,1.15rem)] text-ink transition-colors group-hover:text-accent-strong">
-                  El Sanmiguelino
-                </span>
-                <LogoHoja className="h-[0.85em] w-[0.85em] shrink-0 text-[clamp(0.85rem,2.4vw,1.15rem)]" />
+                {/* Ancho y no alto: ver `LogoSanmiguelino`. El tope lo fija la
+                    cabecera interior del papel, donde el logotipo entra en el
+                    medio del filete sin llegar a los bordes. */}
+                <LogoSanmiguelino
+                  decorativo
+                  className="w-full max-w-[11.5rem] text-ink transition-colors group-hover:text-accent-strong sm:max-w-[14rem]"
+                />
               </Link>
             </div>
             <div
@@ -139,22 +142,23 @@ export async function Masthead({
             </div>
           </div>
         ) : (
-          /* La bandera de tapa: filete grueso, el logotipo en versales con la
-             hoja A LA DERECHA —no encuadrada a la izquierda, que era invento
-             nuestro—, otro filete, y debajo una sola línea centrada. */
+          /* La bandera de tapa: filete grueso, el logotipo —la palabra con la
+             hoja A LA DERECHA, que así viene armado el original—, otro filete,
+             y debajo una sola línea centrada. */
           <div className="mx-auto w-full max-w-6xl px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
             <div className="border-y-[3px] border-ink py-3 sm:py-4">
               <Link
                 href="/diario"
-                className="group flex items-center justify-center gap-[0.35em]"
+                className="group flex items-center justify-center"
                 aria-label="Ir a la portada"
               >
-                <span className="bandera text-[clamp(1.5rem,8.2vw,4.6rem)] text-ink transition-colors group-hover:text-accent-strong">
-                  El Sanmiguelino
-                </span>
-                {/* La hoja acompaña al logotipo y escala con él: en el papel es
-                    parte del logotipo, no un sello aparte. */}
-                <LogoHoja className="h-[0.78em] w-[0.78em] shrink-0 text-[clamp(1.5rem,8.2vw,4.6rem)]" />
+                {/* En el papel la bandera de tapa ocupa el ancho de la caja de
+                    punta a punta, así que acá también: `w-full`, con un tope
+                    para que en un monitor ancho no se vuelva un cartel. */}
+                <LogoSanmiguelino
+                  decorativo
+                  className="w-full max-w-[45rem] text-ink transition-colors group-hover:text-accent-strong"
+                />
               </Link>
             </div>
             {/* Caja normal y diminuta, como en el papel. No usa .meta porque

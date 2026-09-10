@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { LogoDireccionIA, LogoHoja } from "@/components/brand/logos";
+import { LogoDireccionIA, LogoSanmiguelino } from "@/components/brand/logos";
 import { textoDeError } from "@/lib/auth/cidituc/errores";
 import { getResumenEdicion } from "@/lib/repos/edicion";
 import { BotonIngresar } from "./boton-ingresar";
@@ -19,12 +19,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <main className="escritorio grano relative flex flex-1 items-center justify-center overflow-hidden px-4 py-16 sm:py-24">
       <div className="fade-up hoja grano w-full max-w-md px-8 py-10 text-center sm:px-10">
-        {/* La hoja sola, sin el doble recuadro: en el impreso es parte del
-            logotipo, no un sello encuadrado. Era invento nuestro. */}
-        <LogoHoja className="mx-auto h-14 w-14" />
-
-        <h1 className="bandera mt-6 text-[clamp(1.7rem,7vw,2.3rem)] text-ink">
-          El Sanmiguelino
+        {/* Antes acá había una hoja suelta arriba y el nombre escrito debajo:
+            el logotipo partido en dos, y la hoja mostrada dos veces cuando se
+            miraba junto al pie. Es una pieza sola y va como pieza sola. */}
+        <h1 className="mt-2">
+          <LogoSanmiguelino className="mx-auto w-full max-w-[19rem] text-ink" />
         </h1>
         <div className="rule-double mt-4 mb-[7px] py-1.5">
           <p className="meta">Diario digital · {edicion.mes}</p>
