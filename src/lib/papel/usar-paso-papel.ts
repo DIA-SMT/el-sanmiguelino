@@ -9,6 +9,12 @@ const ESPERA_MAXIMA_CAPTURA = 900;
 const DURACION_FALLBACK = 700;
 type Superficie = NonNullable<ReturnType<typeof crearSuperficie>>;
 type Motor = typeof import("./captura") & typeof import("./superficie");
+type EntradaCaptura = {
+  hoja: HTMLElement;
+  firma: string;
+  captura: CapturaPapel;
+  pathname: string;
+};
 let motor: Promise<Motor> | undefined;
 const cargarMotor = () => motor ??= Promise.all([import("./captura"), import("./superficie")])
   .then(([captura, superficie]) => ({ ...captura, ...superficie }));
@@ -22,7 +28,11 @@ function firma(hoja: HTMLElement) {
  * al quedar quieta la lectura; la navegación nunca depende de WebGL. */
 export function usePasoPapel(pathname: string) {
   const enCurso = useRef(false);
-  const cache = useRef<{ hoja: HTMLElement; firma: string; captura: CapturaPapel } | null>(null);
+  const cache = useRef<EntradaCaptura | null>(null);
+  // La última captura buena sigue disponible mientras se vuelve a rasterizar
+  // por una mutación o una carga tardía. Así una foto lenta no convierte el
+  // siguiente click en una navegación sin papel.
+  const respaldo = useRef<EntradaCaptura | null>(null);
   const preparando = useRef<Promise<void> | null>(null);
   const pendiente = useRef<{
     superficie: Superficie; destino: string; hoja: HTMLElement; animando: boolean;
@@ -46,22 +56,24 @@ export function usePasoPapel(pathname: string) {
     if (preparando.current || enCurso.current || document.hidden ||
       matchMedia("(prefers-reduced-motion: reduce)").matches) return preparando.current;
     const hoja = document.querySelector<HTMLElement>(".hoja");
-    if (!hoja || hoja.dataset.papelCargando !== undefined) return null;
+    if (!hoja || hoja.dataset.papelCargando !== undefined || hoja.querySelector("[aria-busy='true']")) return null;
     const clave = firma(hoja);
-    if (cache.current?.hoja === hoja && cache.current.firma === clave) return null;
+    if (cache.current?.pathname === pathname && cache.current.hoja === hoja && cache.current.firma === clave) return null;
     const version = revision.current;
     preparando.current = cargarMotor().then(async ({ capturarPapel }) => {
       await document.fonts.ready;
       const captura = await capturarPapel(hoja);
       if (montado.current && hoja.isConnected && version === revision.current && firma(hoja) === clave) {
-        cache.current = { hoja, firma: clave, captura };
+        const entrada = { hoja, firma: clave, captura, pathname };
+        cache.current = entrada;
+        respaldo.current = entrada;
       }
     }).catch(() => {
       // Un recurso que no se puede rasterizar conserva la navegación normal.
       cache.current = null;
     }).finally(() => { preparando.current = null; });
     return preparando.current;
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     montado.current = true;
@@ -84,14 +96,16 @@ export function usePasoPapel(pathname: string) {
     const alResize = () => { terminar(); invalidar(); };
     const alOcultar = () => { if (document.hidden) terminar(); else programar(); };
     const observador = new MutationObserver(invalidar);
-    const escritorio = document.querySelector(".escritorio");
-    if (escritorio) observador.observe(escritorio, { childList: true, subtree: true, characterData: true });
+    const hojaObservada = document.querySelector(".hoja");
+    if (hojaObservada) observador.observe(hojaObservada, { childList: true, subtree: true });
     const tema = new MutationObserver(invalidar);
     tema.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     window.addEventListener("scroll", alScroll, { passive: true });
     window.addEventListener("resize", alResize);
     document.addEventListener("visibilitychange", alOcultar);
-    document.addEventListener("load", invalidar, true);
+    // Arrancar cuanto antes evita que el primer click ocurra antes de que
+    // exista una captura; `programar` queda para refrescarla tras el render.
+    void preparar();
     programar();
     return () => {
       invalidarRevision();
@@ -101,7 +115,6 @@ export function usePasoPapel(pathname: string) {
       window.removeEventListener("scroll", alScroll);
       window.removeEventListener("resize", alResize);
       document.removeEventListener("visibilitychange", alOcultar);
-      document.removeEventListener("load", invalidar, true);
     };
   }, [invalidarRevision, pathname, preparar, terminar]);
 
@@ -139,7 +152,9 @@ export function usePasoPapel(pathname: string) {
     if (tarea) await Promise.race([tarea, new Promise((r) => setTimeout(r, ESPERA_MAXIMA_CAPTURA))]);
     if (!montado.current) return;
     const hoja = document.querySelector<HTMLElement>(".hoja");
-    const lista = cache.current;
+    const lista = [cache.current, respaldo.current].find(
+      (entrada): entrada is EntradaCaptura => entrada?.pathname === pathname,
+    );
     let superficie: Superficie | null = null;
     if (hoja && lista?.hoja === hoja && lista.firma === firma(hoja) &&
       !matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -158,7 +173,7 @@ export function usePasoPapel(pathname: string) {
       plazo.current = setTimeout(terminar, DURACION_FALLBACK);
     }
     navegar(Boolean(superficie));
-  }, [preparar, terminar]);
+  }, [pathname, preparar, terminar]);
 
   return { pasar, enCurso };
 }

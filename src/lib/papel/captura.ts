@@ -28,6 +28,15 @@ export async function capturarPapel(hoja: HTMLElement): Promise<CapturaPapel> {
     fontEmbedCSS: await fuentes,
     includeQueryParams: true,
     imagePlaceholder: IMAGEN_FALLBACK,
+    // La hoja puede tener muchas fotos debajo del viewport. Rasterizarlas
+    // todas vuelve impredecible el tiempo de captura aunque sólo se vea una
+    // franja; conservar sólo las imágenes que entran en el papel visible hace
+    // que la preparación no dependa de recursos lejanos.
+    filter: (nodo) => {
+      if (!(nodo instanceof HTMLImageElement)) return true;
+      const imagen = nodo.getBoundingClientRect();
+      return imagen.bottom >= arriba && imagen.top <= arriba + alto;
+    },
     style: {
       width: `${rect.width}px`,
       height: `${rect.height}px`,
