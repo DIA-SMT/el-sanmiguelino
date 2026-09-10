@@ -35,6 +35,12 @@ import {
   type ItemTexto,
   type PaginaDigitalizada,
 } from "@/lib/pdf/estructura";
+import { diagnosticarPagina, necesitaOcr } from "@/lib/pdf/calidad";
+import {
+  extraerTextoConOcr,
+  itemsDesdeOcr,
+  ocrHabilitado,
+} from "@/lib/pdf/ocr-openrouter";
 import { zonasDeInfografia, type ZonaVectorial } from "@/lib/pdf/vectores";
 import { subirImagen } from "@/lib/storage";
 
@@ -169,6 +175,46 @@ async function rasterizarZona(
   )
     .webp({ quality: 82 })
     .toBuffer();
+}
+
+/** Renderiza la hoja completa para el OCR. Se limita la escala para que una
+ * página A3 no consuma decenas de megabytes en una función de servidor. */
+async function imagenCompletaDePagina(
+  pagina: PaginaDibujable,
+  ancho: number,
+): Promise<string> {
+  const { createCanvas } = await import("@napi-rs/canvas");
+  const escala = Math.min(1600 / ancho, 2.5);
+  const vista = pagina.getViewport({ scale: escala }) as { width: number; height: number };
+  const lienzo = createCanvas(Math.round(vista.width), Math.round(vista.height));
+  const contexto = lienzo.getContext("2d");
+  contexto.fillStyle = "#ffffff";
+  contexto.fillRect(0, 0, lienzo.width, lienzo.height);
+  await pagina.render({ canvasContext: contexto, viewport: vista, canvas: lienzo }).promise;
+  return lienzo.toBuffer("image/png").toString("base64");
+}
+
+function compacto(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+/** Evita publicar dos veces una línea que ya estaba en la capa nativa. */
+function ocrQueFalta(items: ItemTexto[], ocr: ItemTexto[]): ItemTexto[] {
+  const nativos = items.map((item) => compacto(item.texto)).filter((texto) => texto.length >= 4);
+  return ocr.filter((item) => {
+    const texto = compacto(item.texto);
+    if (texto.length < 4) return false;
+    return !nativos.some(
+      (nativo) =>
+        nativo === texto ||
+        (nativo.length > 20 && nativo.includes(texto)) ||
+        (texto.length > 20 && texto.includes(nativo)),
+    );
+  });
 }
 
 export interface ResultadoDigitalizacion {
@@ -429,15 +475,76 @@ export async function digitalizarPdf(
        * además deja revisar antes de publicar, que en una edición del municipio
        * vale más que el botón.
        */
-      paginas.push(
-        digitalizarPagina({
-          pagina: n,
-          ancho: vista.width,
-          alto: vista.height,
-          items,
-          figuras,
-        }),
-      );
+      let resultado = digitalizarPagina({
+        pagina: n,
+        ancho: vista.width,
+        alto: vista.height,
+        items,
+        figuras,
+      });
+      let diagnostico = diagnosticarPagina({
+        ancho: vista.width,
+        alto: vista.height,
+        items,
+        figuras,
+        resultado,
+      });
+
+      /*
+       * Un PDF puede mostrar texto que no existe en getTextContent(): escaneos,
+       * letras pasadas a curvas y rótulos dentro de una infografía. En esas
+       * páginas el OCR se usa como rescate, nunca como fuente principal. Las
+       * líneas recuperadas se agregan a las nativas y vuelven a pasar por el
+       * mismo ordenamiento de columnas; así no se arma una segunda maqueta con
+       * reglas distintas. Si el servicio falla, queda la salida anterior y un
+       * aviso visible para revisión.
+       */
+      if (ocrHabilitado() && necesitaOcr(diagnostico)) {
+        try {
+          const imagen = await imagenCompletaDePagina(
+            pagina as unknown as PaginaDibujable,
+            vista.width,
+          );
+          const ocr = await extraerTextoConOcr({
+            imagenBase64: imagen,
+            pagina: n,
+            formato: diagnostico.formato,
+          });
+          if (ocr.ok) {
+            const recuperadas = ocrQueFalta(items, itemsDesdeOcr(ocr.lineas, vista.width, vista.height));
+            if (recuperadas.length > 0) {
+              const combinadas = [...items, ...recuperadas];
+              resultado = digitalizarPagina({
+                pagina: n,
+                ancho: vista.width,
+                alto: vista.height,
+                items: combinadas,
+                figuras,
+              });
+              resultado.avisos.push(
+                `Se recuperaron ${recuperadas.length} renglones con OCR; revisar la página antes de publicarla.`,
+              );
+              diagnostico = diagnosticarPagina({
+                ancho: vista.width,
+                alto: vista.height,
+                items: combinadas,
+                figuras,
+                resultado,
+              });
+              diagnostico.motivos.push("se usó OCR para recuperar texto no expuesto por el PDF");
+            }
+          } else {
+            resultado.avisos.push(`El OCR no pudo recuperar la página: ${ocr.motivo}`);
+          }
+        } catch (error) {
+          resultado.avisos.push(
+            `El OCR no pudo recuperar la página: ${error instanceof Error ? error.message : "error desconocido"}`,
+          );
+        }
+      }
+
+      resultado.diagnostico = diagnostico;
+      paginas.push(resultado);
     }
   } finally {
     // Son varios megas parseados y un worker propio detrás. Va en `finally`

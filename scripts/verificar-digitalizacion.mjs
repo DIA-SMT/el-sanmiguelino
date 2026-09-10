@@ -44,6 +44,21 @@ for (const ruta of [archivo, json]) {
 
 const { paginas } = JSON.parse(readFileSync(json, "utf8"));
 
+const paginasParaRevisar = paginas.filter(
+  (pagina) => pagina.diagnostico && pagina.diagnostico.confianza !== "alta",
+);
+if (paginasParaRevisar.length > 0) {
+  console.log("Páginas que requieren revisión visual:");
+  for (const pagina of paginasParaRevisar) {
+    const d = pagina.diagnostico;
+    console.log(
+      `  p${pagina.pagina}: formato ${d.formato}, confianza ${d.confianza}` +
+        (d.motivos?.length ? ` — ${d.motivos.join("; ")}` : ""),
+    );
+  }
+  console.log("");
+}
+
 /** Sin acentos, sin puntuación, sin mayúsculas: sólo las letras y los números,
  *  que es lo que tiene que sobrevivir a la conversión. */
 function normalizar(texto) {

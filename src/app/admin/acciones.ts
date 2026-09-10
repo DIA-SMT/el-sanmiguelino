@@ -980,7 +980,15 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
       // Los avisos son lo que hay que mirar primero en la revisión: páginas sin
       // título propio, citas que se quedaron sin autor, recuadros raros.
       avisos: paginas.flatMap((p) =>
-        p.avisos.map((texto) => ({ pagina: p.pagina, texto })),
+        [
+          ...p.avisos,
+          ...(p.diagnostico && p.diagnostico.confianza !== "alta"
+            ? [
+                `Formato ${p.diagnostico.formato} (${p.diagnostico.ancho}×${p.diagnostico.alto} pt), ` +
+                  `confianza ${p.diagnostico.confianza}: ${p.diagnostico.motivos.join("; ")}.`,
+              ]
+            : []),
+        ].map((texto) => ({ pagina: p.pagina, texto })),
       ),
     };
   } catch (e) {

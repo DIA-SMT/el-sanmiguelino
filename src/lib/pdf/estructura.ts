@@ -46,6 +46,7 @@
  */
 
 import type { BloqueNota, ImagenNota } from "@/lib/types";
+import type { DiagnosticoPagina } from "./calidad.ts";
 
 /* ------------------------------------- de página digitalizada a nota ------ */
 
@@ -211,6 +212,8 @@ export interface PaginaDigitalizada {
   /** Lo que el conversor no supo resolver. Es lo que hay que mirar primero en
    *  la revisión del panel. */
   avisos: string[];
+  /** Diagnóstico de formato y fidelidad, guardado junto con la página. */
+  diagnostico?: DiagnosticoPagina;
   /** Cómo quedó clasificado cada grupo de texto de la página. No lo usa el
    *  diario: existe para poder ver POR QUÉ una página salió como salió, que es
    *  la única forma de corregir el conversor sin adivinar. */

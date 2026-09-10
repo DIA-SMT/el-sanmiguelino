@@ -45,6 +45,12 @@ import {
   digitalizarPagina,
   lineasDePagina,
 } from "../src/lib/pdf/estructura.ts";
+import { diagnosticarPagina, necesitaOcr } from "../src/lib/pdf/calidad.ts";
+import {
+  extraerTextoConOcr,
+  itemsDesdeOcr,
+  ocrHabilitado,
+} from "../src/lib/pdf/ocr-openrouter.ts";
 import { maquetarConModelo } from "../src/lib/pdf/maquetador.ts";
 import {
   consultaOpenRouter,
@@ -236,7 +242,7 @@ for (let n = 1; n <= documento.numPages; n++) {
 
   /* ---------------------------------------------------------------- texto */
 
-  const items = [];
+  let items = [];
   for (const it of contenido.items) {
     if (!it.str || !it.str.trim()) continue;
     const [a, b, , d, e, f] = it.transform;
@@ -379,13 +385,60 @@ for (let n = 1; n <= documento.numPages; n++) {
 
   /* ------------------------------------------------------------ estructura */
 
-  const resultado = digitalizarPagina({
+  let resultado = digitalizarPagina({
     pagina: n,
     ancho: vista.width,
     alto: vista.height,
     items,
     figuras,
   });
+
+  let diagnostico = diagnosticarPagina({
+    ancho: vista.width,
+    alto: vista.height,
+    items,
+    figuras,
+    resultado,
+  });
+
+  if (ocrHabilitado() && necesitaOcr(diagnostico)) {
+    const ocr = await extraerTextoConOcr({
+      imagenBase64: await imagenDeLaPagina(pagina, vista),
+      pagina: n,
+      formato: diagnostico.formato,
+    });
+    if (ocr.ok) {
+      const nativos = items
+        .map((item) => item.texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, ""))
+        .filter((texto) => texto.length >= 4);
+      const recuperadas = itemsDesdeOcr(ocr.lineas, vista.width, vista.height).filter((item) => {
+        const texto = item.texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+        return texto.length >= 4 && !nativos.some((nativo) => nativo === texto || (nativo.length > 20 && nativo.includes(texto)) || (texto.length > 20 && texto.includes(nativo)));
+      });
+      if (recuperadas.length > 0) {
+        items = [...items, ...recuperadas];
+        resultado = digitalizarPagina({
+          pagina: n,
+          ancho: vista.width,
+          alto: vista.height,
+          items,
+          figuras,
+        });
+        resultado.avisos.push(`Se recuperaron ${recuperadas.length} renglones con OCR; revisar la página antes de publicarla.`);
+        console.log(`     ✓ OCR recuperó ${recuperadas.length} renglones`);
+      }
+    } else {
+      resultado.avisos.push(`El OCR no pudo recuperar la página: ${ocr.motivo}`);
+      console.log(`     · sin OCR: ${ocr.motivo}`);
+    }
+    diagnostico = diagnosticarPagina({
+      ancho: vista.width,
+      alto: vista.height,
+      items,
+      figuras,
+      resultado,
+    });
+  }
 
   /*
    * El maquetador con modelo, cuando está prendido.
@@ -425,6 +478,7 @@ for (let n = 1; n <= documento.numPages; n++) {
     }
   }
 
+  resultado.diagnostico = diagnostico;
   paginas.push({ ...resultado, figuras });
 
   const cuenta = resultado.cuerpo.reduce((mapa, b) => {
