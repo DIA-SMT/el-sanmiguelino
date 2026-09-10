@@ -8,7 +8,9 @@ import type { ItemTexto } from "./estructura.ts";
  * esas mismas palabras y las vuelve a pasar por su clasificador de columnas.
  */
 
-const MODELO_POR_DEFECTO = "google/gemini-2.5-flash";
+// Sonnet 5 acepta imágenes y archivos en OpenRouter y queda alineado con el
+// maquetador. La variable OCR_MODELO puede cambiarlo sin tocar el código.
+const MODELO_POR_DEFECTO = "anthropic/claude-sonnet-5";
 const TIMEOUT_MS = 45_000;
 
 export interface LineaOcr {
