@@ -36,6 +36,9 @@ const RATIO_RUEDA = 1.5;
 /** Trackpad: silencio que marca el fin de un gesto. Por debajo de esto todavía
  *  puede ser la inercia del mismo envión. */
 const PAUSA_FIN_GESTO_MS = 220;
+/** La inercia del mismo envión puede tener pausas más largas que la anterior.
+ * Este bloqueo cubre la transición completa y evita saltos de varias páginas. */
+const BLOQUEO_RUEDA_MS = 1100;
 /** Ruido: por debajo de esto el deltaX es temblor de un scroll vertical. */
 const RUIDO_RUEDA = 2;
 /** Los deltas en modo "líneas" o "páginas" vienen en otra escala. */
@@ -281,16 +284,14 @@ export function useDeslizarPaginas({
       // el navegador hace con el mismo movimiento, o navegan las dos cosas.
       e.preventDefault();
 
-      if (e.timeStamp - ultimoRodar > PAUSA_FIN_GESTO_MS) {
+      if (!envionUsado && e.timeStamp - ultimoRodar > PAUSA_FIN_GESTO_MS) {
         acumulado = 0;
-        envionUsado = false;
       }
       ultimoRodar = e.timeStamp;
 
       window.clearTimeout(apagarPista);
       apagarPista = window.setTimeout(() => {
-        acumulado = 0;
-        envionUsado = false;
+        if (!envionUsado) acumulado = 0;
         pintar(null, 0);
       }, PAUSA_FIN_GESTO_MS);
 
@@ -307,6 +308,12 @@ export function useDeslizarPaginas({
       if (Math.abs(acumulado) < UMBRAL_RUEDA) return;
       acumulado = 0;
       envionUsado = true;
+      window.clearTimeout(apagarPista);
+      apagarPista = window.setTimeout(() => {
+        envionUsado = false;
+        acumulado = 0;
+        pintar(null, 0);
+      }, BLOQUEO_RUEDA_MS);
       pintar(null, 0);
       pasarVigente(direccion);
     }
