@@ -254,7 +254,12 @@ for (let n = 1; n <= documento.numPages; n++) {
     const [a, b, , d, e, f] = it.transform;
     let fuente = it.fontName;
     try {
-      const objeto = await pagina.commonObjs.get(it.fontName);
+      // Algunos PDFs dejan un id numérico (p. ej. 55876). pdf.js espera una
+      // cadena en commonObjs.get y hace `.replace()` internamente.
+      const objeto =
+        typeof it.fontName === "string" && it.fontName
+          ? await pagina.commonObjs.get(it.fontName)
+          : null;
       // El PDF nombra a las tipografías con un prefijo de subconjunto de seis
       // letras y un `+`: `RPMMEK+Poppins-Bold`. No dice nada y cambia entre
       // archivos, así que se lo saca.

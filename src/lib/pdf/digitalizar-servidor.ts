@@ -296,9 +296,18 @@ export async function digitalizarPdf(
         const [a, b, , d, e, f] = it.transform;
         let fuente = it.fontName;
         try {
-          const objeto = (await pagina.commonObjs.get(it.fontName)) as {
-            name?: unknown;
-          } | null;
+          /*
+           * `fontName` suele ser un id de texto, pero algunos PDFs dejan un
+           * número interno (por ejemplo, 55876). pdf.js espera una cadena en
+           * `commonObjs.get` y hace `.replace()` internamente, así que no se
+           * debe llamar con ese id numérico.
+           */
+          const objeto =
+            typeof it.fontName === "string" && it.fontName
+              ? ((await pagina.commonObjs.get(it.fontName)) as {
+                  name?: unknown;
+                } | null)
+              : null;
           /*
            * El PDF nombra a las tipografías con un prefijo de subconjunto de
            * seis letras y un `+`: `RPMMEK+Poppins-Bold`. No dice nada y cambia
