@@ -31,6 +31,7 @@ import "server-only";
 import path from "node:path";
 import {
   digitalizarPagina,
+  lineasDePagina,
   type FiguraPagina,
   type ItemTexto,
   type PaginaDigitalizada,
@@ -42,6 +43,8 @@ import {
   ocrHabilitado,
 } from "@/lib/pdf/ocr-openrouter";
 import { zonasDeInfografia, type ZonaVectorial } from "@/lib/pdf/vectores";
+import { maquetarConModelo } from "@/lib/pdf/maquetador";
+import { consultaOpenRouter, modeloQueMaqueta } from "@/lib/pdf/maquetador-openrouter";
 import { subirImagen } from "@/lib/storage";
 
 /** Debajo de esto no es una figura: es un logo, una viñeta o un filete. En
@@ -91,6 +94,21 @@ function componer(m: number[], o: number[]): number[] {
 function nombreDeFuente(valor: unknown): string {
   const texto = typeof valor === "string" ? valor : String(valor ?? "");
   return texto.replace(/^[A-Z]{6}\+/, "");
+}
+
+/**
+ * La acción del panel es una decisión explícita de quien está editando el
+ * número, así que puede usar el maquetador con visión cuando hay una clave.
+ * En producción queda activo por defecto y `MAQUETADOR=0` es el interruptor de
+ * emergencia; en desarrollo exige `MAQUETADOR=1` para no gastar una llamada
+ * por accidente. El script de consola conserva su opt-in separado.
+ */
+function maquetadorDelPanelHabilitado(): boolean {
+  const permitido =
+    process.env.NODE_ENV === "production"
+      ? process.env.MAQUETADOR !== "0"
+      : process.env.MAQUETADOR === "1";
+  return permitido && Boolean(process.env.OPENROUTER_API_KEY);
 }
 
 interface ImagenCruda {
@@ -276,6 +294,7 @@ export async function digitalizarPdf(
 
   const paginas: PaginaDigitalizada[] = [];
   let figurasSubidas = 0;
+  const tareasDeMaquetado: Promise<void>[] = [];
 
   try {
     for (let n = 1; n <= documento.numPages; n++) {
@@ -289,7 +308,7 @@ export async function digitalizarPdf(
 
       /* ------------------------------------------------------------ texto */
 
-      const items: ItemTexto[] = [];
+      let items: ItemTexto[] = [];
       for (const it of contenido.items) {
         if (!("str" in it) || !it.str.trim()) continue;
         const [a, b, , d, e, f] = it.transform;
@@ -467,25 +486,9 @@ export async function digitalizarPdf(
         });
       }
 
-      /*
-       * Acá NO corre el maquetador con modelo, y es una decisión.
-       *
-       * El maquetador existe —`maquetador.ts`— y se usa desde
-       * `scripts/digitalizar.mjs`. Poner una segunda puerta que produzca un
-       * resultado DISTINTO para el mismo PDF es lo que hay que evitar: esta
-       * acción corre con `maxDuration = 60` y cada página lleva entre veinte y
-       * cuarenta segundos con el modelo, así que ocho no entran. La única forma
-       * de que entraran era saltear páginas, y entonces el mismo número salía de
-       * una manera desde el panel y de otra desde la consola, sin que nadie
-       * pudiera explicar por qué meses después.
-       *
-       * Así que el panel hace lo que siempre hizo, rápido y sin depender de
-       * ningún servicio: la maquetación por geometría. Cuando un número
-       * necesita el modelo —lo dicen los recuadros de datos partidos— se
-       * digitaliza por consola, se mira en vista previa y se carga. Ese camino
-       * además deja revisar antes de publicar, que en una edición del municipio
-       * vale más que el botón.
-       */
+      /* La geometría arma la primera versión; las páginas ambiguas pasan al
+       * maquetador con visión después del OCR, sin permitir que una respuesta
+       * incompleta reemplace una salida válida. */
       let resultado = digitalizarPagina({
         pagina: n,
         ancho: vista.width,
@@ -525,6 +528,7 @@ export async function digitalizarPdf(
             const recuperadas = ocrQueFalta(items, itemsDesdeOcr(ocr.lineas, vista.width, vista.height));
             if (recuperadas.length > 0) {
               const combinadas = [...items, ...recuperadas];
+              items = combinadas;
               resultado = digitalizarPagina({
                 pagina: n,
                 ancho: vista.width,
@@ -555,8 +559,76 @@ export async function digitalizarPdf(
       }
 
       resultado.diagnostico = diagnostico;
-      paginas.push(resultado);
+      const paginaGuardada = { ...resultado, figuras };
+      paginas.push(paginaGuardada);
+
+      /*
+       * Las cajas con columnas internas y las dobles páginas son el caso que
+       * la geometría no puede resolver. Se mandan en paralelo para que varias
+       * páginas ambiguas no sumen sus latencias; si el modelo falla, queda la
+       * versión heurística y el aviso para revisión.
+       */
+      if (
+        maquetadorDelPanelHabilitado() &&
+        resultado.clase === "prosa" &&
+        diagnostico.confianza !== "alta"
+      ) {
+        tareasDeMaquetado.push(
+          (async () => {
+            try {
+              const [lineas, imagen] = await Promise.all([
+                Promise.resolve(
+                  lineasDePagina({
+                    pagina: n,
+                    ancho: vista.width,
+                    alto: vista.height,
+                    items,
+                    figuras,
+                  }),
+                ),
+                imagenCompletaDePagina(
+                  pagina as unknown as PaginaDibujable,
+                  vista.width,
+                ),
+              ]);
+              const maqueta = await maquetarConModelo({
+                lineas,
+                imagenBase64: imagen,
+                pagina: n,
+                consultar: consultaOpenRouter(),
+              });
+              if (!maqueta.ok || !maqueta.cuerpo) {
+                paginaGuardada.avisos.push(
+                  `El maquetador (${modeloQueMaqueta()}) no pudo reordenar la página: ${maqueta.motivo ?? "respuesta inválida"}.`,
+                );
+                return;
+              }
+
+              const fotos = paginaGuardada.cuerpo.filter((b) => b.tipo === "foto");
+              paginaGuardada.cuerpo = [...maqueta.cuerpo, ...fotos];
+              if (maqueta.titulo) paginaGuardada.titulo = maqueta.titulo;
+              if (maqueta.bajada) paginaGuardada.bajada = maqueta.bajada;
+              paginaGuardada.avisos.push(
+                `La estructura se reordenó con ${modeloQueMaqueta()}; revisar la página antes de publicarla.`,
+              );
+              paginaGuardada.diagnostico = diagnosticarPagina({
+                ancho: vista.width,
+                alto: vista.height,
+                items,
+                figuras,
+                resultado: paginaGuardada,
+              });
+            } catch (error) {
+              paginaGuardada.avisos.push(
+                `El maquetador no pudo usarse: ${error instanceof Error ? error.message : "error desconocido"}.`,
+              );
+            }
+          })(),
+        );
+      }
     }
+
+    await Promise.allSettled(tareasDeMaquetado);
   } finally {
     // Son varios megas parseados y un worker propio detrás. Va en `finally`
     // para que un PDF roto tampoco los deje colgados en la función.
