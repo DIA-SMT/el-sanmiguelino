@@ -7,7 +7,7 @@
  * volverlos a hacer sin adivinar recortes ni márgenes.
  *
  * La fuente es `scripts/marca/logo-muni-iso.png`, el asset original que entregó
- * la Dirección de IA (235x235, RGBA). **No se usa `LogoHoja` de
+ * la Subsecretaría de Gestión Estratégica y Documentación (235x235, RGBA). **No se usa `LogoHoja` de
  * `src/components/brand/logos.tsx`**: esa está dibujada a mano con curvas
  * bezier aproximadas y sirve perfecto dentro de la página, pero el favicon es
  * la marca del municipio a 16 píxeles y ahí va el original.

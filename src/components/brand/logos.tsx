@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  * **El logotipo de la Municipalidad** —`LogoHoja`, la hoja tricolor con el
  * sol— es otra marca y NO es intercambiable con la anterior. Se queda donde el
  * que firma es el municipio y no el diario: la franja institucional de la
- * portada y el isologotipo de la Dirección de IA en el pie.
+ * portada y el isologotipo de la Subsecretaría en el pie.
  */
 
 /* Las curvas vienen tal cual del original de Illustrator —guardado en
@@ -149,8 +149,8 @@ export function LogoHoja({
   );
 }
 
-/** Isologotipo del equipo desarrollador, para el footer. */
-export function LogoDireccionIA({ className }: { className?: string }) {
+/** Isologotipo del área desarrolladora, para el footer y el acceso. */
+export function LogoSubsecretaria({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <svg viewBox="0 0 240 240" aria-hidden="true" className="h-8 w-8 shrink-0">
@@ -164,9 +164,12 @@ export function LogoDireccionIA({ className }: { className?: string }) {
         />
         <circle cx="112" cy="34" r="26" fill="var(--sol)" />
       </svg>
-      <span className="font-sans font-bold uppercase leading-none tracking-[0.18em] text-ink-2">
-        <span className="block text-[0.6rem]">Dirección</span>
-        <span className="block text-[0.85rem]">de IA</span>
+      <span
+        aria-label="Subsecretaría de Gestión Estratégica y Documentación"
+        className="font-sans font-bold uppercase leading-[1.1] tracking-[0.08em] text-ink-2"
+      >
+        <span className="block text-[0.56rem]">Subsecretaría de Gestión</span>
+        <span className="block text-[0.56rem]">Estratégica y Documentación</span>
       </span>
     </span>
   );

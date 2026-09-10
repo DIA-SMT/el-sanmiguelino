@@ -1,7 +1,7 @@
 # El Sanmiguelino — Diario digital
 
 Edición digital mensual de la **Municipalidad de San Miguel de Tucumán**,
-desarrollada por la **Dirección de IA**. Versión web del impreso, con estética
+desarrollada por la **Subsecretaría de Gestión Estratégica y Documentación**. Versión web del impreso, con estética
 de diario: masthead serif, cuerpo a columnas, letra capitular, filetes y modo
 claro/oscuro.
 

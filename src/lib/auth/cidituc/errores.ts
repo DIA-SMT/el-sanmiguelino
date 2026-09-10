@@ -68,7 +68,7 @@ export const TEXTO_ERROR: Record<ErrorIngreso, string> = {
   "state-distinto":
     "Había otro ingreso en curso. Cerrá las demás pestañas y probá de nuevo.",
   "sesion-fallida":
-    "Cidituc te reconoció, pero no pudimos abrir tu sesión. Avisale a la Dirección de IA.",
+    "Cidituc te reconoció, pero no pudimos abrir tu sesión. Avisale a la Subsecretaría de Gestión Estratégica y Documentación.",
   bloqueado:
     "Tu cuenta no puede ingresar al diario. Si te parece un error, escribinos.",
 };

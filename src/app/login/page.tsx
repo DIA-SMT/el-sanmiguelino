@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { LogoDireccionIA, LogoSanmiguelino } from "@/components/brand/logos";
+import { LogoSanmiguelino, LogoSubsecretaria } from "@/components/brand/logos";
 import { textoDeError } from "@/lib/auth/cidituc/errores";
 import { getResumenEdicion } from "@/lib/repos/edicion";
 import { BotonIngresar } from "./boton-ingresar";
@@ -62,7 +62,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <div className="rule-thin mt-9 pt-6">
           <p className="flex items-center justify-center gap-2.5">
             <span className="meta">Desarrollado por</span>
-            <LogoDireccionIA className="scale-90" />
+            <LogoSubsecretaria className="scale-90" />
           </p>
         </div>
       </div>

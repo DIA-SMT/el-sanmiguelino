@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogoDireccionIA, LogoSanmiguelino } from "@/components/brand/logos";
+import { LogoSanmiguelino, LogoSubsecretaria } from "@/components/brand/logos";
 import { SuscripcionPapel } from "@/components/suscripcion-papel";
 
 export function SiteFooter() {
@@ -38,7 +38,7 @@ export function SiteFooter() {
 
         <div className="flex items-center gap-3 md:justify-end">
           <span className="meta">Desarrollado por</span>
-          <LogoDireccionIA />
+          <LogoSubsecretaria />
         </div>
       </div>
     </footer>

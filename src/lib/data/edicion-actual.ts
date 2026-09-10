@@ -353,7 +353,7 @@ export const edicionActual: EdicionSemilla = {
         {
           tipo: "parrafo",
           texto:
-            "El desarrollo está a cargo de la Dirección de IA de la Municipalidad, el mismo equipo detrás de esta edición digital.",
+            "El desarrollo está a cargo de la Subsecretaría de Gestión Estratégica y Documentación de la Municipalidad, el mismo equipo detrás de esta edición digital.",
         },
       ],
     },
