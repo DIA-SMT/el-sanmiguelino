@@ -296,7 +296,6 @@ export async function digitalizarPdf(
   const paginas: PaginaDigitalizada[] = [];
   let figurasSubidas = 0;
   let paginasMaquetadas = 0;
-  const fallosDeMaquetado: { pagina: number; motivo: string }[] = [];
   const tareasDeMaquetado: Promise<void>[] = [];
 
   try {
@@ -573,8 +572,10 @@ export async function digitalizarPdf(
        * Las cajas con columnas internas y las dobles páginas son el caso que
        * la geometría no puede resolver. Se mandan en paralelo para que varias
        * páginas no sumen sus latencias. Un título reconocible no garantiza un
-       * orden correcto: se revisan todas las páginas de prosa. Si alguna
-       * falla, el resultado completo se rechaza antes de guardar las notas.
+       * orden correcto: se revisan todas las páginas de prosa. Si una respuesta
+       * del modelo no cierra, la página conserva la estructura heurística segura
+       * y queda marcada para revisión; una página problemática no debe impedir
+       * guardar las demás.
        */
       if (
         maquetadorDelPanelHabilitado() &&
@@ -605,9 +606,8 @@ export async function digitalizarPdf(
                 consultar: consultaOpenRouter({ signal }),
               });
               if (!maqueta.ok || !maqueta.cuerpo) {
-                fallosDeMaquetado.push({ pagina: n, motivo: maqueta.motivo ?? "respuesta inválida" });
                 paginaGuardada.avisos.push(
-                  `El maquetador (${modeloQueMaqueta()}) no pudo reordenar la página: ${maqueta.motivo ?? "respuesta inválida"}.`,
+                  `El maquetador (${modeloQueMaqueta()}) no pudo reordenar la página: ${maqueta.motivo ?? "respuesta inválida"}. Se conservó la estructura automática.`,
                 );
                 return;
               }
@@ -628,9 +628,8 @@ export async function digitalizarPdf(
               });
               paginasMaquetadas++;
             } catch (error) {
-              fallosDeMaquetado.push({ pagina: n, motivo: error instanceof Error ? error.message : "error desconocido" });
               paginaGuardada.avisos.push(
-                `El maquetador no pudo usarse: ${error instanceof Error ? error.message : "error desconocido"}.`,
+                `El maquetador no pudo usarse: ${error instanceof Error ? error.message : "error desconocido"}. Se conservó la estructura automática.`,
               );
             }
           })(),
@@ -642,13 +641,13 @@ export async function digitalizarPdf(
     if (signal.aborted) {
       throw new Error("Se agotó el tiempo para digitalizar. No se guardaron cambios en las notas.");
     }
-    if (fallosDeMaquetado.length > 0) {
-      throw new Error(
-        "No se guardó la nueva digitalización; las notas anteriores se conservan. " +
-        fallosDeMaquetado.sort((a, b) => a.pagina - b.pagina)
-          .map((f) => `Página ${f.pagina}: ${f.motivo}`).join(" "),
-      );
-    }
+    /*
+     * El fallo del maquetador no invalida la digitalización: `paginaGuardada`
+     * ya contiene la salida heurística, que conserva todo el texto y las fotos.
+     * Esa salida se guarda y el aviso queda visible en administración para que
+     * la página se pueda revisar o volver a procesar cuando mejore el modelo.
+     * Sólo un corte global (timeout/cancelación) aborta la edición completa.
+     */
   } finally {
     // Son varios megas parseados y un worker propio detrás. Va en `finally`
     // para que un PDF roto tampoco los deje colgados en la función.

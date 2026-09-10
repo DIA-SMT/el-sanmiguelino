@@ -240,6 +240,9 @@ Reglas:
   de los monu» / «mentos a Jorge Luis Borges»— es la señal de que no era una
   entrada de ficha: era un párrafo.
 - El orden de "bloques" es el orden en que se lee la nota.
+- Antes de enviar el JSON, hacé un control mecánico: contá cada número de línea
+  del listado y verificá que aparezca una sola vez en toda la respuesta. No
+  copies un número de un bloque a otro aunque el texto parezca relacionado.
 - CADA PÁRRAFO DEL IMPRESO ES UN BLOQUE. No juntes en uno solo dos párrafos que
   en el papel están separados: se reconocen por la sangría de la primera línea o
   por el espacio entre ellos. Una nota de seis párrafos tiene que devolver seis
@@ -396,6 +399,8 @@ Tu respuesta anterior no se pudo usar: ${ultimoMotivo}.
 ` +
           "Devolvé el reparto completo de nuevo, corrigiendo eso. Cada línea " +
           "exactamente una vez, ninguna afuera. Incluí también fechas, años y rótulos.\n" +
+          "No reutilices ningún número que ya aparezca en tu respuesta anterior; " +
+          "hacé el conteo completo de IDs antes de enviar el JSON.\n" +
           "Este fue el JSON anterior que debés corregir:\n" + crudo;
     try {
       crudo = await consultar({
