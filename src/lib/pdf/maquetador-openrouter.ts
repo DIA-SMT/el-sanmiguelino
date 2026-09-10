@@ -22,14 +22,11 @@ import type { Consulta } from "./maquetador.ts";
 const MODELO_POR_DEFECTO = "anthropic/claude-sonnet-5";
 
 /**
- * La digitalización corre dentro de una Server Action de Vercel. No podemos
- * dejar que una página esperando al proveedor consuma todo el presupuesto de
- * la acción: si el proveedor no responde, la acción termina con el mensaje
- * genérico "An unexpected response was received from the server" aunque el
- * PDF ya haya sido procesado. Hay un segundo intento en `maquetador.ts`, por
- * por eso un timeout de 25 s sigue dejando margen para guardar y revalidar.
+ * Una página con cientos de líneas necesita más que una consulta de chat.
+ * El panel tiene 300 s y comparte una señal de cancelación entre todas las
+ * consultas y sus reintentos, dejando margen para guardar y responder.
  */
-const TIMEOUT_MS = 25_000;
+const TIMEOUT_MS = 120_000;
 
 /** El reparto de una página de ciento treinta líneas es largo. Quedarse corto
  *  acá se ve como un JSON cortado a la mitad, que el control rechaza. */
@@ -49,20 +46,24 @@ export function maquetadorHabilitado(): boolean {
   return process.env.MAQUETADOR === "1" && hayModeloParaMaquetar();
 }
 
-export function consultaOpenRouter(): Consulta {
+export function consultaOpenRouter(opciones: { signal?: AbortSignal } = {}): Consulta {
   return async ({ instrucciones, pedido, imagenBase64 }) => {
     const clave = process.env.OPENROUTER_API_KEY;
     if (!clave) throw new Error("falta OPENROUTER_API_KEY");
 
     const control = new AbortController();
     const reloj = setTimeout(() => control.abort(), TIMEOUT_MS);
+    const signal = opciones.signal
+      ? AbortSignal.any([control.signal, opciones.signal])
+      : control.signal;
     try {
+      signal.throwIfAborted();
       const res = await fetch(
         process.env.OPENROUTER_URL ??
           "https://openrouter.ai/api/v1/chat/completions",
         {
           method: "POST",
-          signal: control.signal,
+          signal,
           headers: {
             Authorization: `Bearer ${clave}`,
             "Content-Type": "application/json",
@@ -73,6 +74,9 @@ export function consultaOpenRouter(): Consulta {
           body: JSON.stringify({
             model: modeloQueMaqueta(),
             max_tokens: MAXIMO_TOKENS,
+            // Sonnet 5 usa razonamiento alto por defecto. Para repartir
+            // líneas alcanza un presupuesto bajo; la fidelidad se valida acá.
+            reasoning: { effort: "low" },
             // Cero: acá no se quiere ninguna variación. Dos corridas sobre la
             // misma página tienen que repartir las líneas igual.
             temperature: 0,
@@ -97,11 +101,24 @@ export function consultaOpenRouter(): Consulta {
         throw new Error(`OpenRouter respondió ${res.status}: ${(await res.text()).slice(0, 200)}`);
       }
       const datos = (await res.json()) as {
-        choices?: { message?: { content?: string } }[];
+        error?: { message?: string };
+        choices?: { finish_reason?: string; message?: { content?: string } }[];
       };
+      if (datos.error) throw new Error(datos.error.message ?? "OpenRouter devolvió un error sin detalle.");
+      if (datos.choices?.[0]?.finish_reason === "length") {
+        throw new Error("El modelo agotó los tokens antes de completar la página.");
+      }
       const texto = datos.choices?.[0]?.message?.content;
       if (!texto) throw new Error("la respuesta vino vacía");
       return texto;
+    } catch (error) {
+      if (opciones.signal?.aborted) {
+        throw new Error("Se agotó el tiempo disponible para digitalizar la edición.");
+      }
+      if (control.signal.aborted) {
+        throw new Error("El modelo no terminó de ordenar la página en 120 segundos.");
+      }
+      throw error;
     } finally {
       clearTimeout(reloj);
     }

@@ -100,6 +100,7 @@ export async function extraerTextoConOcr(opciones: {
   imagenBase64: string;
   pagina: number;
   formato: string;
+  signal?: AbortSignal;
 }): Promise<{ ok: true; lineas: LineaOcr[] } | { ok: false; motivo: string }> {
   const clave = process.env.OPENROUTER_API_KEY;
   if (!clave) return { ok: false, motivo: "falta OPENROUTER_API_KEY" };
@@ -111,7 +112,9 @@ export async function extraerTextoConOcr(opciones: {
       process.env.OPENROUTER_URL ?? "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
-        signal: control.signal,
+        signal: opciones.signal
+          ? AbortSignal.any([control.signal, opciones.signal])
+          : control.signal,
         headers: {
           Authorization: `Bearer ${clave}`,
           "Content-Type": "application/json",

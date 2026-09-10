@@ -28,16 +28,12 @@ export const metadata = { title: "Ediciones" };
  * informa: agrupa. Quien no lo distingue lee exactamente lo mismo.
  */
 /**
- * Un minuto, por la digitalización.
- *
- * Las Server Actions corren con el presupuesto de la página que las invoca, y
- * `digitalizarEdicionAction` se dispara desde acá: baja el PDF del bucket, lo
- * parsea, decodifica cada foto, la recodifica en WebP y la sube. Medido contra
- * el número de agosto —8 páginas A3, 29 imágenes— son 4,9 segundos, pero un
- * número de 24 páginas es el triple de trabajo y el default de Vercel lo
- * cortaría por la mitad, dejando la edición a medio escribir.
+ * Las Server Actions heredan este límite. La digitalización cancela las
+ * consultas a los 240 s: el minuto restante permite cerrar el PDF, guardar
+ * en una transacción, registrar el resultado y devolverlo al navegador.
+ * Un límite de 60 s cortaba la operación mientras el modelo aún maquetaba.
  */
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export default async function AdminEdiciones() {
   await requerirAdmin();

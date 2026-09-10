@@ -642,7 +642,7 @@ export function PdfEdicion({
               : paso.que === "subiendo"
                 ? `Subiendo… ${paso.porcentaje}%`
                 : paso.que === "digitalizando"
-                  ? "Digitalizando: separando el texto, recortando las fotos y armando las notas. Puede tardar unos segundos."
+                  ? "Digitalizando: recuperando el texto, recortando las fotos y revisando el orden de lectura con IA. Puede tardar hasta cuatro minutos."
                   : "Guardando las páginas de la edición…"}
           </p>
           {/* La barra es decorativa: el número ya está escrito arriba y lo

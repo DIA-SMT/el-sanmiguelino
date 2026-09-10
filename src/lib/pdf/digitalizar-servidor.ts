@@ -14,12 +14,8 @@ import "server-only";
  * queda en una URL pública y el servidor se lo puede bajar cuando quiera. Eso
  * es lo que hace que "volver a digitalizar" sea un botón y no una resubida.
  *
- * Medido contra el número de agosto —8 páginas A3, 29 imágenes, 6,2 MB— el
- * trabajo completo tardaba **4,9 segundos**: bajar, parsear, decodificar cada
- * foto, recodificarla en WebP y subirla. Rasterizar las dos infografías
- * vectoriales de las páginas 6 y 7 le suma **medio segundo** —3,63 contra 3,07
- * en el script de consola, que hace lo mismo sin bajar ni subir—, así que sigue
- * lejos del `maxDuration` de 60 segundos de la acción que lo llama.
+ * OCR y maquetado comparten un presupuesto de 240 segundos. La acción que
+ * llama tiene 300, para conservar margen de guardado y de respuesta.
  *
  * Las tres dependencias pesadas ya estaban instaladas: `pdfjs-dist` lo usa el
  * visor del diario, `sharp` lo trae Next para optimizar imágenes y
@@ -265,10 +261,11 @@ export async function digitalizarPdf(
   edicionSlug: string,
 ): Promise<ResultadoDigitalizacion> {
   const arranque = Date.now();
+  const signal = AbortSignal.timeout(240_000);
 
   const respuesta = await fetch(url, {
     cache: "no-store",
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
   });
   if (!respuesta.ok) {
     throw new Error(
@@ -299,10 +296,14 @@ export async function digitalizarPdf(
   const paginas: PaginaDigitalizada[] = [];
   let figurasSubidas = 0;
   let paginasMaquetadas = 0;
+  const fallosDeMaquetado: { pagina: number; motivo: string }[] = [];
   const tareasDeMaquetado: Promise<void>[] = [];
 
   try {
     for (let n = 1; n <= documento.numPages; n++) {
+      if (signal.aborted) {
+        throw new Error("Se agotó el tiempo para digitalizar. No se guardaron cambios en las notas.");
+      }
       const pagina = await documento.getPage(n);
       const vista = pagina.getViewport({ scale: 1 });
       // Puebla `commonObjs` con las tipografías Y da la lista de imágenes: las
@@ -528,6 +529,7 @@ export async function digitalizarPdf(
             imagenBase64: imagen,
             pagina: n,
             formato: diagnostico.formato,
+            signal,
           });
           if (ocr.ok) {
             const recuperadas = ocrQueFalta(items, itemsDesdeOcr(ocr.lineas, vista.width, vista.height));
@@ -570,13 +572,13 @@ export async function digitalizarPdf(
       /*
        * Las cajas con columnas internas y las dobles páginas son el caso que
        * la geometría no puede resolver. Se mandan en paralelo para que varias
-       * páginas ambiguas no sumen sus latencias; si el modelo falla, queda la
-       * versión heurística y el aviso para revisión.
+       * páginas no sumen sus latencias. Un título reconocible no garantiza un
+       * orden correcto: se revisan todas las páginas de prosa. Si alguna
+       * falla, el resultado completo se rechaza antes de guardar las notas.
        */
       if (
         maquetadorDelPanelHabilitado() &&
-        resultado.clase === "prosa" &&
-        diagnostico.confianza !== "alta"
+        resultado.clase === "prosa"
       ) {
         tareasDeMaquetado.push(
           (async () => {
@@ -600,9 +602,10 @@ export async function digitalizarPdf(
                 lineas,
                 imagenBase64: imagen,
                 pagina: n,
-                consultar: consultaOpenRouter(),
+                consultar: consultaOpenRouter({ signal }),
               });
               if (!maqueta.ok || !maqueta.cuerpo) {
+                fallosDeMaquetado.push({ pagina: n, motivo: maqueta.motivo ?? "respuesta inválida" });
                 paginaGuardada.avisos.push(
                   `El maquetador (${modeloQueMaqueta()}) no pudo reordenar la página: ${maqueta.motivo ?? "respuesta inválida"}.`,
                 );
@@ -611,8 +614,8 @@ export async function digitalizarPdf(
 
               const fotos = paginaGuardada.cuerpo.filter((b) => b.tipo === "foto");
               paginaGuardada.cuerpo = [...maqueta.cuerpo, ...fotos];
-              if (maqueta.titulo) paginaGuardada.titulo = maqueta.titulo;
-              if (maqueta.bajada) paginaGuardada.bajada = maqueta.bajada;
+              paginaGuardada.titulo = maqueta.titulo ?? "";
+              paginaGuardada.bajada = maqueta.bajada ?? "";
               paginaGuardada.avisos.push(
                 `La estructura se reordenó con ${modeloQueMaqueta()}; revisar la página antes de publicarla.`,
               );
@@ -625,6 +628,7 @@ export async function digitalizarPdf(
               });
               paginasMaquetadas++;
             } catch (error) {
+              fallosDeMaquetado.push({ pagina: n, motivo: error instanceof Error ? error.message : "error desconocido" });
               paginaGuardada.avisos.push(
                 `El maquetador no pudo usarse: ${error instanceof Error ? error.message : "error desconocido"}.`,
               );
@@ -635,9 +639,20 @@ export async function digitalizarPdf(
     }
 
     await Promise.allSettled(tareasDeMaquetado);
+    if (signal.aborted) {
+      throw new Error("Se agotó el tiempo para digitalizar. No se guardaron cambios en las notas.");
+    }
+    if (fallosDeMaquetado.length > 0) {
+      throw new Error(
+        "No se guardó la nueva digitalización; las notas anteriores se conservan. " +
+        fallosDeMaquetado.sort((a, b) => a.pagina - b.pagina)
+          .map((f) => `Página ${f.pagina}: ${f.motivo}`).join(" "),
+      );
+    }
   } finally {
     // Son varios megas parseados y un worker propio detrás. Va en `finally`
     // para que un PDF roto tampoco los deje colgados en la función.
+    await Promise.allSettled(tareasDeMaquetado);
     await tarea.destroy();
   }
 

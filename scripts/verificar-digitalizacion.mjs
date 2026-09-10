@@ -88,6 +88,7 @@ function textoDe(pagina) {
     }
     if (b.tipo === "foto") return [b.epigrafe, b.credito].filter(Boolean).join(" ");
     if (b.tipo === "cita") return [b.texto, b.autor, b.cargo].filter(Boolean).join(" ");
+    if (b.tipo === "lista") return [b.titulo, ...b.items].filter(Boolean).join(" ");
     return b.texto;
   });
   return [
@@ -134,6 +135,7 @@ for (let n = 1; n <= documento.numPages; n++) {
   }
 
   const resultado = new Set(normalizar(textoDe(digitalizada)).split(" "));
+  const resultadoCompacto = normalizar(textoDe(digitalizada)).replace(/\s+/g, "");
 
   /*
    * Se cuentan PALABRAS y no apariciones.
@@ -146,7 +148,11 @@ for (let n = 1; n <= documento.numPages; n++) {
   const original_ = [...new Set(original.split(" "))].filter(
     (p) => p.length > 2,
   );
-  const perdidas = original_.filter((p) => !resultado.has(p));
+  // pdf.js puede cortar una palabra entre dos items sin dejar guión:
+  // `france` + `ses`, `reconstruc` + `ción`, `al` + `rededor`. El diario los
+  // vuelve a unir al armar el renglón, así que se comprueba también contra el
+  // texto compacto para no marcar como pérdida un corte de extracción.
+  const perdidas = original_.filter((p) => !resultado.has(p) && !resultadoCompacto.includes(p));
 
   palabrasTotales += original_.length;
   perdidasTotales += perdidas.length;

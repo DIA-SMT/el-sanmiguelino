@@ -123,6 +123,7 @@ Devolvé un JSON con esta forma exacta:
 }
 
 Reglas:
+- Emití JSON compacto, sin sangría ni explicación alrededor.
 - CADA línea tiene que aparecer exactamente una vez: en el título, en la bajada
   o en un bloque. Ninguna dos veces y NINGUNA AFUERA.
 - No hay dónde descartar. Las líneas que te paso ya vienen limpias: el folio, el
@@ -232,8 +233,7 @@ function revisar(
   const faltan = lineas.filter((l) => !vistos.has(l.i));
   if (faltan.length) {
     return `dejó ${faltan.length} líneas sin destino: ${faltan
-      .slice(0, 3)
-      .map((l) => `"${l.texto.slice(0, 30)}"`)
+      .map((l) => `${l.i} ("${l.texto.slice(0, 60)}")`)
       .join(", ")}`;
   }
 
@@ -304,7 +304,8 @@ export async function maquetarConModelo(opciones: {
 Tu respuesta anterior no se pudo usar: ${ultimoMotivo}.
 ` +
           "Devolvé el reparto completo de nuevo, corrigiendo eso. Cada línea " +
-          "exactamente una vez, ninguna afuera.";
+          "exactamente una vez, ninguna afuera. Incluí también fechas, años y rótulos.\n" +
+          "Este fue el JSON anterior que debés corregir:\n" + crudo;
     try {
       crudo = await consultar({
         instrucciones: INSTRUCCIONES,
