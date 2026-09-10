@@ -1,11 +1,4 @@
-import Link from "next/link";
-import {
-  ArrowRight,
-  LogIn,
-  MessageCircle,
-  Newspaper,
-  ThumbsUp,
-} from "lucide-react";
+import { MessageCircle, Newspaper, ThumbsUp } from "lucide-react";
 import { LogoHoja, LogoSanmiguelino } from "@/components/brand/logos";
 import { DiarioEnPerspectiva } from "@/components/landing/diario-en-perspectiva";
 import { VistaPrevia } from "@/components/landing/vista-previa";
@@ -35,7 +28,7 @@ const QUE_TRAE = [
   },
 ];
 
-/** Landing pública: presenta El Sanmiguelino e invita a ingresar con Cidituc.
+/** Landing pública: presenta El Sanmiguelino y anuncia su próxima apertura.
  *  El diario completo vive detrás del gate, en /diario. */
 export default async function Landing() {
   const [edicion, indice] = await Promise.all([
@@ -57,13 +50,9 @@ export default async function Landing() {
           </span>
           <span className="flex items-center gap-2.5">
             <ThemeToggle />
-            <Link
-              href="/login"
-              className="pressable inline-flex items-center gap-2 bg-ink px-4 py-2.5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-paper hover:bg-accent hover:text-accent-contrast"
-            >
-              <LogIn className="h-3.5 w-3.5" aria-hidden="true" />
-              Ingresar
-            </Link>
+            <span className="font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-accent-strong">
+              Próximamente
+            </span>
           </span>
         </div>
       </header>
@@ -99,19 +88,11 @@ export default async function Landing() {
                 de los vecinos.
               </p>
               <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-4">
-                <Link
-                  href="/login"
-                  className="pressable group inline-flex items-center gap-2.5 bg-accent px-7 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-accent-contrast shadow-control hover:bg-accent-strong"
-                >
-                  <LogIn className="h-4 w-4" aria-hidden="true" />
-                  Ingresar con Cidituc
-                  <ArrowRight
-                    className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
-                    aria-hidden="true"
-                  />
-                </Link>
+                <span className="inline-flex items-center bg-accent px-7 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-accent-contrast shadow-control">
+                  Próximamente
+                </span>
                 <p className="font-serif text-sm italic text-ink-2">
-                  Lectura exclusiva para usuarios de Cidituc.
+                  El acceso al diario estará disponible próximamente.
                 </p>
               </div>
 
@@ -199,19 +180,12 @@ export default async function Landing() {
               La edición de {edicion.mes} ya está en la calle
             </h2>
             <p className="max-w-xl font-serif text-[1.05rem] leading-relaxed text-ink-2">
-              Ingresá con tu cuenta de Cidituc y leela como se lee un diario:
-              pasando páginas.
+              Muy pronto vas a poder leerla como se lee un diario: pasando
+              páginas.
             </p>
-            <Link
-              href="/login"
-              className="pressable group inline-flex items-center gap-2.5 bg-ink px-7 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-paper hover:bg-accent hover:text-accent-contrast"
-            >
-              Ingresar con Cidituc
-              <ArrowRight
-                className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
-                aria-hidden="true"
-              />
-            </Link>
+            <span className="inline-flex bg-ink px-7 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-paper">
+              Próximamente
+            </span>
           </div>
         </section>
       </main>

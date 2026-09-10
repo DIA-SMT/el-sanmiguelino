@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import {
   getCompletas,
   getIndice,
@@ -18,10 +17,10 @@ function arranqueDe(nota: NotaCompleta): string | undefined {
 /**
  * Vista previa de la edición: una portada chica de verdad, con su nota
  * protagonista y tres secundarias, para que se vea cómo se lee el diario antes
- * de ingresar.
+ * de su apertura.
  *
- * Los titulares apuntan a la nota real y no al login: el gate se encarga de
- * mandar a ingresar y de volver después a la nota que se quiso leer.
+ * Los titulares apuntan a la nota real y no al acceso: la vista previa deja
+ * conocer la edición mientras el ingreso permanece cerrado.
  */
 export async function VistaPrevia() {
   const [edicion, indice] = await Promise.all([
@@ -154,18 +153,11 @@ export async function VistaPrevia() {
 
             <p className="hidden pt-5 font-serif text-[0.9rem] italic leading-relaxed text-ink-3 sm:block">
               La edición completa —{indice.length} notas, columnas y la voz de
-              los vecinos— está detrás del ingreso.
+              los vecinos— estará disponible próximamente.
             </p>
-            <Link
-              href="/login"
-              className="group mt-1 inline-flex items-center gap-2 border-0 pt-4 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-accent transition-colors hover:text-accent-strong"
-            >
-              Ingresar al diario
-              <ArrowRight
-                className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1"
-                aria-hidden="true"
-              />
-            </Link>
+            <span className="mt-1 inline-flex pt-4 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-accent">
+              Próximamente
+            </span>
           </div>
         </div>
       </div>
