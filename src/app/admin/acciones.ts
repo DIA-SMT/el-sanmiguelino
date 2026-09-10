@@ -556,6 +556,71 @@ export async function guardarEdicionAction(datos: unknown): Promise<{
 }
 
 /**
+ * Hace que una edición sea la que ve el lector ahora.
+ *
+ * La edición principal no es una bandera: el diario siempre sirve la edición
+ * con contenido cuya fecha de publicación es la más reciente y ya pasó. Poner
+ * una edición en la calle consiste en llevar su fecha al instante actual;
+ * queda como la más reciente y la que estaba vigente pasa al archivo.
+ */
+export async function ponerEdicionEnLaCalleAction(
+  slug: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  const { usuario } = await requerirAdmin();
+
+  try {
+    if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
+      throw new Error("Falta la edición.");
+    }
+
+    const edicion = await db().edicion.findUnique({
+      where: { slug },
+      select: {
+        slug: true,
+        mes: true,
+        publicaEn: true,
+        pdfUrl: true,
+        _count: { select: { notas: true } },
+      },
+    });
+    if (!edicion) throw new Error("Esa edición ya no existe.");
+    if (!edicion.pdfUrl && edicion._count.notas === 0) {
+      throw new Error("No se puede poner en la calle una edición vacía.");
+    }
+
+    const ahora = new Date();
+    await db().edicion.update({
+      where: { slug },
+      data: { publicaEn: ahora },
+    });
+
+    await anotar(usuario, {
+      accion: "edicion.publicada",
+      objetoId: edicion.slug,
+      resumen: `Puso en la calle ${edicion.mes}`,
+      detalle: {
+        fechaAnterior: edicion.publicaEn?.toISOString() ?? null,
+        fechaNueva: ahora.toISOString(),
+      },
+    });
+
+    revalidatePath("/diario");
+    revalidatePath("/archivo");
+    revalidatePath("/buscar");
+    revalidatePath("/admin/ediciones");
+    revalidatePath("/admin");
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof Error ? e.message : "No se pudo poner la edición en la calle.",
+    };
+  }
+}
+
+/**
  * Pone una edición "en foco", o vuelve a la publicada.
  *
  * La cookie sola no da acceso: `edicionEnFoco()` vuelve a verificar que quien

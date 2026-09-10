@@ -3,11 +3,20 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, Eye, Pencil, Trash2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Eye,
+  Newspaper,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   borrarEdicionAction,
   enfocarEdicionAction,
   guardarEdicionAction,
+  ponerEdicionEnLaCalleAction,
 } from "@/app/admin/acciones";
 import {
   Aviso,
@@ -219,6 +228,22 @@ export function FilaEdicion({
       await enfocarEdicionAction(slug);
       if (irAlDiario) router.push("/diario");
       else router.refresh();
+    });
+  }
+
+  function ponerEnLaCalle() {
+    setError(null);
+    iniciar(async () => {
+      try {
+        const res = await ponerEdicionEnLaCalleAction(edicion.slug);
+        if (!res.ok) {
+          setError(res.error ?? "No se pudo poner la edición en la calle.");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("No se pudo hablar con el servidor.");
+      }
     });
   }
 
@@ -446,6 +471,23 @@ export function FilaEdicion({
                 >
                   <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                   Verla en el diario
+                </button>
+              )}
+
+              {!esLaPublicada && (
+                <button
+                  type="button"
+                  onClick={ponerEnLaCalle}
+                  disabled={enCurso || !tieneAlgo}
+                  title={
+                    !tieneAlgo
+                      ? "Primero cargá contenido en la edición."
+                      : undefined
+                  }
+                  className={BOTON_PRIMARIO}
+                >
+                  <Newspaper className="h-3.5 w-3.5" aria-hidden="true" />
+                  {enCurso ? "Publicando…" : "Poner en la calle"}
                 </button>
               )}
 

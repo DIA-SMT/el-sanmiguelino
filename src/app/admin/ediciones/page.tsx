@@ -228,7 +228,10 @@ export default async function AdminEdiciones() {
           <strong className="font-semibold text-panel-tinta">
             hora de Tucumán
           </strong>
-          .
+          . También podés usar <strong className="font-semibold text-panel-tinta">
+            Poner en la calle
+          </strong>{" "}
+          para hacerla principal ahora mismo.
         </Aviso>
 
         {/* Las ediciones sí van como tarjetas sueltas flotando sobre el fondo,

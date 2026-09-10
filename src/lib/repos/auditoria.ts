@@ -63,6 +63,7 @@ export const ACCIONES = {
   "nota.guardada": { objeto: "nota", nombre: "Guardó una nota" },
   "edicion.creada": { objeto: "edicion", nombre: "Creó una edición" },
   "edicion.editada": { objeto: "edicion", nombre: "Editó una edición" },
+  "edicion.publicada": { objeto: "edicion", nombre: "Puso en la calle" },
   "edicion.borrada": {
     objeto: "edicion",
     nombre: "Borró una edición",
