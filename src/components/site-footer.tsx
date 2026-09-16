@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { LogoSanmiguelino, LogoSubsecretaria } from "@/components/brand/logos";
 import { SuscripcionPapel } from "@/components/suscripcion-papel";
+import { getUsuario } from "@/lib/auth/session";
 
-export function SiteFooter() {
+/**
+ * El pie pregunta quién está leyendo, y es sólo para el formulario de
+ * suscripción: si hay sesión, el nombre ya lo sabemos y no se lo pedimos de
+ * nuevo. En la landing —que es pública— no hay sesión y el formulario queda
+ * como estaba, con todos los campos vacíos.
+ */
+export async function SiteFooter() {
+  const usuario = await getUsuario();
   return (
     <footer className="mt-auto border-t-[3px] border-double border-ink bg-paper-2">
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[auto_1fr_auto] md:items-center md:gap-12">
@@ -21,7 +29,7 @@ export function SiteFooter() {
               porque no es navegación: es algo que se hace una vez, y el pie es
               donde uno mira cuando ya leyó. */}
           <div className="mt-4 flex justify-center">
-            <SuscripcionPapel />
+            <SuscripcionPapel nombre={usuario?.nombre ?? ""} />
           </div>
           {/* El archivo se llega desde el pie, que está en todas las páginas.
               En la bandera competiría con las secciones de la edición en curso,

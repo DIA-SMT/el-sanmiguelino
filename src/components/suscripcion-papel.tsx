@@ -8,10 +8,18 @@ import { cn } from "@/lib/utils";
 /**
  * Anotarse para recibir El Sanmiguelino en papel.
  *
- * Pide correo, domicilio, nombre y edad. **Cuando llegue el SSO de Cidituc, el
- * nombre y la edad van a salir de ahí** y el formulario va a quedar en dos
- * campos. Por eso esos dos están juntos y últimos: el día que sobren, se va la
- * fila entera y el resto queda igual.
+ * Pide correo, domicilio, nombre y edad. **El nombre lo trae Cidituc y llega
+ * ya puesto**; el resto se escribe a mano.
+ *
+ * Acá decía que con el SSO iban a salir de ahí "el nombre y la edad", y la
+ * mitad de esa predicción no se pudo cumplir: el backend municipal devuelve
+ * `id_persona`, CUIL, DNI, nombre, apellido y correo —ver `PersonaCidituc`— y
+ * **nada de fecha de nacimiento ni de domicilio**. Así que la edad y la
+ * dirección son manuales por falta de dato, no por falta de ganas. La fila que
+ * las junta se queda donde está.
+ *
+ * El nombre llega prellenado pero **editable**: puede estar anotándose para la
+ * abuela, o querer corregir cómo se escribe.
  *
  * La validación de verdad está en el servidor —`/api/suscripciones`—. Lo de
  * acá es para que quien escribe se entere antes de mandar, no una defensa.
@@ -22,13 +30,19 @@ const campo =
 const etiqueta =
   "block font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink-2";
 
-export function SuscripcionPapel() {
+export function SuscripcionPapel({
+  /** El de la sesión de Cidituc. Vacío si no hay sesión —la landing es
+   *  pública—, y ahí el formulario queda como estaba. */
+  nombre = "",
+}: {
+  nombre?: string;
+}) {
   const [abierto, setAbierto] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState<"nuevo" | "actualizado" | null>(null);
   const [datos, setDatos] = useState({
-    nombre: "",
+    nombre,
     edad: "",
     email: "",
     direccion: "",
@@ -151,7 +165,8 @@ export function SuscripcionPapel() {
                 </span>
               </label>
 
-              {/* Los dos que va a traer Cidituc. */}
+              {/* El nombre lo trae Cidituc; la edad no la tiene nadie más que
+                  la persona. */}
               <div className="grid gap-4 sm:grid-cols-[1fr_6.5rem]">
                 <label className="block">
                   <span className={etiqueta}>Nombre</span>
@@ -162,6 +177,11 @@ export function SuscripcionPapel() {
                     className={cn(campo, "mt-1.5")}
                     placeholder="Nombre y apellido"
                   />
+                  {nombre && (
+                    <span className="mt-1.5 block font-sans text-[0.72rem] text-ink-3">
+                      Lo trajimos de tu Ciudadano Digital. Podés cambiarlo.
+                    </span>
+                  )}
                 </label>
                 <label className="block">
                   <span className={etiqueta}>Edad</span>
