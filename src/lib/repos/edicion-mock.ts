@@ -63,6 +63,13 @@ export const edicionMockRepo: EdicionRepo = {
     return encontrada ? aCompleta(encontrada) : null;
   },
 
+  async existe(slug) {
+    // Sin base hay una sola edición, así que mirar la actual ES mirar todo lo
+    // legible. Igual se pregunta por el mismo camino que `nota()` para que las
+    // dos no puedan divergir.
+    return edicionActual.notas.some((n) => n.slug === slug);
+  },
+
   async completas(slugs) {
     // Se respeta el orden pedido, no el de la edición: quien pide
     // ["b", "a"] espera recibirlas así.

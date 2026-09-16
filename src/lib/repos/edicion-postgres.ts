@@ -234,6 +234,17 @@ export const edicionPostgresRepo: EdicionRepo = {
    * Para un administrador con una edición en foco, `edicionActualFila()`
    * devuelve esa, así que ve sus notas. Es la misma consulta.
    */
+  /** El `select 1` de `nota()`: misma cláusula de legibilidad, sin el cuerpo.
+   *  Las dos tienen que mirar lo mismo — si divergen, se podría comentar una
+   *  nota que no se puede leer. */
+  async existe(slug: string): Promise<boolean> {
+    const fila = await db().nota.findFirst({
+      where: { slug, edicion: edicionesLegibles(await edicionEnFoco()) },
+      select: { slug: true },
+    });
+    return fila !== null;
+  },
+
   async nota(slug: string): Promise<NotaCompleta | null> {
     const fila = await db().nota.findFirst({
       where: { slug, edicion: edicionesLegibles(await edicionEnFoco()) },

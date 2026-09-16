@@ -32,6 +32,10 @@ export interface EdicionRepo {
   indice(): Promise<NotaResumen[]>;
   /** Una nota entera, o null si no está en la edición. */
   nota(slug: string): Promise<NotaCompleta | null>;
+  /** ¿Existe y se puede leer? Misma regla que `nota()`, sin traerse el cuerpo:
+   *  lo llaman los dos extremos de los comentarios en cada pedido, y ahí el
+   *  cuerpo de una página digitalizada es carga que nadie mira. */
+  existe(slug: string): Promise<boolean>;
   /** Varias notas enteras, en el orden pedido. Para la portada, que necesita
    *  el cuerpo de las dos primeras, y para Migue, que las necesita todas. */
   completas(slugs: string[]): Promise<NotaCompleta[]>;
@@ -143,12 +147,28 @@ export const getProximaEdicion = cache(
   async (): Promise<ProximaEdicion | null> => repo.proxima(),
 );
 
-/** Para validar que un slug existe sin traerse la nota. Hoy cuesta lo mismo;
- *  con la base detrás, es un `select 1`. */
-export async function notaExiste(slug: string): Promise<boolean> {
-  const indice = await getIndice();
-  return indice.some((n) => n.slug === slug);
-}
+/**
+ * ¿Hay una nota con este slug que el lector pueda leer?
+ *
+ * **Vale para cualquier edición publicada, no sólo para la del mes.** Antes
+ * preguntaba por `getIndice()`, o sea por el índice de la edición EN LA CALLE,
+ * y eso convertía en inexistente a toda nota del archivo. Lo usan los dos
+ * extremos de los comentarios, así que en una nota de agosto el listado
+ * contestaba 404 —el lector veía "No pudimos cargar los comentarios"— y
+ * publicar uno fallaba igual.
+ *
+ * El defecto es viejo, pero estaba tapado: hasta que la barra tuvo el selector
+ * de ediciones casi no se llegaba a una nota del archivo. Al abrirle la puerta
+ * quedó a la vista.
+ *
+ * La regla es la misma que aplica `repo.nota()` —`edicionesLegibles()`: su
+ * edición está publicada, o es la que un administrador tiene en foco—, y tiene
+ * que seguir siéndolo: si acá se pudiera comentar algo que allá no se puede
+ * leer, o al revés, serían dos respuestas distintas a la misma pregunta.
+ */
+export const notaExiste = cache(
+  async (slug: string): Promise<boolean> => repo.existe(slug),
+);
 
 /**
  * La nota como la ve el panel: de cualquier edición, publicada o no.
