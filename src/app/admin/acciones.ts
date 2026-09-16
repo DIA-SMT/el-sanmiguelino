@@ -6,8 +6,9 @@ import { db } from "@/lib/db";
 import { COOKIE_EDICION } from "@/lib/auth/vista-previa";
 import { desdeHoraTucuman } from "@/lib/fecha-edicion";
 import {
-  subirImagen,
+  urlFirmadaParaFoto,
   urlFirmadaParaPdf,
+  verificarFotoSubida,
   verificarPdfSubido,
 } from "@/lib/storage";
 import {
@@ -651,31 +652,83 @@ export async function enfocarEdicionAction(
   return { ok: true };
 }
 
+/* ------------------------------------------------------------------------
+ * La foto de una nota
+ *
+ * Son dos acciones y no una porque **el archivo no pasa por el servidor**: el
+ * navegador le pide una firma, sube directo a Storage y después pregunta si
+ * quedó bien. El porqué está en el comentario de las subidas firmadas, en
+ * src/lib/storage.ts.
+ *
+ * Antes era una sola acción que recibía el `File` por `FormData`, y andaba
+ * —hasta que alguien subió una foto de teléfono—: una Server Action acepta 1 MB
+ * de cuerpo, la pantalla ofrecía 8 MB, y lo que veía el redactor era "no se
+ * pudo hablar con el servidor al subir la foto". El request moría antes de
+ * entrar acá, así que ningún mensaje de estas acciones podía explicarlo.
+ *
+ * Ninguna de las dos guarda la nota. La dirección va al campo del archivo y se
+ * guarda con el resto cuando el redactor aprieta Guardar: así subir una foto y
+ * arrepentirse no deja la nota a medio cambiar.
+ * --------------------------------------------------------------------- */
+
 /**
- * Sube la foto de una nota y devuelve su dirección.
+ * Primer paso: pedir permiso para subir la foto.
  *
- * Recibe el archivo por `FormData` y lo manda a Storage **desde el servidor**.
- * El navegador nunca ve la clave: subir directo desde el cliente exigiría
- * dársela, y la `service_role` no es una llave de subida sino una llave
- * maestra de todo el proyecto.
- *
- * No guarda la nota. Devuelve la URL y el editor la pone en el campo del
- * archivo, que se guarda con el resto cuando el redactor aprieta Guardar. Así
- * subir una foto y arrepentirse no deja la nota a medio cambiar.
+ * La extensión la propone el navegador —que ya olió los bytes— y la valida
+ * `urlFirmadaParaFoto()` contra la tabla de firmas. Lo que nunca sale de acá es
+ * la `service_role`, que no es una llave de subida sino la llave maestra del
+ * proyecto entero.
  */
-export async function subirImagenAction(
-  datos: FormData,
+export async function firmarSubidaFotoAction(datos: unknown): Promise<{
+  ok: boolean;
+  destino?: string;
+  urlPublica?: string;
+  mime?: string;
+  error?: string;
+}> {
+  await requerirAdmin();
+
+  try {
+    if (!esObjeto(datos)) throw new Error("Faltan los datos de la foto.");
+    const { slug, ext } = datos;
+
+    // El slug sólo nombra el archivo: que venga cualquier cosa no es un error
+    // que valga la pena mostrarle a nadie, se cae a "nota" y listo. Es el mismo
+    // criterio que tenía la acción vieja.
+    const nombre = textoNoVacio(slug) && SLUG_VALIDO.test(slug) ? slug : "nota";
+    if (!textoNoVacio(ext)) throw new Error("Falta el tipo de la foto.");
+
+    const firma = await urlFirmadaParaFoto(nombre, ext);
+    return { ok: true, ...firma };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo preparar la subida.",
+    };
+  }
+}
+
+/**
+ * Segundo paso: la foto ya está en el bucket, confirmar que sirve.
+ *
+ * Quien llama es nuestro propio panel, pero lo que dice —"quedó subida acá"— es
+ * exactamente lo que no se puede dar por bueno: si la subida se cortó a mitad
+ * de camino, la nota quedaría apuntando a un objeto trunco y el error aparecería
+ * recién cuando un lector abre el diario.
+ *
+ * Devuelve la misma dirección que recibió, ya verificada, para que el editor
+ * tenga una sola cosa que mirar antes de ponerla en el campo.
+ */
+export async function confirmarSubidaFotoAction(
+  url: unknown,
 ): Promise<{ ok: boolean; url?: string; error?: string }> {
   await requerirAdmin();
 
   try {
-    const archivo = datos.get("archivo");
-    const slug = datos.get("slug");
-    if (!(archivo instanceof File)) throw new Error("No llegó ningún archivo.");
-    const nombre =
-      textoNoVacio(slug) && SLUG_VALIDO.test(slug) ? slug : "nota";
-
-    const { url } = await subirImagen(archivo, nombre);
+    if (!textoNoVacio(url)) throw new Error("Falta la dirección de la foto.");
+    // Que esté, que sea una imagen de las que aceptamos y que pese lo que tiene
+    // que pesar. Si no, la borra y tira con un mensaje que dice qué pasó.
+    await verificarFotoSubida(url);
     return { ok: true, url };
   } catch (e) {
     return {

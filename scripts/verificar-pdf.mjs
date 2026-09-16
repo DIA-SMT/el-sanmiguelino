@@ -4,11 +4,12 @@
  * Se corre con `npm run verificar:pdf`. Toca el Storage de verdad: pide una
  * firma, sube un archivo y lo vuelve a leer. No simula nada.
  *
- * Existe porque la subida del facsímil es la única del proyecto que **no pasa
- * por el servidor** —el navegador escribe directo en el bucket con una URL
- * firmada, porque en Vercel un request no puede pesar más de 4,5 MB y un diario
- * mensual siempre pesa más— y eso significa que hay tres piezas que sólo se
- * pueden probar contra Supabase:
+ * Existe porque la subida del facsímil **no pasa por el servidor** —el navegador
+ * escribe directo en el bucket con una URL firmada, porque en Vercel un request
+ * no puede pesar más de 4,5 MB y un diario mensual siempre pesa más— y eso
+ * significa que hay tres piezas que sólo se pueden probar contra Supabase.
+ * (La foto de una nota va por el mismo camino desde que se descubrió que 8 MB
+ * no entran en una Server Action; su gemelo es `verificar-foto.mjs`.)
  *
  *  1. **Que el proyecto sepa firmar una subida.** Es un endpoint distinto del
  *     que usan las fotos (`/object/upload/sign/…` en lugar de `/object/…`) y

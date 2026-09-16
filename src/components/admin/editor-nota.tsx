@@ -11,7 +11,11 @@ import {
   TriangleAlert,
   Upload,
 } from "lucide-react";
-import { guardarNotaAction, subirImagenAction } from "@/app/admin/acciones";
+import {
+  confirmarSubidaFotoAction,
+  firmarSubidaFotoAction,
+  guardarNotaAction,
+} from "@/app/admin/acciones";
 import {
   clasesDeBoton,
   clasesDeBotonIcono,
@@ -42,6 +46,36 @@ import { cn } from "@/lib/utils";
  * tarjeta que flota sobre el fondo gris, igual que las tarjetas del resto del
  * panel. Lo único que se escribe acá son los campos, que las piezas no cubren.
  */
+
+/** El mismo tope que valida el servidor en `verificarFotoSubida()` y el mismo
+ *  que dice la pantalla. Acá está para avisar ANTES de esperar una subida
+ *  entera, no para reemplazarlo: la validación que cuenta es la del servidor,
+ *  que es la única que no se puede saltear desde acá. */
+const MAXIMO_BYTES_FOTO = 8 * 1024 * 1024;
+
+/**
+ * Qué imagen es, mirando los bytes y no el nombre.
+ *
+ * Es la misma tabla que `FIRMAS` en `src/lib/storage.ts`, recortada a lo que el
+ * navegador necesita: la extensión. Está duplicada porque aquel archivo es
+ * `server-only` —lleva la `service_role`— y no se puede importar desde acá.
+ *
+ * WebP es `RIFF....WEBP`: la marca vive en los bytes 8..11, no al principio.
+ */
+function extensionDeImagen(bytes: Uint8Array): string | null {
+  const empieza = (...firma: number[]) => firma.every((b, i) => bytes[i] === b);
+  if (empieza(0xff, 0xd8, 0xff)) return "jpg";
+  if (empieza(0x89, 0x50, 0x4e, 0x47)) return "png";
+  if (empieza(0x52, 0x49, 0x46, 0x46)) {
+    return String.fromCharCode(...bytes.slice(8, 12)) === "WEBP" ? "webp" : null;
+  }
+  return null;
+}
+
+/** Lo que tira la propia subida —el archivo, el PUT, el storage— y ya viene con
+ *  un mensaje que se puede mostrar tal cual. Existe para distinguirlo de que
+ *  RECHACE una Server Action, que es otra cosa y se cuenta distinto. */
+class FalloDeSubida extends Error {}
 
 const TIPOS: { valor: BloqueNota["tipo"]; nombre: string; ayuda: string }[] = [
   { valor: "parrafo", nombre: "Párrafo", ayuda: "Texto corrido de la nota." },
@@ -278,7 +312,11 @@ export function EditorNota({
   const [imagenCredito, setImagenCredito] = useState(
     nota?.imagen?.credito ?? "",
   );
-  const [subiendo, setSubiendo] = useState(false);
+  /** `null` cuando no hay ninguna subida en curso; si no, un rótulo con el
+   *  avance. Una foto de ocho megas por una conexión municipal tarda, y un
+   *  "Subiendo…" quieto durante un minuto se lee como colgado: lo más razonable
+   *  que puede hacer el redactor ahí es apretar de nuevo. */
+  const [subiendo, setSubiendo] = useState<string | null>(null);
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
   const [cuerpo, setCuerpo] = useState<BloqueNota[]>(
     nota?.cuerpo ?? [{ tipo: "parrafo", texto: "" }],
@@ -339,33 +377,126 @@ export function EditorNota({
   }, [sucio]);
 
   /**
-   * Sube la foto y pone su dirección en el campo. **No guarda la nota.**
+   * Sube un archivo y devuelve su dirección, o null si falló. **No guarda la
+   * nota** ni toca ningún campo: quién la pidió decide dónde va. Lo usan la
+   * foto de apertura y las fotos que viven dentro del cuerpo, que son dos
+   * destinos distintos.
    *
-   * Separar las dos cosas es a propósito: subir una foto y arrepentirse no
+   * Separar subir de guardar es a propósito: subir una foto y arrepentirse no
    * deja la nota a medio cambiar, y el redactor ve el resultado antes de
    * publicar nada.
+   *
+   * **La foto no pasa por el servidor**: se pide una firma, se sube derecho a
+   * Storage y recién ahí se confirma. El porqué está en `acciones.ts`, junto a
+   * `firmarSubidaFotoAction` — en resumen, una Server Action acepta 1 MB y esta
+   * pantalla ofrece ocho.
    */
-  /** Sube un archivo y devuelve su dirección, o null si falló. No toca ningún
-   *  campo: quién la pidió decide dónde va. Lo usan la foto de apertura y las
-   *  fotos que viven dentro del cuerpo, que son dos destinos distintos. */
   async function subirArchivo(archivo: File): Promise<string | null> {
     setErrorFoto(null);
-    setSubiendo(true);
+
+    // Las dos comprobaciones de acá son para avisar EN EL ACTO, no para
+    // reemplazar nada: las que cuentan son las del servidor, en
+    // `verificarFotoSubida()`, porque son las únicas que no se pueden saltear
+    // desde el navegador. La diferencia es que estas se enteran antes de
+    // esperar ocho megas de subida.
+    if (archivo.size === 0) {
+      setErrorFoto("El archivo está vacío.");
+      return null;
+    }
+    if (archivo.size > MAXIMO_BYTES_FOTO) {
+      setErrorFoto(
+        `La foto pesa ${(archivo.size / 1024 / 1024).toFixed(1)} MB y el ` +
+          `máximo son ${MAXIMO_BYTES_FOTO / 1024 / 1024} MB. Achicala antes ` +
+          "de subirla.",
+      );
+      return null;
+    }
+
+    setSubiendo("Subiendo…");
     try {
-      const datos = new FormData();
-      datos.set("archivo", archivo);
-      datos.set("slug", slug);
-      const res = await subirImagenAction(datos);
+      // Los primeros doce bytes dicen qué es el archivo de verdad. Se miran acá
+      // porque de ellos sale la extensión con la que el servidor firma la
+      // clave: el `type` que declara el navegador lo pone quien sube y puede
+      // decir cualquier cosa.
+      let ext: string | null;
+      try {
+        const cabeza = new Uint8Array(await archivo.slice(0, 12).arrayBuffer());
+        ext = extensionDeImagen(cabeza);
+      } catch {
+        throw new FalloDeSubida("No se pudo leer el archivo elegido.");
+      }
+      if (!ext) {
+        throw new FalloDeSubida(
+          "Ese archivo no es una imagen JPG, PNG o WebP. Si lo renombraste, " +
+            "el contenido sigue siendo el de antes.",
+        );
+      }
+
+      const firma = await firmarSubidaFotoAction({ slug, ext });
+      if (!firma.ok || !firma.destino || !firma.urlPublica || !firma.mime) {
+        setErrorFoto(firma.error ?? "No se pudo preparar la subida.");
+        return null;
+      }
+
+      /*
+       * XMLHttpRequest y no `fetch`, por una sola razón: el porcentaje.
+       * `fetch` no informa el avance de la SUBIDA, sólo el de la bajada. Es el
+       * mismo motivo —y el mismo código— que en el PDF del impreso.
+       */
+      await new Promise<void>((listo, falla) => {
+        const pedido = new XMLHttpRequest();
+        pedido.open("PUT", firma.destino!);
+        // El tipo lo eligió el SERVIDOR, a partir de los bytes. Con este valor
+        // se queda Storage y con él sirve la foto a cada lector.
+        pedido.setRequestHeader("Content-Type", firma.mime!);
+        pedido.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) {
+            setSubiendo(`Subiendo ${Math.round((e.loaded / e.total) * 100)}%…`);
+          }
+        });
+        pedido.addEventListener("load", () => {
+          if (pedido.status >= 200 && pedido.status < 300) listo();
+          else {
+            falla(
+              new FalloDeSubida(
+                `Storage rechazó la foto (${pedido.status}).`,
+              ),
+            );
+          }
+        });
+        pedido.addEventListener("error", () =>
+          falla(
+            new FalloDeSubida("Se cortó la conexión mientras subía la foto."),
+          ),
+        );
+        pedido.addEventListener("abort", () =>
+          falla(new FalloDeSubida("La subida se canceló.")),
+        );
+        pedido.send(archivo);
+      });
+
+      setSubiendo("Confirmando…");
+      const res = await confirmarSubidaFotoAction(firma.urlPublica);
       if (!res.ok || !res.url) {
         setErrorFoto(res.error ?? "No se pudo subir la foto.");
         return null;
       }
       return res.url;
-    } catch {
-      setErrorFoto("No se pudo hablar con el servidor al subir la foto.");
+    } catch (e) {
+      // Lo que tira la subida en sí ya viene explicado. Lo que cae en el `else`
+      // es que una de las dos acciones RECHAZÓ —no devolvió `ok:false`—, y el
+      // caso realista es `requerirAdmin()`: la sesión se venció. Decirlo ahorra
+      // el rato de probar con otra foto, que es lo que uno hace cuando el
+      // cartel no distingue una cosa de la otra.
+      setErrorFoto(
+        e instanceof FalloDeSubida
+          ? e.message
+          : "El servidor no aceptó la subida. Lo más probable es que se haya " +
+              "vencido tu sesión: recargá la página y fijate si seguís adentro.",
+      );
       return null;
     } finally {
-      setSubiendo(false);
+      setSubiendo(null);
     }
   }
 
@@ -599,11 +730,11 @@ export function EditorNota({
                 }`}
               >
                 <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
-                {subiendo ? "Subiendo…" : "Subir una foto"}
+                {subiendo ?? "Subir una foto"}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                  disabled={subiendo}
+                  disabled={subiendo !== null}
                   className="sr-only"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -951,7 +1082,9 @@ function CamposBloque({
   onCambio: (cambios: Partial<BloqueNota>) => void;
   /** Sube un archivo y devuelve su dirección. Sólo lo usa el bloque de foto. */
   onSubir: (archivo: File) => Promise<string | null>;
-  subiendo: boolean;
+  /** El rótulo del botón mientras sube —lleva el avance adentro—, o `null` si
+   *  no hay ninguna subida en curso. */
+  subiendo: string | null;
 }) {
   if (bloque.tipo === "ficha") {
     return (
@@ -1063,11 +1196,11 @@ function CamposBloque({
             subiendo && "opacity-60",
           )}
         >
-          {subiendo ? "Subiendo…" : "Reemplazar la foto"}
+          {subiendo ?? "Reemplazar la foto"}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            disabled={subiendo}
+            disabled={subiendo !== null}
             className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0];

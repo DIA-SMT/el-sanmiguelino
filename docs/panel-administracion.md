@@ -716,17 +716,48 @@ ese error en un error de compilación.
 Verificado después de compilar: la clave aparece en **0** archivos de
 `.next/static`.
 
-### La subida pasa por el servidor
+### La subida NO pasa por el servidor (corregido)
 
-El navegador nunca ve la clave. Subir directo desde el cliente exigiría dársela,
-y la `service_role` no es una llave de subida: es una llave maestra del
-proyecto entero, base incluida.
+Pasaba, y estaba mal. La foto viajaba dentro de una Server Action como
+`FormData`, y **una Server Action acepta 1 MB de cuerpo por default**: la
+pantalla ofrecía 8 MB, `subirImagen()` validaba 8 MB, y cualquier foto de
+teléfono —3 a 6 MB— rebotaba antes de llegar al servidor. Lo que veía el
+redactor era *"No se pudo hablar con el servidor al subir la foto"*, el cartel
+del `catch`, porque el request moría antes de que ninguna acción pudiera
+explicar nada.
+
+El tope de Vercel (4,5 MB duros por request) hace que subir el límite de la
+acción tampoco alcance. Así que la foto va por donde ya iba el PDF: **el
+servidor firma una clave, el navegador escribe directo en el bucket, el servidor
+confirma después**. La `service_role` no sale de ahí — lo que sale es un token
+acotado a una sola clave y con diez minutos de vida.
+
+La regla que quedó escrita en `src/lib/storage.ts`: **lo que decide es por dónde
+viaja el archivo, no cuánto se espera que pese.**
 
 ### El tipo se valida por los bytes, no por lo que diga el archivo
 
 El `type` que manda el navegador lo pone quien sube y puede decir cualquier
 cosa. Se miran las firmas reales de JPG, PNG y WebP. Verificado con un archivo
 de texto renombrado a `.jpg`: **rechazado**.
+
+Lo que cambió al mover la subida es **cuándo**: antes se olían los bytes en el
+servidor con el archivo en la mano; ahora se leen del objeto ya subido, con un
+`Range` de doce bytes (WebP es `RIFF....WEBP` y la marca vive en el 8..11).
+Eso abre una ventana en la que el objeto existe y es público, así que si no
+pasa la verificación **se borra**: no alcanza con no guardarlo en la nota. Se
+mira también con qué `content-type` lo va a servir Storage, que es el que fijó
+el PUT.
+
+El borrado sólo toca claves con la forma de una foto (`<slug>-<8 hex>.<ext>`, en
+la raíz). Sin ese cerrojo, pasarle la dirección del PDF de una edición a la
+acción de confirmar lo habría borrado: no es una imagen válida, así que habría
+caído por el camino del descarte.
+
+El navegador también huele los bytes antes de pedir la firma, y de ahí sale la
+extensión. Es para avisar en el acto y para que la clave nazca bien; la
+validación que cuenta sigue siendo la del servidor, que es la única que no se
+puede saltear.
 
 El nombre del archivo también lo elegimos nosotros —slug de la nota más un
 sufijo al azar—: un nombre que el usuario controla dentro de una ruta es la
@@ -735,10 +766,15 @@ foto anterior al cambiarla.
 
 ### El bucket
 
-`diario`, público de lectura, con tope de 8 MB y sólo JPG/PNG/WebP **en el
-propio bucket**, además de lo que valida el código. Público porque las fotos de
-un diario se ven sin iniciar sesión y porque el optimizador de imágenes de Next
-las busca sin credenciales.
+`diario`, público de lectura y con la lista de tipos permitidos **en el propio
+bucket**, además de lo que valida el código. Público porque las fotos de un
+diario se ven sin iniciar sesión y porque el optimizador de imágenes de Next las
+busca sin credenciales.
+
+Su `file_size_limit` son 50 MB desde que entró el PDF del impreso (ver esa
+etapa). Las fotos siguen topadas en 8 MB por código, en los dos lados: el
+navegador mide el archivo antes de empezar a subir y el servidor lo vuelve a
+medir sobre el objeto ya subido.
 
 `next.config.ts` acota `remotePatterns` al **bucket**, no al host: sin el
 `pathname`, cualquier archivo de cualquier bucket del proyecto pasaría por el
@@ -752,6 +788,15 @@ verdad sube, la nota se guarda y la imagen se sirve **a través del optimizador
 de Next** (`/_next/image?url=…`) con las dimensiones correctas — que es la
 prueba de que el patrón remoto está bien puesto. Después se restauró la nota y
 se vació el bucket.
+
+**`npm run verificar:foto`** prueba contra el Storage de verdad lo que la
+interfaz no puede mostrar: firma, sube un JPEG de **5,1 MB** —más que el
+megabyte de la Server Action y más que los 4,5 MB de Vercel, o sea el tamaño que
+antes no llegaba nunca—, lo vuelve a leer y comprueba la firma, el
+`content-type` y el largo. Después sube basura con nombre de `.jpg` para
+confirmar que Storage **no** la frena sola —el cerrojo tiene que estar en el
+servidor— y que la clave de servicio puede borrarla. Deja el bucket como lo
+encontró.
 
 
 ## Migue con modelo (OpenRouter)
