@@ -51,12 +51,18 @@ function umbral(ancho: number): number {
   return Math.min(140, Math.max(56, ancho * 0.14));
 }
 
-/** El dedo es de otro: hay un diálogo abierto (el chat de Migue), o el gesto
- *  arrancó dentro de algo que ya se desplaza solo en horizontal, como la barra
- *  de secciones. */
+/** El dedo es de otro: hay un diálogo abierto (el chat de Migue) o una capa
+ *  flotante propia (el selector de ediciones de la barra), o el gesto arrancó
+ *  dentro de algo que ya se desplaza solo en horizontal, como la barra de
+ *  secciones.
+ *
+ *  `[data-capa-flotante]` y no sólo `[role='dialog']`: un menú desplegable no
+ *  es un diálogo —ponerle ese rol para que lo ataje esta guardia sería mentirle
+ *  al lector de pantalla— pero el dedo que está adentro tampoco es del papel.
+ *  Sin esto, deslizar sobre la lista de números pasaba de página por debajo. */
 function esZonaAjena(objetivo: EventTarget | null): boolean {
   if (!(objetivo instanceof Element)) return false;
-  if (objetivo.closest("[role='dialog']")) return true;
+  if (objetivo.closest("[role='dialog'], [data-capa-flotante]")) return true;
 
   for (let n: Element | null = objetivo; n; n = n.parentElement) {
     const { overflowX } = getComputedStyle(n);

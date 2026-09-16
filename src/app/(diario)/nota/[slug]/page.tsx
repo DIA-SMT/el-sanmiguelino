@@ -26,7 +26,8 @@ import {
   getResumenEdicion,
 } from "@/lib/repos/edicion";
 import { seccionesDeEdicion, slugificarSeccion } from "@/lib/data/secciones";
-import { numeroDeNota } from "@/lib/data/paginas";
+import { numeroDeNota, paginasDeEdicion } from "@/lib/data/paginas";
+import { FoliadoDeLaPagina } from "@/components/foliado-visible";
 import { getUsuario } from "@/lib/auth/session";
 import type { BloqueNota } from "@/lib/types";
 
@@ -218,6 +219,55 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
       : (await getPublicadas()).find((e) => e.slug === nota.edicionSlug);
 
   /*
+   * La cabecera representa la edición DE LA NOTA, por lo mismo que el PDF y el
+   * foliado de acá arriba.
+   *
+   * Hace falta desde que la barra tiene identidad de número: de acá salen el
+   * mes que rotula el selector de ediciones, en qué fila cae el tilde, y a
+   * dónde apunta la pestaña "Notas". Con la edición en la calle, leyendo la
+   * página 4 de agosto la barra decía SEPTIEMBRE y "Notas" sacaba al lector de
+   * su propio número — el mismo callejón que la pestaña vino a cerrar.
+   *
+   * Las secciones, por lo mismo: se listan las de la edición de la nota, que es
+   * de donde sale `seccionActiva`. Calculadas sobre el índice de la calle, en
+   * el archivo nunca podían coincidir.
+   *
+   * El `?? edicion` cubre al administrador mirando una edición en foco todavía
+   * sin publicar: ahí `getPublicadas()` no la encuentra y la de la calle —que
+   * en vista previa ES la enfocada— es el dato correcto.
+   */
+  const edicionDeLaNota = suEdicion ?? edicion;
+  const seccionesDeLaNota = seccionesDeEdicion(indiceDeSuEdicion);
+  const esDeLaCalle = nota.edicionSlug === edicion.slug;
+
+  /*
+   * A dónde vuelve el enlace de arriba.
+   *
+   * A la portada si la nota es del número en curso, que es de donde se vino. En
+   * el archivo eso mandaba a la tapa de OTRO mes —la de la calle—, así que
+   * volver a la lista de la que se estaba leyendo no tenía enlace: ahora va al
+   * sumario de su propio número.
+   */
+  const volver = esDeLaCalle
+    ? { href: "/diario", texto: `Portada de ${edicionDeLaNota.mes}` }
+    : {
+        href: `/edicion/${nota.edicionSlug}`,
+        texto: `Sumario de ${edicionDeLaNota.mes}`,
+      };
+
+  /*
+   * El foliado de un número del ARCHIVO, para que se pueda recorrer con las
+   * flechas igual que el del mes.
+   *
+   * Sólo cuando no es la edición en la calle: esa ya se la sabe el mando, que
+   * la recibe del layout. Así la pantalla normal —que es casi todas— no lleva
+   * ni un byte de más. El porqué de este camino está en `foliado-visible.tsx`.
+   */
+  const foliadoDelArchivo = esDeLaCalle
+    ? null
+    : paginasDeEdicion(indiceDeSuEdicion, { enLaCalle: false });
+
+  /*
    * Una página del facsímil del impreso.
    *
    * El PDF es el de LA EDICIÓN DE LA NOTA, no el de la que está en la calle: en
@@ -255,12 +305,15 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
             numeroPagina={numeroPagina}
             edicionSlug={nota.edicionSlug}
           >
+            {foliadoDelArchivo && (
+              <FoliadoDeLaPagina paginas={foliadoDelArchivo} />
+            )}
             {/* Sin bandera ni folio: la hoja del PDF los trae impresos, y
                 dibujar los nuestros encima los mostraba dos veces. El foliado
                 nuestro sigue al pie, en el pasador de páginas. */}
             <Masthead
-              edicion={edicion}
-              secciones={seccionesDeEdicion(indice)}
+              edicion={edicionDeLaNota}
+              secciones={esDeLaCalle ? seccionesDeLaNota : []}
               usuario={usuario}
               seccionActiva={slugificarSeccion(nota.seccion)}
               pagina={numeroPagina}
@@ -270,7 +323,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
             <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
               <nav aria-label="Volver" className="mb-7">
                 <Link
-                  href="/diario"
+                  href={volver.href}
                   transitionTypes={["pagina-atras"]}
                   className="group inline-flex items-center gap-2 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3 transition-colors hover:text-accent"
                 >
@@ -278,7 +331,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                     className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-1"
                     aria-hidden="true"
                   />
-                  Portada de {edicion.mes}
+                  {volver.texto}
                 </Link>
               </nav>
 
@@ -312,9 +365,12 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
 
       <ViewTransition {...transicionPagina}>
         <HojaDiario numeroPagina={numeroPagina} edicionSlug={nota.edicionSlug}>
+          {foliadoDelArchivo && (
+            <FoliadoDeLaPagina paginas={foliadoDelArchivo} />
+          )}
           <Masthead
-            edicion={edicion}
-            secciones={seccionesDeEdicion(indice)}
+            edicion={edicionDeLaNota}
+            secciones={esDeLaCalle ? seccionesDeLaNota : []}
             usuario={usuario}
             seccionActiva={slugificarSeccion(nota.seccion)}
             pagina={numeroPagina}
@@ -323,7 +379,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
           <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
             <nav aria-label="Volver" className="mb-7">
               <Link
-                href="/diario"
+                href={volver.href}
                 transitionTypes={["pagina-atras"]}
                 className="group inline-flex items-center gap-2 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3 transition-colors hover:text-accent"
               >
@@ -331,7 +387,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                   className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-1"
                   aria-hidden="true"
                 />
-                Portada de {edicion.mes}
+                {volver.texto}
               </Link>
             </nav>
 
@@ -349,7 +405,11 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                   <span aria-hidden="true" className="text-line">
                     ·
                   </span>
-                  <p className="meta">{edicion.mes}</p>
+                  {/* El mes de SU edición. Decía el de la que está en la calle,
+                      así que una nota de agosto leída en septiembre aparecía
+                      fechada en septiembre: no es un detalle de navegación, es
+                      un dato mal puesto arriba del texto. */}
+                  <p className="meta">{edicionDeLaNota.mes}</p>
                   <span aria-hidden="true" className="text-line">
                     ·
                   </span>

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { MandoPaginas } from "@/components/mando-paginas";
+import { ProveedorFoliado } from "@/components/foliado-visible";
 import { MigueChat } from "@/components/migue/migue-chat";
 import { usuarioActual } from "@/lib/auth/dal";
 import { edicionEnFoco } from "@/lib/auth/vista-previa";
@@ -80,8 +81,14 @@ export default async function DiarioLayout({ children }: LayoutProps<"/">) {
        * ancho que pueda para el texto. Es el mínimo que hace visible el canto.
        */}
       <div className="escritorio flex flex-1 flex-col px-2.5 py-3 sm:px-6 sm:py-8 lg:py-10">
-        {children}
-        <MandoPaginas paginas={paginasDeEdicion(await getIndice())} />
+        {/* El proveedor envuelve a los dos: la página, que sabe de qué número
+            es lo que está mostrando, y el mando, que necesita saberlo. El
+            porqué de este camino —y no de pasarle la ruta al layout— está en
+            `foliado-visible.tsx`. */}
+        <ProveedorFoliado>
+          {children}
+          <MandoPaginas paginas={paginasDeEdicion(await getIndice())} />
+        </ProveedorFoliado>
         <MigueChat />
       </div>
     </>

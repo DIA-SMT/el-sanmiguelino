@@ -146,9 +146,26 @@ export default async function Portada() {
         {/*
          * La tapa lleva UNA sola nota, como el impreso: bandera, titular,
          * bajada, foto a todo el ancho y el cuerpo en columnas. No hay
-         * segunda nota compitiendo ni grilla de fichas al pie — al resto de
-         * la edición se llega pasando página, que es el gesto que el diario
-         * ya tiene, y por la barra de secciones de la bandera.
+         * segunda nota compitiendo ni grilla de fichas al pie.
+         *
+         * Al resto de la edición se llega pasando página —el gesto que el
+         * diario ya tiene— y por la pestaña **"Notas"** de la bandera, que
+         * lleva al sumario del número.
+         *
+         * Esa pestaña no estaba, y su falta es lo que rompió esto. Acá decía
+         * que se llegaba "por la barra de secciones", y era cierto de casualidad:
+         * la barra mostraba una pestaña con el NOMBRE DE LA SECCIÓN de las
+         * notas, que en un número digitalizado sale de un campo de texto que
+         * un redactor escribe a mano. Decía "Edición impresa", o "Edición
+         * septiembre" cuando alguien lo editaba, y se leía como "acá está el
+         * PDF escaneado". Un lector reportó que no encontraba las notas, y
+         * tenía razón: el índice existía y no se llamaba índice. Peor todavía,
+         * un número con `tema` no mostraba ninguna pestaña de sección, así que
+         * agosto quedó publicado sin ningún camino a sus ocho páginas.
+         *
+         * Moraleja, por si vuelve a tentar: el paso de página hay que
+         * descubrirlo. Dos flechas al costado no dicen que del otro lado haya
+         * ocho notas.
          */}
         <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
           {!principal ? (
@@ -177,8 +194,9 @@ export default async function Portada() {
                   {principal.bajada}
                 </p>
                 {/* Treinta segundos: qué edición es, de qué se trata y la nota
-                    principal. El sumario de las ocho notas son dos minutos y es
-                    otro control, para otra vuelta. */}
+                    principal. Escuchar las ocho notas seguidas son dos minutos
+                    y sigue siendo otro control, para otra vuelta; el sumario
+                    LEÍDO ya existe y está en la pestaña "Notas". */}
                 <div className="mt-5">
                   <BotonEscuchar
                     texto={textoDeResumenDeTapa(edicion, principal)}
@@ -251,17 +269,33 @@ export default async function Portada() {
                 ))}
               </div>
 
-              {/* El remate del impreso: la nota sigue en su página. */}
-              <p className="mt-7 border-t border-hairline pt-3.5 font-serif text-[0.9rem] italic text-ink-3">
-                Sigue en la página{" "}
-                <Link
-                  href={`/nota/${principal.slug}`}
-                  transitionTypes={["pagina-adelante"]}
-                  className="enlace not-italic tabular-nums"
-                >
-                  {paginaPrincipal}
-                </Link>
-              </p>
+              {/*
+                El remate del impreso: la nota sigue en su página.
+
+                Sólo si de verdad sigue en otra. En un número DIGITALIZADO la
+                tapa ES la página 1 y se muestra entera, así que esto decía
+                "Sigue en la página 1" y enlazaba a lo mismo que el lector
+                estaba terminando de leer. `paginaPrincipal === 1` pasa
+                exactamente en ese caso: en una edición de notas escritas la
+                tapa es una vidriera y la nota empieza en la 2 (ver
+                `paginas.ts`).
+
+                No se pierde el camino a `/nota/…`, que es donde se comenta: el
+                titular de la tapa ya es ese enlace, y las flechas llevan a la
+                página siguiente.
+              */}
+              {paginaPrincipal > 1 && (
+                <p className="mt-7 border-t border-hairline pt-3.5 font-serif text-[0.9rem] italic text-ink-3">
+                  Sigue en la página{" "}
+                  <Link
+                    href={`/nota/${principal.slug}`}
+                    transitionTypes={["pagina-adelante"]}
+                    className="enlace not-italic tabular-nums"
+                  >
+                    {paginaPrincipal}
+                  </Link>
+                </p>
+              )}
             </>
           )}
         </main>

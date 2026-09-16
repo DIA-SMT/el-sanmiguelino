@@ -5,6 +5,19 @@ export interface PaginaEdicion {
   numero: number;
   href: string;
   titulo: string;
+  /**
+   * La otra dirección de esta misma página, si tiene dos.
+   *
+   * Sólo la tapa de un número digitalizado: se sirve en `/diario`, que es la
+   * portada, y también vive en su propia `/nota/…`, que es a donde llevan el
+   * titular de la tapa y el "Pág. 1" del sumario, y donde se la puede comentar.
+   *
+   * Existe porque el mando de paso de página ubica la pantalla comparando
+   * direcciones: sin esto, entrar a la tapa por su nota daba una pantalla del
+   * diario SIN flechas, sin teclado y sin gesto. `href` sigue siendo la
+   * canónica —es a donde apunta la flecha de "anterior" desde la página 2—.
+   */
+  alias?: string;
 }
 
 /**
@@ -42,13 +55,38 @@ function esDigitalizada(notas: NotaResumen[]): boolean {
  * una vidriera —muestra la nota principal para que se entre a leerla— y no la
  * nota misma.
  */
-export function paginasDeEdicion(notas: NotaResumen[]): PaginaEdicion[] {
+export function paginasDeEdicion(
+  notas: NotaResumen[],
+  /**
+   * ¿Es el número que el diario está sirviendo?
+   *
+   * Sólo entonces existe `/diario`, que es la portada. **En el archivo no hay
+   * portada**: la tapa se lee en su propia nota y la puerta al número es su
+   * sumario. Pasarle `false` a un número viejo es lo que permite recorrerlo
+   * con las flechas igual que al del mes, que antes no se podía: el foliado
+   * era siempre el de la calle, ninguna nota del archivo figuraba en él y el
+   * mando se apagaba entero.
+   */
+  { enLaCalle = true }: { enLaCalle?: boolean } = {},
+): PaginaEdicion[] {
+  if (!enLaCalle) {
+    // Todas las páginas por su nota, con el número que les toca según la clase
+    // de edición. `numeroDeNota()` ya sabe cuál es la regla de cada una.
+    return notas.map((nota) => ({
+      numero: numeroDeNota(notas, nota.slug),
+      href: `/nota/${nota.slug}`,
+      titulo: nota.titulo,
+    }));
+  }
+
   if (esDigitalizada(notas)) {
     return notas.map((nota, i) => ({
       numero: i + 1,
       // La tapa se sirve en `/diario`, que es la portada del diario y la
-      // página 1 del impreso al mismo tiempo.
+      // página 1 del impreso al mismo tiempo. Y además vive en su nota: por
+      // eso lleva `alias`, o ahí no habría con qué pasar de página.
       href: i === 0 ? "/diario" : `/nota/${nota.slug}`,
+      ...(i === 0 ? { alias: `/nota/${nota.slug}` } : {}),
       titulo: nota.titulo,
     }));
   }
@@ -61,6 +99,20 @@ export function paginasDeEdicion(notas: NotaResumen[]): PaginaEdicion[] {
       titulo: nota.titulo,
     })),
   ];
+}
+
+/**
+ * En qué posición del foliado cae una dirección. `-1` si no es de este número.
+ *
+ * Mira las DOS direcciones de una página, que es lo que distingue a la tapa.
+ */
+export function posicionEnFoliado(
+  paginas: PaginaEdicion[],
+  pathname: string,
+): number {
+  return paginas.findIndex(
+    (p) => p.href === pathname || p.alias === pathname,
+  );
 }
 
 /**
@@ -88,24 +140,11 @@ export function notaEnPagina(
   return notas[i] ?? null;
 }
 
-/** Página actual a partir del pathname; null si la ruta no es una página
- *  numerada (por ejemplo, el listado de una sección). */
-export function paginaActual(
-  notas: NotaResumen[],
-  pathname: string,
-): PaginaEdicion | null {
-  const paginas = paginasDeEdicion(notas);
-  const directa = paginas.find((p) => p.href === pathname);
-  if (directa) return directa;
-
-  /*
-   * La tapa de un número digitalizado tiene DOS direcciones: `/diario`, que es
-   * la portada, y su propia `/nota/…`, a la que se llega desde el titular de la
-   * portada y que es donde se puede comentar. Las dos son la página 1, y sin
-   * esto la segunda se quedaba sin número al pie.
-   */
-  if (esDigitalizada(notas) && notas[0] && pathname === `/nota/${notas[0].slug}`) {
-    return paginas[0] ?? null;
-  }
-  return null;
-}
+/*
+ * Acá vivía `paginaActual(notas, pathname)`, que hacía lo mismo que
+ * `posicionEnFoliado()` pero armando el foliado por su cuenta. **No la llamaba
+ * nadie**, y mientras tanto el mando de paso de página comparaba direcciones a
+ * mano y se perdía la segunda dirección de la tapa: entrar a la tapa por su
+ * nota daba una pantalla sin flechas. La regla que ella tenía escrita ahora
+ * vive en el campo `alias` de `PaginaEdicion`, que es donde se puede usar.
+ */

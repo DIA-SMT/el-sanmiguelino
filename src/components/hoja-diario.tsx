@@ -29,12 +29,26 @@ export async function HojaDiario({
   // archivo— alcanza con el índice que ya pidió la página. Pedirlo "de" esa
   // edición sería la misma lista por otra consulta.
   const enLaCalle = await getResumenEdicion();
+  const esDeLaCalle = !edicionSlug || edicionSlug === enLaCalle.slug;
   const paginas = paginasDeEdicion(
-    !edicionSlug || edicionSlug === enLaCalle.slug
-      ? await getIndice()
-      : await getIndiceDe(edicionSlug),
+    esDeLaCalle ? await getIndice() : await getIndiceDe(edicionSlug),
+    // En el archivo no hay portada: `/diario` es del número del mes. Sin esto
+    // el pasador del pie ofrecía "anterior" apuntando a la tapa de OTRA
+    // edición.
+    { enLaCalle: esDeLaCalle },
   );
-  const indice = numeroPagina === null ? -1 : numeroPagina - 1;
+  /*
+   * La posición sale de BUSCAR el folio, no de restarle uno.
+   *
+   * `numeroPagina - 1` daba por sentado que el foliado arranca en 1 y va
+   * corrido, que es cierto en un número digitalizado y falso en uno de notas
+   * escritas —ahí la primera nota es la página 2— y falso también en el
+   * archivo, donde la portada no está en la lista.
+   */
+  const indice =
+    numeroPagina === null
+      ? -1
+      : paginas.findIndex((p) => p.numero === numeroPagina);
 
   return (
     <div className={cn("hoja grano mx-auto w-full max-w-6xl", className)}>
@@ -46,7 +60,10 @@ export async function HojaDiario({
             anterior={paginas[indice - 1] ?? null}
             siguiente={paginas[indice + 1] ?? null}
             numero={paginas[indice].numero}
-            total={paginas.length}
+            /* El total es el folio más ALTO, no cuántas filas hay: en una
+               edición de notas escritas la portada es la página 1 y no está en
+               esta lista cuando se lee del archivo. */
+            total={paginas[paginas.length - 1]?.numero ?? paginas.length}
           />
         )}
       </div>

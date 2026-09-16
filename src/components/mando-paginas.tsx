@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { PaginaEdicion } from "@/lib/data/paginas";
+import { posicionEnFoliado, type PaginaEdicion } from "@/lib/data/paginas";
+import { useFoliadoExtra } from "@/components/foliado-visible";
 import { usePasoPapel } from "@/lib/papel/usar-paso-papel";
 import {
   useDeslizarPaginas,
@@ -57,11 +58,28 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
   const pistaAtras = useRef<HTMLDivElement>(null);
   const pistaAdelante = useRef<HTMLDivElement>(null);
 
-  const indice = paginas.findIndex((p) => p.href === pathname);
-  // Fuera de las páginas numeradas (el listado de una sección) no hay mando.
+  /*
+   * De qué número es esta pantalla.
+   *
+   * Primero el foliado que baja del layout, que es el de la edición en la
+   * calle: es el caso normal y el único que viene ya armado en el HTML del
+   * servidor. Si la dirección no figura ahí, se prueba con el que haya
+   * registrado la página, que es como llega un número del ARCHIVO — ver
+   * `foliado-visible.tsx`.
+   *
+   * `posicionEnFoliado()` y no un `findIndex` por `href`: la tapa de un número
+   * digitalizado tiene dos direcciones y entrar por la segunda dejaba la
+   * pantalla sin mando.
+   */
+  const extra = useFoliadoExtra();
+  const enLaCalle = posicionEnFoliado(paginas, pathname);
+  const foliado = enLaCalle >= 0 ? paginas : extra;
+  const indice = enLaCalle >= 0 ? enLaCalle : posicionEnFoliado(extra, pathname);
+  // Fuera de las páginas numeradas (el listado de una sección, el sumario) no
+  // hay mando.
   const enPagina = indice >= 0;
-  const anterior = enPagina ? paginas[indice - 1] ?? null : null;
-  const siguiente = enPagina ? paginas[indice + 1] ?? null : null;
+  const anterior = enPagina ? foliado[indice - 1] ?? null : null;
+  const siguiente = enPagina ? foliado[indice + 1] ?? null : null;
 
   const hayDestino = useCallback(
     (direccion: DireccionPagina) =>
