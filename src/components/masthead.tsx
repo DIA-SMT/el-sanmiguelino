@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
 import { SeccionesNav } from "@/components/secciones-nav";
 import { esAdmin } from "@/lib/auth/dal";
+import { getPublicadas, getResumenEdicion } from "@/lib/repos/edicion";
 import type { SeccionInfo } from "@/lib/data/secciones";
 import type { EdicionResumen, Usuario } from "@/lib/types";
 
@@ -33,6 +34,12 @@ import type { EdicionResumen, Usuario } from "@/lib/types";
  * que olvidarse. `esAdmin()` está memoizado con `cache()`, así que si el layout
  * ya lo resolvió en este mismo render, esto no cuesta nada.
  *
+ * Por lo mismo se pide acá la lista de números publicados, que es lo que llena
+ * el selector de ediciones de la barra: son cinco pantallas montando esta
+ * cabecera y una que se olvide de pasarla dejaría al lector sin poder cambiar
+ * de número, otra vez sin ningún error a la vista. `getPublicadas()` también
+ * está memoizada.
+ *
  * Que el botón no se dibuje no es lo que protege el panel: `/admin` responde 404
  * por su cuenta a quien no corresponde. Esto es para no anunciar una puerta que
  * la mayoría no puede abrir.
@@ -45,6 +52,9 @@ export async function Masthead({
   pagina,
   facsimil = false,
 }: {
+  /** El número que esta cabecera representa. En las pantallas del diario es
+   *  el que está en la calle; en el sumario de un número del archivo, ése. De
+   *  acá sale a dónde apunta "Notas" y qué mes rotula el selector. */
   edicion: EdicionResumen;
   secciones: SeccionInfo[];
   usuario: Usuario;
@@ -71,7 +81,18 @@ export async function Masthead({
   // El folio interior es lo único que `pagina` decide, así que en un facsímil
   // —donde no se dibuja— la distinción tapa/interior no aplica.
   const esInterior = typeof pagina === "number";
-  const puedeAdministrar = await esAdmin();
+  const [puedeAdministrar, ediciones, enLaCalle] = await Promise.all([
+    esAdmin(),
+    getPublicadas(),
+    getResumenEdicion(),
+  ]);
+  /* Si esta cabecera es la del número que el diario está sirviendo. De eso
+     depende que exista la pestaña "Portada": en el archivo no hay portada —la
+     tapa se lee en su propia nota y la puerta al número es su sumario—, así que
+     un enlace fijo a `/diario` sacaba al lector de agosto para dejarlo en la
+     tapa de septiembre, sin avisarle. Es la misma regla que ya aplican el
+     pasador del pie y el "Volver" de una nota. */
+  const esLaDeLaCalle = edicion.slug === enLaCalle.slug;
   // El folio va al borde EXTERIOR de la hoja, como en cualquier impreso: en
   // una página par —que en un pliego cae a la izquierda— el exterior es la
   // izquierda; en una impar, la derecha.
@@ -172,11 +193,22 @@ export async function Masthead({
         )}
       </header>
 
-      {/* Barra de secciones */}
+      {/* El índice del diario */}
       <SeccionesNav
         secciones={secciones}
         seccionActiva={seccionActiva}
         tema={edicion.tema}
+        esLaDeLaCalle={esLaDeLaCalle}
+        edicion={{
+          slug: edicion.slug,
+          mes: edicion.mes,
+          numero: edicion.numero,
+        }}
+        ediciones={ediciones.map((e) => ({
+          slug: e.slug,
+          mes: e.mes,
+          numero: e.numero,
+        }))}
       />
     </>
   );
