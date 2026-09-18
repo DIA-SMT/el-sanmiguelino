@@ -23,7 +23,12 @@ export async function SiteFooter() {
             Municipalidad de San Miguel de Tucumán · 9 de Julio 570, San Miguel
             de Tucumán (4000), Tucumán.
           </p>
-          <p className="meta mt-2">Publicación gratuita, prohibida su venta</p>
+          {/* Acá iba "Publicación gratuita, prohibida su venta". Se sacó: esa
+              leyenda es del EJEMPLAR IMPRESO —lo que no se puede vender es el
+              papel— y en la web no dice nada. El sitio no se vende ni se podría.
+
+              Si alguna vez hay que mostrarla, el lugar es donde se ofrece el
+              papel, no el pie del sitio. */}
 
           {/* Anotarse para recibirlo impreso. Va en el pie y no en la bandera
               porque no es navegación: es algo que se hace una vez, y el pie es
