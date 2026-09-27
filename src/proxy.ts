@@ -3,8 +3,10 @@ import { SESSION_COOKIE, cookieMuerta } from "@/lib/auth/cookie";
 import { AUTH_CIDITUC_OBLIGATORIA } from "@/lib/auth/config";
 
 /**
- * Gate de acceso con Cidituc. Públicas: la landing (/), /login y las rutas de
- * auth; todo el resto del diario requiere sesión.
+ * Gate de acceso con Cidituc. Públicas: la landing (/), /login, las rutas de
+ * auth y la página de aviso sin conexión (/sin-conexion); el manifest y el
+ * service worker ni pasan por acá (ver el `matcher`). Todo el resto del diario
+ * requiere sesión.
  *
  * El proxy hace un chequeo *estructural* del token (versión y vencimiento), no
  * criptográfico: la firma se verifica del lado servidor en cada página y API.
@@ -26,7 +28,15 @@ export function proxy(request: NextRequest) {
   // el ingreso no podría completarse nunca.
   const esAuth =
     pathname.startsWith("/api/auth/") || pathname.startsWith("/auth/cidituc/");
-  const esPublica = pathname === "/" || pathname === "/login" || esAuth;
+  // `/sin-conexion` la pide el service worker al instalarse, que puede ser en la
+  // landing y sin sesión. Detrás del gate el pedido terminaría en /login, que
+  // no trae la marca de página guardable, y sin sesión el worker no llegaría a
+  // instalarse nunca.
+  const esPublica =
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/sin-conexion" ||
+    esAuth;
 
   // Las API responden su propio 401 (un redirect HTML no le sirve a un fetch).
   // Antes /api/* quedaba enteramente fuera del gate: cualquiera sin sesión
@@ -71,7 +81,12 @@ export const config = {
   // El `$` al final del grupo de extensiones no es decorativo: sin él, la
   // alternancia se ancla en cualquier parte de la ruta y `/admin/x.png/borrar`
   // queda exento del proxy. Con `$`, sólo se exime lo que TERMINA en imagen.
+  //
+  // El manifest y el service worker van exentos por la misma razón que el
+  // favicon: el navegador los pide solo y, en el caso del manifest, sin cookies.
+  // Con el gate encima, el diario dejaba de ser instalable sin un solo error a
+  // la vista. Llevan `$` para no eximir nada que sólo empiece igual.
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest$|sw\\.js$|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)",
   ],
 };

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOut } from "lucide-react";
 import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
+import { olvidarPaginasGuardadas } from "@/lib/pwa";
 import type { Usuario } from "@/lib/types";
 
 export function UserChip({
@@ -37,6 +38,9 @@ export function UserChip({
     setSaliendo(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
+      // Después del logout y no antes: si el POST falla, la sesión sigue
+      // abierta y las páginas guardadas siguen siendo de esta persona.
+      await olvidarPaginasGuardadas();
       router.push("/");
       router.refresh();
     } catch {
