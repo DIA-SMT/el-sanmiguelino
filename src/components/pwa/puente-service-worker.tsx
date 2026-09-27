@@ -23,8 +23,10 @@ const WORKER_ACTIVO =
  *    (`VERSION_SITIO`, de next.config.ts), que es lo que hace que cada deploy
  *    instale un worker nuevo y tire las cachés del anterior.
  * 2. **Le avisa qué ruta está en pantalla**, en cada cambio de ruta y cada vez
- *    que un worker nuevo toma el control. La navegación interna de Next no pasa
- *    por el worker, y sin este aviso sólo se guardaba la página por la que se
+ *    que un worker nuevo toma el control. La navegación interna de Next son
+ *    pedidos RSC: le llegan al worker, pero él los deja ir a la red sin
+ *    tocarlos, a propósito (el protocolo es interno de Next; ver
+ *    `public/sw.js`). Sin este aviso sólo se guardaba la página por la que se
  *    entraba a la aplicación.
  *
  * En desarrollo, sin la variable, da de baja cualquier worker que haya quedado

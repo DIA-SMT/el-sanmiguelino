@@ -16,7 +16,9 @@ export const metadata: Metadata = {
  * es recargar, y recargar vuelve a pedir esa nota y no esta página.
  *
  * Es pública en el proxy: el worker la pide al instalarse, que puede ser en la
- * landing y sin sesión. Si pasara por el gate se guardaría el /login como aviso.
+ * landing y sin sesión. Si pasara por el gate, el pedido terminaría en el
+ * /login, que no trae la marca (ver abajo), y sin sesión el worker no llegaría a
+ * instalarse nunca.
  *
  * No dice nada de quién está leyendo ni de la edición: es la misma para todos y
  * queda guardada en el teléfono aunque se cierre la sesión.

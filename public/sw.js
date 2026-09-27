@@ -87,19 +87,25 @@
  *   caso, y `navegar()` lo ve además cuando es una navegación completa, por si
  *   la página no llega a hidratar.
  *
- * Una copia que se empezó a guardar antes del borrado no se escribe después
+ * Una copia que se empezó a pedir antes del borrado no se escribe después
  * (ver `generacion`).
  *
  * El borrado lo hace siempre este archivo y no la página, aunque la página
  * también ve las cachés: así los nombres y la regla de qué se conserva viven en
  * un solo lugar.
  *
- * ## Qué se descarta cuando se llena
+ * ## Dos horas en cada copia
  *
- * Cada copia lleva en `Guardada-En` la hora en que se guardó o se usó por
- * última vez, y al pasar el tope se va la más vieja. No se usa el orden de
- * `cache.keys()`: en Chrome volver a guardar una URL la manda al final, pero
- * en Safari la deja donde estaba.
+ * - `Usada-En`: la última vez que se mostró. Decide qué se descarta al pasar
+ *   el tope: se va la usada hace más tiempo. No se usa el orden de
+ *   `cache.keys()`, porque en Chrome volver a guardar una URL la manda al
+ *   final pero en Safari la deja donde estaba.
+ * - `Bajada-En`: cuándo se bajó del servidor, sólo en las páginas. Decide si
+ *   hay que volver a bajarla (`REFRESCO_MS`).
+ *
+ * Son dos y no una porque miden cosas opuestas: una página que se lee todos
+ * los días está siempre recién usada, y con una sola hora nunca se volvía a
+ * bajar, por vieja que fuera.
  */
 
 const VERSION =
@@ -131,7 +137,8 @@ const TOPE_PAGINAS = 40;
 const TOPE_IMAGENES = 150;
 
 /** Cada cuánto se vuelve a bajar una página que ya está guardada cuando se la
- *  muestra por navegación interna. Sin esto, la copia de /diario podía quedar
+ *  muestra por navegación interna, contado desde `Bajada-En`. Sin esto, la
+ *  copia de /diario podía quedar
  *  en la edición anterior si el lector nunca volvía a abrir la aplicación de
  *  cero, y una nota corregida desde el panel se leería sin conexión con el
  *  error. Seis horas es una bajada por página y por turno de lectura. */
@@ -152,8 +159,13 @@ const RECURSO_DE_BUILD = /\/_next\/static\/[^"'\s\\)]+\.[a-z0-9]+(?:\?[^"'\s\\)]
  *  esto la misma página se bajaba dos veces. */
 const enCurso = new Set();
 
-/** Sube cada vez que se borran las páginas. Una copia que se empezó a guardar
- *  antes del borrado ya no se escribe: sería de quien acaba de salir. */
+/** Sube cada vez que se borran las páginas. Una copia que se empezó a pedir
+ *  antes del borrado ya no se escribe: sería de quien acaba de salir.
+ *
+ *  Se toma cuando el guardado EMPIEZA, antes de pedir la página, y no cuando
+ *  llega la respuesta: el pedido salió con la cookie de quien estaba adentro,
+ *  y el servidor tarda en contestar lo suficiente como para que alguien toque
+ *  "Cerrar sesión" en el medio. */
 let generacion = 0;
 
 self.addEventListener("install", (event) => {
@@ -218,6 +230,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 async function navegar(event, url) {
+  const inicio = generacion;
   try {
     const respuesta =
       (await event.preloadResponse) || (await fetch(event.request));
@@ -230,7 +243,9 @@ async function navegar(event, url) {
       event.waitUntil(olvidarPaginas());
     } else if (SE_GUARDA.test(url.pathname) && esGuardable(respuesta)) {
       const copia = respuesta.clone();
-      event.waitUntil(guardarUnaVez(clavePagina(url), async () => copia));
+      event.waitUntil(
+        guardarUnaVez(clavePagina(url), async () => copia, inicio),
+      );
     }
     return respuesta;
   } catch {
@@ -238,7 +253,7 @@ async function navegar(event, url) {
     const clave = clavePagina(url);
     const guardada = SE_GUARDA.test(url.pathname) && (await cache.match(clave));
     if (guardada) {
-      event.waitUntil(tocar(cache, clave, guardada.clone()));
+      event.waitUntil(tocar(cache, clave, guardada.clone(), inicio));
       return guardada;
     }
     return (await cache.match(SIN_CONEXION)) || Response.error();
@@ -254,16 +269,21 @@ async function mostrando(ruta) {
   if (url.pathname === "/login") return olvidarPaginas();
   if (!SE_GUARDA.test(url.pathname)) return;
 
+  const inicio = generacion;
   const clave = clavePagina(url);
   const cache = await caches.open(PAGINAS);
   const guardada = await cache.match(clave);
-  if (guardada && Date.now() - sello(guardada) < REFRESCO_MS) {
-    await tocar(cache, clave, guardada);
+  if (guardada && Date.now() - bajada(guardada) < REFRESCO_MS) {
+    await tocar(cache, clave, guardada, inicio);
     return;
   }
   // Sin encabezados RSC, el servidor contesta el documento completo. Si la
   // sesión venció, el proxy redirige a /login y `esGuardable` lo descarta.
-  await guardarUnaVez(clave, () => fetch(clave, { credentials: "same-origin" }));
+  await guardarUnaVez(
+    clave,
+    () => fetch(clave, { credentials: "same-origin" }),
+    inicio,
+  );
 }
 
 async function primeroLaCache(event, nombre, tope) {
@@ -294,13 +314,13 @@ async function primeroLaCache(event, nombre, tope) {
 
 /** Guarda la página `clave` con la respuesta que traiga `obtener()`, salvo que
  *  ya se esté guardando. Si no hay red o la respuesta no sirve, queda la copia
- *  que había. */
-async function guardarUnaVez(clave, obtener) {
+ *  que había. `inicio` es la `generacion` de cuando se empezó a pedir. */
+async function guardarUnaVez(clave, obtener, inicio) {
   if (enCurso.has(clave)) return;
   enCurso.add(clave);
   try {
     const respuesta = await obtener();
-    if (esGuardable(respuesta)) await guardarPagina(clave, respuesta);
+    if (esGuardable(respuesta)) await guardarPagina(clave, respuesta, inicio);
   } catch {
     // Sin red, o el servidor no contestó: no hay nada nuevo que guardar.
   } finally {
@@ -318,10 +338,12 @@ async function guardarUnaVez(clave, obtener) {
  * deja algo sin hidratar y la nota se lee igual.
  *
  * Se guarda en una respuesta nueva y no en la que llegó, porque el cuerpo ya
- * se leyó para buscar la marca y los recursos, y para sellarla con la hora.
+ * se leyó para buscar la marca y los recursos, y para sellarla con las horas.
+ *
+ * `inicio` es la `generacion` de cuando se empezó a pedir la página. Por
+ * defecto, la de ahora: sirve para la página de aviso, que no es de nadie.
  */
-async function guardarPagina(clave, respuesta) {
-  const inicio = generacion;
+async function guardarPagina(clave, respuesta, inicio = generacion) {
   const html = await respuesta.text();
   if (!html.includes(MARCA)) return false;
 
@@ -346,12 +368,14 @@ async function guardarPagina(clave, respuesta) {
 
   const paginas = await caches.open(PAGINAS);
   if (generacion !== inicio) return false;
+  const ahora = String(Date.now());
   await paginas.put(
     clave,
     new Response(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Guardada-En": String(Date.now()),
+        "Bajada-En": ahora,
+        "Usada-En": ahora,
       },
     }),
   );
@@ -369,9 +393,9 @@ async function recortar(nombre, tope, conservar) {
   const candidatas = await Promise.all(
     claves
       .filter((c) => new URL(c.url).pathname !== conservar)
-      .map(async (c) => ({ clave: c, sello: sello(await cache.match(c)) })),
+      .map(async (c) => ({ clave: c, usada: usada(await cache.match(c)) })),
   );
-  candidatas.sort((a, b) => a.sello - b.sello);
+  candidatas.sort((a, b) => a.usada - b.usada);
   await Promise.all(
     candidatas.slice(0, sobran).map(({ clave }) => cache.delete(clave)),
   );
@@ -419,17 +443,23 @@ async function otraMedida(cache, direccion) {
   return mejor && cache.match(mejor);
 }
 
-/** Vuelve a sellar una copia con la hora de ahora, si la que tiene es de hace
- *  más de `TOQUE_MS`. Recibe una respuesta que puede consumir. */
-async function tocar(cache, clave, respuesta) {
-  if (Date.now() - sello(respuesta) < TOQUE_MS) return;
+/** Pone `Usada-En` en la hora de ahora, si la que tiene es de hace más de
+ *  `TOQUE_MS`. Recibe una respuesta que puede consumir.
+ *
+ *  Con `inicio` (en las páginas) no escribe si hubo un borrado desde entonces:
+ *  sin esto, una página que se estaba mostrando justo al cerrar sesión volvía
+ *  a aparecer guardada. Las fotos no lo llevan: no son de nadie. */
+async function tocar(cache, clave, respuesta, inicio) {
+  if (Date.now() - usada(respuesta) < TOQUE_MS) return;
+  if (inicio !== undefined && generacion !== inicio) return;
   await cache.put(clave, sellada(respuesta));
 }
 
-/** La misma respuesta con `Guardada-En` en la hora de ahora. */
+/** La misma respuesta con `Usada-En` en la hora de ahora. `Bajada-En`, si la
+ *  tiene, pasa igual. */
 function sellada(respuesta) {
   const encabezados = new Headers(respuesta.headers);
-  encabezados.set("Guardada-En", String(Date.now()));
+  encabezados.set("Usada-En", String(Date.now()));
   return new Response(respuesta.body, {
     status: respuesta.status,
     statusText: respuesta.statusText,
@@ -437,10 +467,16 @@ function sellada(respuesta) {
   });
 }
 
-/** Cuándo se guardó o se usó por última vez. Lo que no tiene sello —o ya no
- *  está— cuenta como lo más viejo. */
-function sello(respuesta) {
-  return Number(respuesta?.headers.get("Guardada-En")) || 0;
+/** Cuándo se mostró por última vez. Lo que no tiene hora —o ya no está—
+ *  cuenta como lo más viejo, y es lo primero que se descarta. */
+function usada(respuesta) {
+  return Number(respuesta?.headers.get("Usada-En")) || 0;
+}
+
+/** Cuándo se bajó del servidor. Sin hora cuenta como viejísima, así que se
+ *  vuelve a bajar. */
+function bajada(respuesta) {
+  return Number(respuesta?.headers.get("Bajada-En")) || 0;
 }
 
 /** Una copia se guarda sólo de una respuesta entera y propia: ni una

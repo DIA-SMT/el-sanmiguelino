@@ -29,9 +29,10 @@ export async function olvidarPaginasGuardadas(): Promise<void> {
 
 /**
  * Le dice al worker qué ruta está en pantalla. Con eso guarda las páginas que
- * se abren por navegación interna, que para el navegador no son navegaciones y
- * el worker no ve pasar; y si la ruta es /login, borra lo guardado, porque
- * /login sólo se dibuja sin sesión. El porqué completo está en `public/sw.js`.
+ * se abren por navegación interna, que para el navegador no son navegaciones
+ * sino pedidos RSC, y el worker los deja pasar sin guardarlos a propósito; y si
+ * la ruta es /login, borra lo guardado, porque /login sólo se dibuja sin
+ * sesión. El porqué completo está en `public/sw.js`.
  */
 export async function avisarRutaMostrada(ruta: string): Promise<void> {
   (await worker())?.postMessage({ tipo: "mostrando", ruta });

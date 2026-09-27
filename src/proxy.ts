@@ -29,7 +29,9 @@ export function proxy(request: NextRequest) {
   const esAuth =
     pathname.startsWith("/api/auth/") || pathname.startsWith("/auth/cidituc/");
   // `/sin-conexion` la pide el service worker al instalarse, que puede ser en la
-  // landing y sin sesión: detrás del gate guardaría el /login como aviso.
+  // landing y sin sesión. Detrás del gate el pedido terminaría en /login, que
+  // no trae la marca de página guardable, y sin sesión el worker no llegaría a
+  // instalarse nunca.
   const esPublica =
     pathname === "/" ||
     pathname === "/login" ||
