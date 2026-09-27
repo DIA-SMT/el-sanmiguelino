@@ -31,8 +31,9 @@ Source Serif 4 / Inter.
 
 ## Aplicación instalable (PWA)
 
-El diario se puede instalar en el teléfono o la computadora y abre sin señal
-lo que ya se leyó con conexión.
+El diario se puede instalar en el teléfono o la computadora. Las páginas del
+diario que se abren con conexión quedan guardadas (hasta 40, se van las usadas
+hace más tiempo) y se pueden volver a abrir sin señal.
 
 | Pieza | Dónde |
 | --- | --- |
@@ -40,13 +41,15 @@ lo que ya se leyó con conexión.
 | Iconos de la app (192, 512 y "maskable" para Android) | `public/iconos/`, generados con `npm run marca:iconos` |
 | Service worker: páginas primero la red, chunks y fotos primero la caché | `public/sw.js` |
 | Aviso sin conexión | `src/app/sin-conexion/` |
-| Registro, sólo en producción | `src/components/pwa/registrar-service-worker.tsx` |
+| Registro, y aviso al worker de qué ruta se muestra | `src/components/pwa/puente-service-worker.tsx` |
+| Marca de "la página se dibujó entera, se puede guardar" | `data-sin-conexion` en `src/components/hoja-diario.tsx` |
 
 Las cachés van atadas a cada build (`VERSION_SITIO` en `next.config.ts`): un
 deploy nuevo borra lo guardado por el anterior. Las páginas guardadas se borran
-al cerrar sesión y cuando la sesión vence. El manifest, `/sw.js` y
-`/sin-conexion` quedan fuera del gate de Cidituc en `src/proxy.ts`. Sin eso el
-sitio deja de ser instalable y no aparece ningún error.
+al cerrar sesión y cada vez que se muestra /login, que es lo que ve quien tiene
+la sesión vencida. El manifest, `/sw.js` y `/sin-conexion` quedan fuera del
+gate de Cidituc en `src/proxy.ts`. Sin eso el sitio deja de ser instalable y no
+aparece ningún error.
 
 **Probarlo:** con `npm run build && npm run start`, o con `next dev` poniendo
 `NEXT_PUBLIC_PWA_EN_DESARROLLO=1`. Para simular la falta de señal, usar

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo_Black, Newsreader, Poppins } from "next/font/google";
 import { FondoPanorama } from "@/components/fondo-panorama";
-import { RegistrarServiceWorker } from "@/components/pwa/registrar-service-worker";
+import { PuenteServiceWorker } from "@/components/pwa/puente-service-worker";
 import "./globals.css";
 
 /**
@@ -95,7 +95,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             y fija: el resto del contenido se apoya encima. */}
         <FondoPanorama />
         {children}
-        <RegistrarServiceWorker />
+        <PuenteServiceWorker />
       </body>
     </html>
   );

@@ -51,7 +51,16 @@ export async function HojaDiario({
       : paginas.findIndex((p) => p.numero === numeroPagina);
 
   return (
-    <div className={cn("hoja grano mx-auto w-full max-w-6xl", className)}>
+    /* `data-sin-conexion` le dice al service worker que la página se dibujó
+       entera y se puede guardar para leer sin señal. Va acá porque ésta es la
+       hoja de todas las páginas del diario y no la usan los `loading.tsx`: si
+       la base falla después del esqueleto, el documento llega igual con 200
+       pero sin esta marca, y la copia buena que había no se pisa. Ver
+       `MARCA` en `public/sw.js`. */
+    <div
+      className={cn("hoja grano mx-auto w-full max-w-6xl", className)}
+      data-sin-conexion="guardable"
+    >
       {children}
 
       <div className="px-4 pb-7 sm:px-6">

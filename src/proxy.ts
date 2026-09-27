@@ -3,8 +3,10 @@ import { SESSION_COOKIE, cookieMuerta } from "@/lib/auth/cookie";
 import { AUTH_CIDITUC_OBLIGATORIA } from "@/lib/auth/config";
 
 /**
- * Gate de acceso con Cidituc. Públicas: la landing (/), /login y las rutas de
- * auth; todo el resto del diario requiere sesión.
+ * Gate de acceso con Cidituc. Públicas: la landing (/), /login, las rutas de
+ * auth y la página de aviso sin conexión (/sin-conexion); el manifest y el
+ * service worker ni pasan por acá (ver el `matcher`). Todo el resto del diario
+ * requiere sesión.
  *
  * El proxy hace un chequeo *estructural* del token (versión y vencimiento), no
  * criptográfico: la firma se verifica del lado servidor en cada página y API.

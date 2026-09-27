@@ -24,7 +24,8 @@
  *   los marcadores y las vistas previas de los chats. Si no está, esos no leen
  *   el `<link>` del HTML y no muestran nada.
  * - `src/app/icon.png` — 512. Lo que usan los navegadores modernos en pantallas
- *   de alta densidad y Android al agregar el sitio a la pantalla de inicio.
+ *   de alta densidad. Para la pantalla de inicio de Android ya no: desde que
+ *   hay manifest, Android usa los iconos que lista (abajo).
  * - `src/app/apple-icon.png` — 180, **sobre blanco**. iOS no respeta la
  *   transparencia en el icono de la pantalla de inicio: la compone sobre negro,
  *   y el azul del isotipo sobre negro es una mancha. El blanco además es el
@@ -45,7 +46,7 @@
  *   forma que elija cada fabricante (círculo, gota, cuadrado redondeado), y si
  *   no hay uno "maskable" mete el transparente adentro de un círculo blanco con
  *   la marca chiquita en el medio. Este va **sobre blanco**, por lo mismo que el
- *   de iOS, y con la marca adentro de la zona segura (ver `OCUPA_MASCARA`).
+ *   de iOS, y con la marca adentro de la zona segura (ver `ocupaMascara()`).
  *
  * ## El recorte
  *

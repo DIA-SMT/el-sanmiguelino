@@ -4,11 +4,18 @@ import type { MetadataRoute } from "next";
  * El diario instalado como aplicación. Next lo sirve en `/manifest.webmanifest`
  * y pone el `<link rel="manifest">` solo.
  *
- * Ojo con el proxy: el navegador pide el manifest **sin cookies** (así lo dice
- * la especificación, salvo `crossorigin="use-credentials"`), así que para el
- * gate de Cidituc llega siempre sin sesión. Si el proxy lo agarrara, lo mandaría
- * a /login y el sitio dejaría de ser instalable sin ningún error visible. Por
- * eso está exento en el `matcher` de `src/proxy.ts`, igual que `/sw.js`.
+ * Ojo con el proxy: Chrome y Safari piden el manifest **sin cookies** salvo que
+ * el `<link>` lleve `crossorigin="use-credentials"`. Es cosa de los motores y
+ * no de la especificación de HTML, que diría `same-origin`, pero es lo que
+ * pasa. En producción, entonces, llega al gate de Cidituc sin sesión: si el
+ * proxy lo agarrara, lo mandaría a /login y el sitio dejaría de ser instalable
+ * sin ningún error visible. Por eso está exento en el `matcher` de
+ * `src/proxy.ts`, igual que `/sw.js`.
+ *
+ * Un deploy de preview de Vercel NO sirve para comprobar si la excepción hace
+ * falta: ahí Next le agrega `use-credentials` al `<link>` por su cuenta
+ * (`node_modules/next/dist/lib/metadata/metadata.js`, `VERCEL_ENV`), la cookie
+ * viaja y el manifest pasa aunque no esté exento.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {

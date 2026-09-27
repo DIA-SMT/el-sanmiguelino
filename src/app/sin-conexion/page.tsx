@@ -20,10 +20,16 @@ export const metadata: Metadata = {
  *
  * No dice nada de quién está leyendo ni de la edición: es la misma para todos y
  * queda guardada en el teléfono aunque se cierre la sesión.
+ *
+ * Lleva la misma marca que `HojaDiario` (`data-sin-conexion`) porque el worker
+ * no guarda ninguna página que no la traiga, tampoco ésta.
  */
 export default function SinConexion() {
   return (
-    <main className="escritorio grano flex flex-1 items-center justify-center px-4 py-24">
+    <main
+      className="escritorio grano flex flex-1 items-center justify-center px-4 py-24"
+      data-sin-conexion="guardable"
+    >
       <div className="fade-up hoja grano max-w-md px-8 py-12 text-center sm:px-10">
         <LogoSanmiguelino className="mx-auto w-full max-w-[15rem] text-ink opacity-70" />
         <p className="volanta mt-6 text-accent">Sin conexión</p>
@@ -34,8 +40,8 @@ export default function SinConexion() {
             computadora, y ahí el aviso tiene que seguir siendo cierto. */}
         <p className="mt-4 text-pretty font-serif text-[0.98rem] leading-[1.7] text-ink-2">
           No hay conexión a internet y esta página todavía no estaba guardada
-          en este dispositivo. Las que ya leíste con conexión se pueden volver a
-          abrir sin ella.
+          en este dispositivo. Las páginas del diario que abrís con conexión
+          quedan guardadas para leerlas sin ella.
         </p>
         <BotonReintentar />
         {/* Un enlace común y no un `<Link>`: el `<Link>` pediría la portada
