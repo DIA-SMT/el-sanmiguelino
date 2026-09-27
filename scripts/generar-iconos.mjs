@@ -33,6 +33,20 @@
  * Los tres los toma Next por convención de archivo en `src/app/` y arma los
  * `<link>` solo; no hay que declarar `metadata.icons`.
  *
+ * Y tres más para el diario instalado como aplicación, en `public/iconos/`. Los
+ * lista `src/app/manifest.ts` y no los toma nadie por convención, así que van en
+ * `public/` con nombre fijo:
+ *
+ * - `icono-192.png` y `icono-512.png` — transparentes, igual que `icon.png`.
+ *   Son los que usa el escritorio (la ventana de la app en Windows o macOS, la
+ *   barra de tareas). El 192 existe porque Chrome lo pide para dar el sitio
+ *   por instalable; el 512 es el de la pantalla de carga.
+ * - `icono-mascara-512.png` — el de Android. Android recorta el icono con la
+ *   forma que elija cada fabricante (círculo, gota, cuadrado redondeado), y si
+ *   no hay uno "maskable" mete el transparente adentro de un círculo blanco con
+ *   la marca chiquita en el medio. Este va **sobre blanco**, por lo mismo que el
+ *   de iOS, y con la marca adentro de la zona segura (ver `OCUPA_MASCARA`).
+ *
  * ## El recorte
  *
  * El original trae la marca descentrada: dentro del lienzo de 235x235 la figura
@@ -52,6 +66,7 @@ import sharp from "sharp";
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ORIGEN = path.join(raiz, "scripts", "marca", "logo-muni-iso.png");
 const APP = path.join(raiz, "src", "app");
+const ICONOS_APP = path.join(raiz, "public", "iconos");
 
 /** Cuánto del lado ocupa la marca en los iconos transparentes. 0,94 deja un
  *  píxel de aire a 32 y dos a 48: lo justo para que no toque el borde del
@@ -61,6 +76,23 @@ const OCUPA = 0.94;
 /** En el icono de iOS, en cambio, la marca va más chica: el sistema le aplica
  *  su propia máscara redondeada y recorta las esquinas del lienzo. */
 const OCUPA_IOS = 0.72;
+
+/**
+ * En el de Android se calcula en vez de elegirse a ojo. La especificación de
+ * iconos "maskable" garantiza visible sólo un círculo centrado de radio 40% del
+ * lado: lo que caiga afuera lo puede recortar la máscara de algún fabricante.
+ *
+ * La marca va encajada en un cuadrado de `lado * ocupa`, con su lado largo
+ * tocando ese cuadrado. Las esquinas de su caja quedan entonces a
+ * `ocupa/2 * hypot(1, corto/largo)` del centro, y eso tiene que ser a lo sumo
+ * 0,4. Con la caja de 189x215 da 0,60. Es conservador a propósito: las esquinas
+ * de la caja están vacías, pero el borde del pétalo pasa muy cerca.
+ */
+function ocupaMascara(caja) {
+  const corto = Math.min(caja.width, caja.height);
+  const largo = Math.max(caja.width, caja.height);
+  return 0.8 / Math.hypot(1, corto / largo);
+}
 
 /** La caja real de la marca dentro del lienzo del original. Se calcula por el
  *  canal alfa en vez de confiar en `trim()`, que con este archivo devuelve el
@@ -195,3 +227,18 @@ console.log(`icon.png     ${png512.length} bytes  (512px, transparente)`);
 const ios = await icono(caja, 180, { ocupa: OCUPA_IOS, fondo: blanco });
 await writeFile(path.join(APP, "apple-icon.png"), ios);
 console.log(`apple-icon   ${ios.length} bytes  (180px, sobre blanco)`);
+
+await mkdir(ICONOS_APP, { recursive: true });
+
+for (const lado of [192, 512]) {
+  const png = await icono(caja, lado, { ocupa: OCUPA, fondo: transparente });
+  await writeFile(path.join(ICONOS_APP, `icono-${lado}.png`), png);
+  console.log(`icono-${lado}    ${png.length} bytes  (${lado}px, transparente)`);
+}
+
+const ocupa = ocupaMascara(caja);
+const mascara = await icono(caja, 512, { ocupa, fondo: blanco });
+await writeFile(path.join(ICONOS_APP, "icono-mascara-512.png"), mascara);
+console.log(
+  `mascara-512  ${mascara.length} bytes  (512px, sobre blanco, marca al ${Math.round(ocupa * 100)}%)`,
+);

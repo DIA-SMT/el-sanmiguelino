@@ -26,7 +26,13 @@ export function proxy(request: NextRequest) {
   // el ingreso no podría completarse nunca.
   const esAuth =
     pathname.startsWith("/api/auth/") || pathname.startsWith("/auth/cidituc/");
-  const esPublica = pathname === "/" || pathname === "/login" || esAuth;
+  // `/sin-conexion` la pide el service worker al instalarse, que puede ser en la
+  // landing y sin sesión: detrás del gate guardaría el /login como aviso.
+  const esPublica =
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/sin-conexion" ||
+    esAuth;
 
   // Las API responden su propio 401 (un redirect HTML no le sirve a un fetch).
   // Antes /api/* quedaba enteramente fuera del gate: cualquiera sin sesión
@@ -71,7 +77,12 @@ export const config = {
   // El `$` al final del grupo de extensiones no es decorativo: sin él, la
   // alternancia se ancla en cualquier parte de la ruta y `/admin/x.png/borrar`
   // queda exento del proxy. Con `$`, sólo se exime lo que TERMINA en imagen.
+  //
+  // El manifest y el service worker van exentos por la misma razón que el
+  // favicon: el navegador los pide solo y, en el caso del manifest, sin cookies.
+  // Con el gate encima, el diario dejaba de ser instalable sin un solo error a
+  // la vista. Llevan `$` para no eximir nada que sólo empiece igual.
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest$|sw\\.js$|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)",
   ],
 };

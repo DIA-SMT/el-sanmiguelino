@@ -35,6 +35,25 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.*.*", "10.*.*.*"],
 
   /**
+   * Un valor distinto en cada build, para el service worker.
+   *
+   * El registro pide `/sw.js?v=<esto>`, así que un deploy nuevo cambia la URL
+   * del worker, el navegador lo instala de nuevo y el worker tira las cachés
+   * del build anterior (el porqué, en `public/sw.js`). Tiene que ser de build y
+   * no de arranque: un valor calculado al levantar el servidor cambiaría con
+   * cada instancia que Vercel encienda, y cada lector reinstalaría el worker y
+   * perdería lo guardado varias veces por día.
+   *
+   * Va por `env` porque así Next lo escribe literal en el bundle del cliente al
+   * compilar, y queda fijo para todo ese build aunque el servidor vuelva a leer
+   * este archivo al arrancar. Lo usa sólo el cliente. No es un secreto: queda a
+   * la vista en la URL del worker.
+   */
+  env: {
+    VERSION_SITIO: Date.now().toString(36),
+  },
+
+  /**
    * El dominio viejo de Vercel manda todo al dominio nuevo.
    *
    * El diario se mudó a `sanmiguelino.smt.gob.ar`, pero

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo_Black, Newsreader, Poppins } from "next/font/google";
 import { FondoPanorama } from "@/components/fondo-panorama";
+import { RegistrarServiceWorker } from "@/components/pwa/registrar-service-worker";
 import "./globals.css";
 
 /**
@@ -59,6 +60,13 @@ export const metadata: Metadata = {
   },
   description:
     "El diario digital mensual de la Municipalidad de San Miguel de Tucumán. Exclusivo para usuarios de Cidituc.",
+  /* El nombre bajo el icono en la pantalla de inicio del iPhone. Sin esto iOS
+     puede tomar el `<title>` de la página desde la que se agregó, y agregarlo
+     desde una nota dejaría el icono con el título de la nota. El resto de la
+     instalación sale del manifest (`manifest.ts`). */
+  appleWebApp: {
+    title: "Sanmiguelino",
+  },
 };
 
 /** La barra del navegador acompaña al papel en claro y a la edición nocturna
@@ -87,6 +95,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             y fija: el resto del contenido se apoya encima. */}
         <FondoPanorama />
         {children}
+        <RegistrarServiceWorker />
       </body>
     </html>
   );
