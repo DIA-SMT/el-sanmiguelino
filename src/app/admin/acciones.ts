@@ -898,13 +898,13 @@ export async function guardarPdfEdicionAction(datos: unknown): Promise<{
   error?: string;
   paginas?: number;
   borradas?: number;
-  notasBorradas?: number;
+  escritasConservadas?: number;
 }> {
   const { usuario } = await requerirAdmin();
 
   try {
     if (!esObjeto(datos)) throw new Error("Faltan los datos del PDF.");
-    const { slug, url, paginas, reemplazarNotasEscritas } = datos;
+    const { slug, url, paginas } = datos;
 
     if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
       throw new Error("Falta la edición.");
@@ -915,12 +915,7 @@ export async function guardarPdfEdicionAction(datos: unknown): Promise<{
     // mensaje que dice qué pasó.
     await verificarPdfSubido(url);
 
-    const resultado = await guardarPdfDeEdicion(slug, url, Number(paginas), {
-      // `=== true` y no un truthy: esta bandera borra notas escritas, así que
-      // un `"false"`, un `1` o un `{}` que llegue por la URL de la acción no
-      // puede valer por un sí.
-      reemplazarNotasEscritas: reemplazarNotasEscritas === true,
-    });
+    const resultado = await guardarPdfDeEdicion(slug, url, Number(paginas));
 
     await anotar(usuario, {
       accion: "edicion.pdf",
@@ -928,8 +923,8 @@ export async function guardarPdfEdicionAction(datos: unknown): Promise<{
       resumen: `Cargó el PDF de ${slug} (${resultado.paginas} páginas)`,
       detalle: {
         paginas: resultado.paginas,
-        ...(resultado.notasBorradas
-          ? { notasEscritasBorradas: resultado.notasBorradas }
+        ...(resultado.escritasConservadas
+          ? { notasEscritasConservadas: resultado.escritasConservadas }
           : {}),
       },
     });

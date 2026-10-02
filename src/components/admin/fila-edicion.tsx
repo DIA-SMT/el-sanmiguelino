@@ -422,7 +422,6 @@ export function FilaEdicion({
               mes={edicion.mes}
               pdf={edicion.pdf}
               notasEscritas={edicion.notasEscritas}
-              comentariosEscritos={edicion.comentariosEscritos}
               /* Los de las páginas son los de la edición menos los de las notas
                  escritas: en un facsímil no hay notas escritas, así que son
                  todos, y en una edición de notas no hay páginas, así que son

@@ -51,19 +51,12 @@ export async function guardarPdfDeEdicion(
   edicionSlug: string,
   url: string,
   paginas: number,
-  opciones: {
-    /**
-     * Borrar las notas escritas que tenga la edición, para publicarla como
-     * facsímil.
-     *
-     * Va como bandera explícita y por default en `false` porque **se lleva
-     * texto que alguien escribió, y los comentarios que tenga**. Quien la
-     * prende tiene que haber visto cuántas notas y cuántos comentarios son: el
-     * panel lo cuenta y lo pregunta antes.
-     */
-    reemplazarNotasEscritas?: boolean;
-  } = {},
-): Promise<{ paginas: number; borradas: number; notasBorradas: number }> {
+): Promise<{
+  paginas: number;
+  borradas: number;
+  /** Cuántas notas escritas quedaron, corridas detrás del impreso. */
+  escritasConservadas: number;
+}> {
   if (!Number.isInteger(paginas) || paginas < 1 || paginas > MAXIMO_PAGINAS) {
     throw new Error(
       `El PDF dice tener ${paginas} páginas, y eso no es un diario. ` +
@@ -78,22 +71,26 @@ export async function guardarPdfDeEdicion(
   if (!edicion) throw new Error(`No existe la edición "${edicionSlug}".`);
 
   /*
-   * Una edición es de notas escritas o es un facsímil, nunca las dos cosas.
+   * Un número PUEDE tener las dos cosas: el impreso y notas sólo de la web.
    *
-   * Mezclarlas no rompe nada visible de entrada y por eso hay que atajarlo acá:
-   * las notas escritas quedarían intercaladas entre las páginas del PDF, con el
-   * foliado corrido, y el número saldría con la página 4 del impreso numerada 7.
+   * Acá decía lo contrario —"una edición es de notas escritas o es un facsímil,
+   * nunca las dos cosas"— y cargar el PDF exigía confirmar que las notas se
+   * borraban. El motivo que estaba escrito era el foliado: una nota escrita
+   * intercalada entre las páginas corría todo y el número salía con la página 4
+   * del impreso numerada 7.
+   *
+   * Pero el foliado no se arregla borrando texto: se arregla poniendo las notas
+   * escritas DETRÁS del impreso. Las páginas ocupan `orden` 0…N-1 —las páginas
+   * 1…N del papel— y lo escrito sigue desde N. Así la página 4 es siempre la 4.
+   *
+   * Septiembre ya venía funcionando así de hecho: sus ocho páginas y, atrás,
+   * "La Batalla de Tucumán". Lo que faltaba era que el panel no lo destruyera.
    */
-  const escritas = await db().nota.count({
+  const escritas = await db().nota.findMany({
     where: { edicionId: edicion.id, pdfPagina: null },
+    orderBy: { orden: "asc" },
+    select: { id: true },
   });
-  if (escritas > 0 && !opciones.reemplazarNotasEscritas) {
-    throw new Error(
-      `Esta edición tiene ${escritas} ${escritas === 1 ? "nota escrita" : "notas escritas"}. ` +
-        "Una edición se publica con notas o con el PDF del impreso, no con las " +
-        "dos cosas: hay que confirmar que las notas se reemplazan por el PDF.",
-    );
-  }
 
   /*
    * Que ningún slug de página esté ocupado por una nota de OTRA edición.
@@ -119,17 +116,19 @@ export async function guardarPdfDeEdicion(
 
   return db().$transaction(async (tx) => {
     /*
-     * Las notas escritas, si se pidió reemplazarlas.
+     * Las notas escritas se APARTAN, no se borran.
      *
-     * Va PRIMERO y dentro de la transacción por `@@unique([edicionId, orden])`:
-     * las notas escritas ocupan los mismos `orden` que van a necesitar las
-     * páginas, así que si no se van antes, el upsert de la página 2 choca.
+     * Va primero y dentro de la transacción por `@@unique([edicionId, orden])`:
+     * ocupan los mismos `orden` que van a necesitar las páginas, así que si no
+     * se corren antes, el upsert de la página 2 choca. Vuelven al final, detrás
+     * del impreso.
      */
-    const { count: notasBorradas } = opciones.reemplazarNotasEscritas
-      ? await tx.nota.deleteMany({
-          where: { edicionId: edicion.id, pdfPagina: null },
-        })
-      : { count: 0 };
+    for (const [i, escrita] of escritas.entries()) {
+      await tx.nota.update({
+        where: { id: escrita.id },
+        data: { orden: 1000 + i },
+      });
+    }
 
     // Después las páginas que sobran: un PDF más corto que el anterior deja
     // páginas colgadas que ya no existen en el archivo nuevo.
@@ -161,12 +160,26 @@ export async function guardarPdfDeEdicion(
       });
     }
 
+    /*
+     * Y las notas escritas vuelven, detrás del impreso.
+     *
+     * En un facsímil sin digitalizar la página 1 no es una fila —se dibuja en
+     * `/diario`— así que las páginas 2…N ocupan `orden` 0…N-2 y el primer lugar
+     * libre es N-1.
+     */
+    for (const [i, escrita] of escritas.entries()) {
+      await tx.nota.update({
+        where: { id: escrita.id },
+        data: { orden: paginas - 1 + i },
+      });
+    }
+
     await tx.edicion.update({
       where: { id: edicion.id },
       data: { pdfUrl: url, pdfPaginas: paginas },
     });
 
-    return { paginas, borradas, notasBorradas };
+    return { paginas, borradas, escritasConservadas: escritas.length };
   });
 }
 
@@ -197,7 +210,12 @@ export async function guardarDigitalizacion(
      */
     confirmarPublicada?: boolean;
   } = {},
-): Promise<{ paginas: number; borradas: number }> {
+): Promise<{
+  paginas: number;
+  borradas: number;
+  /** Cuántas notas escritas se conservaron, corridas detrás del impreso. */
+  escritasConservadas: number;
+}> {
   if (paginas.length === 0) {
     throw new Error("La digitalización no produjo ninguna página.");
   }
@@ -305,12 +323,41 @@ export async function guardarDigitalizacion(
       });
     }
 
-    // Lo que quedó en el rango alto es una página que el PDF nuevo ya no tiene.
+    /*
+     * Las notas ESCRITAS de la edición vuelven, detrás de las páginas.
+     *
+     * Se las había corrido al rango alto junto con todo lo demás, y antes se
+     * borraban con el resto: redigitalizar se llevaba puesto cualquier texto
+     * que alguien hubiera escrito para ese número, sin avisar. Un número puede
+     * tener las dos cosas —el impreso digitalizado y notas que sólo salen en la
+     * web— y eso ya pasa: septiembre publicó "La Batalla de Tucumán" después de
+     * sus ocho páginas.
+     *
+     * **Van DETRÁS del impreso, y eso es lo que mantiene honesto el foliado.**
+     * Las páginas ocupan `orden` 0…N-1, o sea las páginas 1…N del papel; una
+     * nota escrita intercalada correría todo y el número saldría con la página
+     * 4 del impreso numerada 5. Atrás, la 4 sigue siendo la 4 y la nota es la
+     * N+1. Es la misma regla que ya cumplía la de septiembre por casualidad,
+     * ahora garantizada.
+     */
+    const escritas = await tx.nota.findMany({
+      where: { edicionId: edicion.id, orden: { gte: 1000 }, pdfPagina: null },
+      orderBy: { orden: "asc" },
+      select: { id: true },
+    });
+    for (const [i, escrita] of escritas.entries()) {
+      await tx.nota.update({
+        where: { id: escrita.id },
+        data: { orden: paginas.length + i },
+      });
+    }
+
+    // Lo que sigue en el rango alto es una página que el PDF nuevo ya no tiene.
     const { count: borradas } = await tx.nota.deleteMany({
       where: { edicionId: edicion.id, orden: { gte: 1000 } },
     });
 
-    return { paginas: paginas.length, borradas };
+    return { paginas: paginas.length, borradas, escritasConservadas: escritas.length };
   });
 }
 

@@ -71,7 +71,6 @@ export function PdfEdicion({
   mes,
   pdf,
   notasEscritas,
-  comentariosEscritos,
   comentariosPaginas,
   laUnicaServible,
   publicada,
@@ -81,11 +80,9 @@ export function PdfEdicion({
   mes: string;
   /** Lo que ya está cargado, si hay algo. */
   pdf: { url: string; paginas: number } | null;
-  /** Notas escritas a mano en esta edición. Cargar el PDF las reemplaza, y por
-   *  eso se cuentan: hay que poder decir cuántas se van. */
+  /** Notas escritas a mano en esta edición, además del impreso. Se cuentan
+   *  para poder decir que se conservan y que van detrás de las páginas. */
   notasEscritas: number;
-  /** Comentarios que cuelgan de esas notas escritas. Se van con ellas. */
-  comentariosEscritos: number;
   /** Comentarios que cuelgan de las PÁGINAS del PDF: los que se pierden al
    *  quitarlo. */
   comentariosPaginas: number;
@@ -154,17 +151,16 @@ export function PdfEdicion({
 
       const paginas = await contarPaginas(archivo);
       /*
-       * Se pregunta antes de subir cuando hay algo que se va a borrar, y hay
-       * dos motivos posibles:
+       * Se pregunta antes de subir sólo cuando hay algo que se va a borrar, y
+       * hoy queda un motivo: **un PDF más corto que el anterior** deja páginas
+       * colgadas, y se llevan los comentarios de los vecinos por la cascada.
        *
-       * - **notas escritas**: publicar el número como facsímil las reemplaza;
-       * - **un PDF más largo que el nuevo**: las páginas de más quedan colgadas.
-       *
-       * Los dos se llevan comentarios de vecinos por la cascada, así que
-       * ninguno puede pasar en silencio.
+       * Antes también se preguntaba por las notas escritas, porque cargar el
+       * PDF las reemplazaba. Ya no: se conservan y se corren detrás del
+       * impreso, así que no hay nada que confirmar.
        */
       const sePierden = pdf ? Math.max(pdf.paginas - paginas, 0) : 0;
-      if (sePierden > 0 || notasEscritas > 0) {
+      if (sePierden > 0) {
         setPaso({ que: "confirmar", archivo, paginas, sePierden });
         return;
       }
@@ -227,10 +223,6 @@ export function PdfEdicion({
         slug,
         url: firma.urlPublica,
         paginas,
-        // Sólo cuando de verdad hay notas escritas. La bandera existe porque el
-        // servidor se niega a mezclar las dos formas de publicar un número, y
-        // acá ya se preguntó cuántas notas y cuántos comentarios se van.
-        reemplazarNotasEscritas: notasEscritas > 0,
       });
       if (!guardado.ok) throw new Error(guardado.error ?? "No se pudo guardar.");
 
@@ -427,25 +419,6 @@ export function PdfEdicion({
             El PDF tiene {paso.paginas}{" "}
             {paso.paginas === 1 ? "página" : "páginas"}. Al cargarlo se borra:
             <ul className="mt-1.5 grid gap-0.5">
-              {notasEscritas > 0 && (
-                <li>
-                  las{" "}
-                  <strong className="font-semibold text-panel-tinta">
-                    {notasEscritas}{" "}
-                    {notasEscritas === 1 ? "nota escrita" : "notas escritas"}
-                  </strong>{" "}
-                  de {mes}
-                  {comentariosEscritos > 0 ? (
-                    <>
-                      {" "}
-                      y sus {comentariosEscritos}{" "}
-                      {comentariosEscritos === 1
-                        ? "comentario"
-                        : "comentarios"}
-                    </>
-                  ) : null}
-                </li>
-              )}
               {paso.sePierden > 0 && (
                 <li>
                   <strong className="font-semibold text-panel-tinta">
@@ -465,9 +438,7 @@ export function PdfEdicion({
               className={BOTON_PRIMARIO}
             >
               <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-              {notasEscritas > 0
-                ? "Publicar el número como PDF"
-                : "Subir igual"}
+              Subir igual
             </button>
             <button
               type="button"
@@ -488,15 +459,12 @@ export function PdfEdicion({
               Ahora el botón se ve siempre y el conflicto se resuelve en la
               confirmación, contando lo que se va. */}
           {notasEscritas > 0 && (
-            <Aviso
-              icono={AlertTriangle}
-              tono="var(--grafico-diario)"
-              sobre="tarjeta"
-            >
-              {mes} está armada con {notasEscritas}{" "}
-              {notasEscritas === 1 ? "nota escrita" : "notas escritas"}. Un
-              número se publica con notas o con el PDF del impreso, no con las
-              dos cosas: cargar el PDF las reemplaza.
+            <Aviso icono={FileText} tono="var(--grafico-indice)" sobre="tarjeta">
+              {mes} tiene {notasEscritas}{" "}
+              {notasEscritas === 1 ? "nota escrita" : "notas escritas"} además
+              del impreso. {notasEscritas === 1 ? "Se conserva" : "Se conservan"}{" "}
+              y {notasEscritas === 1 ? "va" : "van"} detrás de las páginas del
+              papel, así la página 4 del impreso sigue siendo la 4 en el diario.
             </Aviso>
           )}
           <div className="flex flex-wrap items-center gap-panel-controles">
