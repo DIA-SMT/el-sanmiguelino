@@ -143,7 +143,14 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
       return (
         <div className="my-5 [break-inside:auto]">
           {bloque.titulo ? (
-            <p className="volanta mb-2 text-ink">{bloque.titulo}</p>
+            /* El título de una lista es un subtítulo y tiene el mismo
+               problema: la lista se parte entre columnas a propósito (ver
+               arriba), así que sin esto el título podía quedar solo al pie de
+               una y sus ítems arrancar en la otra. La regla de `globals.css`
+               no lo alcanza porque no es un <h2> hijo directo de las columnas. */
+            <p className="volanta mb-2 text-ink [break-after:avoid]">
+              {bloque.titulo}
+            </p>
           ) : null}
           <ul className="grid gap-y-1">
             {bloque.items.map((item, i) => (
@@ -397,9 +404,11 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                 <h1 className="titular mt-2.5 text-[clamp(1.9rem,5.4vw,3.5rem)] text-ink">
                   {nota.titulo}
                 </h1>
-                <p className="bajada mt-4 max-w-3xl text-[clamp(0.98rem,1.6vw,1.15rem)]">
-                  {nota.bajada}
-                </p>
+                {nota.bajada && (
+                  <p className="bajada mt-4 max-w-3xl text-[clamp(0.98rem,1.6vw,1.15rem)]">
+                    {nota.bajada}
+                  </p>
+                )}
                 <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-hairline py-2.5">
                   <p className="meta">San Miguel de Tucumán</p>
                   <span aria-hidden="true" className="text-line">

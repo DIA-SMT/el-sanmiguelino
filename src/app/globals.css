@@ -825,6 +825,17 @@
   .note-columns p {
     break-inside: auto;
   }
+  /* Un subtítulo no termina una columna: se va con su texto a la siguiente.
+     Lo pidió la redacción: quedaba el subtítulo solo al pie de una columna y el
+     párrafo que anuncia arrancaba arriba de la otra, que es justo lo que un
+     diarista no deja pasar nunca. `break-inside` de arriba no alcanza: evita
+     partir el subtítulo por dentro, no despegarlo de lo que sigue. Va
+     `avoid-column` además de `avoid` porque es el valor que nombra el corte de
+     columna; los motores viejos que no lo conocen se quedan con el primero. */
+  .note-columns > h2 {
+    break-after: avoid;
+    break-after: avoid-column;
+  }
 
   /* Una figura que cruza las columnas: la infografía del impreso.
      `column-span: all` la saca del reparto y le da el ancho de la nota entera.

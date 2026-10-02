@@ -105,9 +105,15 @@ export async function DiarioEnPerspectiva() {
                   <p className="titular mt-1 text-[0.82rem] leading-[1.1] text-ink sm:text-[0.95rem]">
                     {principal.titulo}
                   </p>
-                  <p className="mt-1.5 font-serif text-[0.44rem] leading-[1.5] text-ink-2">
-                    {principal.bajada.slice(0, 150)}…
-                  </p>
+                  {principal.bajada && (
+                    <p className="mt-1.5 font-serif text-[0.44rem] leading-[1.5] text-ink-2">
+                      {/* Los puntos suspensivos sólo si de verdad se cortó: una
+                          bajada corta los llevaba igual, como si siguiera. */}
+                      {principal.bajada.length > 150
+                        ? `${principal.bajada.slice(0, 150)}…`
+                        : principal.bajada}
+                    </p>
+                  )}
                   <p className="mt-1.5 font-sans text-[0.4rem] uppercase tracking-[0.12em] text-ink-3">
                     Redacción · {principal.minutosLectura} min de lectura
                   </p>

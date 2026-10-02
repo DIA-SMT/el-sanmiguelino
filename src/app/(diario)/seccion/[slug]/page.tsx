@@ -113,9 +113,11 @@ export default async function SeccionPage({
                     {principal.titulo}
                   </Link>
                 </h2>
-                <p className="mt-4 max-w-2xl text-pretty font-serif text-[1.05rem] italic leading-relaxed text-ink-2">
-                  {principal.bajada}
-                </p>
+                {principal.bajada && (
+                  <p className="mt-4 max-w-2xl text-pretty font-serif text-[1.05rem] italic leading-relaxed text-ink-2">
+                    {principal.bajada}
+                  </p>
+                )}
                 <p className="meta mt-4">
                   {principal.minutosLectura} min de lectura
                 </p>
@@ -178,9 +180,11 @@ export default async function SeccionPage({
                           {nota.titulo}
                         </Link>
                       </h3>
-                      <p className="mt-2 text-pretty font-serif text-[0.9rem] leading-[1.65] text-ink-2">
-                        {nota.bajada}
-                      </p>
+                      {nota.bajada && (
+                        <p className="mt-2 text-pretty font-serif text-[0.9rem] leading-[1.65] text-ink-2">
+                          {nota.bajada}
+                        </p>
+                      )}
                       <p className="meta mt-2.5">
                         {nota.minutosLectura} min de lectura
                       </p>

@@ -190,9 +190,11 @@ export default async function Portada() {
                     {principal.titulo}
                   </Link>
                 </h1>
-                <p className="bajada mt-4 max-w-4xl text-[clamp(1rem,1.7vw,1.22rem)]">
-                  {principal.bajada}
-                </p>
+                {principal.bajada && (
+                  <p className="bajada mt-4 max-w-4xl text-[clamp(1rem,1.7vw,1.22rem)]">
+                    {principal.bajada}
+                  </p>
+                )}
                 {/* Treinta segundos: qué edición es, de qué se trata y la nota
                     principal. Escuchar las ocho notas seguidas son dos minutos
                     y sigue siendo otro control, para otra vuelta; el sumario

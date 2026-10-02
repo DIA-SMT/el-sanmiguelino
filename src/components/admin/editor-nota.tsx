@@ -318,6 +318,14 @@ export function EditorNota({
    *  que puede hacer el redactor ahí es apretar de nuevo. */
   const [subiendo, setSubiendo] = useState<string | null>(null);
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
+  /** Qué control pidió la subida en curso —o la última que falló—: "apertura"
+   *  o "bloque-N". De esto depende DÓNDE se ven el avance y el error. Antes
+   *  los dos salían siempre arriba, en la foto de apertura: si fallaba el
+   *  retrato de una cita al fondo del cuerpo, al lado de la cita no pasaba
+   *  nada y el aviso, fuera de la vista, parecía de otra foto. No se limpia al
+   *  terminar, así el error queda junto a lo que lo causó hasta el próximo
+   *  intento. */
+  const [destinoSubida, setDestinoSubida] = useState<string | null>(null);
   const [cuerpo, setCuerpo] = useState<BloqueNota[]>(
     nota?.cuerpo ?? [{ tipo: "parrafo", texto: "" }],
   );
@@ -391,8 +399,12 @@ export function EditorNota({
    * `firmarSubidaFotoAction` — en resumen, una Server Action acepta 1 MB y esta
    * pantalla ofrece ocho.
    */
-  async function subirArchivo(archivo: File): Promise<string | null> {
+  async function subirArchivo(
+    archivo: File,
+    destino: string,
+  ): Promise<string | null> {
     setErrorFoto(null);
+    setDestinoSubida(destino);
 
     // Las dos comprobaciones de acá son para avisar EN EL ACTO, no para
     // reemplazar nada: las que cuentan son las del servidor, en
@@ -501,7 +513,7 @@ export function EditorNota({
   }
 
   async function subirFoto(archivo: File) {
-    const url = await subirArchivo(archivo);
+    const url = await subirArchivo(archivo, "apertura");
     if (!url) return;
     setImagenSrc(url);
     setGuardado(false);
@@ -602,7 +614,8 @@ export function EditorNota({
 
           <div className="sm:col-span-2">
             <label htmlFor="nota-bajada" className={etiqueta}>
-              Bajada
+              Bajada{" "}
+              <span className="font-normal text-panel-tinta-3">(opcional)</span>
             </label>
             <textarea
               id="nota-bajada"
@@ -614,8 +627,9 @@ export function EditorNota({
               placeholder="Las dos o tres líneas que resumen la nota"
             />
             <span id="nota-bajada-ayuda" className={ayudaCampo}>
-              Es también lo que Migue lee en voz alta cuando le piden escuchar
-              la nota. Escribila para ser oída.
+              Es también lo que se lee en voz alta cuando piden escuchar la
+              nota: escribila para ser oída. Si la dejás vacía, se lee sólo la
+              sección y el titular.
             </span>
           </div>
 
@@ -730,7 +744,7 @@ export function EditorNota({
                 }`}
               >
                 <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
-                {subiendo ?? "Subir una foto"}
+                {(destinoSubida === "apertura" && subiendo) || "Subir una foto"}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
@@ -749,18 +763,8 @@ export function EditorNota({
                 JPG, PNG o WebP, hasta 8 MB.
               </span>
             </div>
-            {errorFoto && (
-              <span
-                role="alert"
-                className="mt-2 flex items-start gap-2 text-panel-sm"
-                style={{ color: tintaAlerta }}
-              >
-                <TriangleAlert
-                  className="mt-[0.15em] h-4 w-4 shrink-0"
-                  aria-hidden="true"
-                />
-                {errorFoto}
-              </span>
+            {errorFoto && destinoSubida === "apertura" && (
+              <AvisoDeSubida texto={errorFoto} />
             )}
           </div>
 
@@ -861,6 +865,7 @@ export function EditorNota({
                     <select
                       id={`bloque-${i}-tipo`}
                       value={bloque.tipo}
+                      disabled={subiendo !== null}
                       onChange={(e) => {
                         setGuardado(false);
                         setSucio(true);
@@ -896,13 +901,22 @@ export function EditorNota({
                       la casa sangra 5px por lado, así que con 4px de separación
                       el anillo del botón enfocado se metía 1px dentro del
                       vecino. Tres botones de sólo icono, pegados, y ninguna
-                      forma de saber cuál estaba enfocado. */}
+                      forma de saber cuál estaba enfocado.
+
+                      Los tres —y el selector de tipo— se apagan mientras haya
+                      una subida en curso. Una foto o un retrato que termina de
+                      subir se aplica a la POSICIÓN del bloque que la pidió, no
+                      al bloque: si en el medio se borraba o se movía uno, la
+                      cara caía en la cita de otra persona. Ubicar el bloque por
+                      su contenido no sirve, porque se reescribe en cada tecla;
+                      lo correcto, si algún día hace falta reordenar mientras
+                      sube, es un id estable por bloque. */}
                   <div className="flex items-center gap-panel-controles">
                     <BotonIcono
                       titulo={`Subir el bloque ${i + 1}`}
                       dato="subir"
                       onClick={() => mover(i, -1)}
-                      disabled={i === 0}
+                      disabled={i === 0 || subiendo !== null}
                     >
                       <ArrowUp className="h-4 w-4" />
                     </BotonIcono>
@@ -910,7 +924,7 @@ export function EditorNota({
                       titulo={`Bajar el bloque ${i + 1}`}
                       dato="bajar"
                       onClick={() => mover(i, 1)}
-                      disabled={i === cuerpo.length - 1}
+                      disabled={i === cuerpo.length - 1 || subiendo !== null}
                     >
                       <ArrowDown className="h-4 w-4" />
                     </BotonIcono>
@@ -921,7 +935,7 @@ export function EditorNota({
                         setSucio(true);
                         setCuerpo((prev) => prev.filter((_, k) => k !== i));
                       }}
-                      disabled={cuerpo.length === 1}
+                      disabled={cuerpo.length === 1 || subiendo !== null}
                     >
                       <Trash2 className="h-4 w-4" />
                     </BotonIcono>
@@ -938,6 +952,8 @@ export function EditorNota({
                   onCambio={(c) => editarBloque(i, c)}
                   onSubir={subirArchivo}
                   subiendo={subiendo}
+                  destinoSubida={destinoSubida}
+                  errorFoto={errorFoto}
                 />
               </TarjetaPanel>
             </li>
@@ -1065,6 +1081,23 @@ function BotonIcono({
   );
 }
 
+/** El aviso de una subida que falló, para ponerlo junto al control que la
+ *  pidió. Es el mismo que tenía la foto de apertura, sacado afuera porque ahora
+ *  hay tres lugares que suben —apertura, foto del cuerpo y retrato de una
+ *  cita— y cada uno muestra el suyo. */
+function AvisoDeSubida({ texto }: { texto: string }) {
+  return (
+    <span
+      role="alert"
+      className="mt-2 flex items-start gap-2 text-panel-sm"
+      style={{ color: tintaAlerta }}
+    >
+      <TriangleAlert className="mt-[0.15em] h-4 w-4 shrink-0" aria-hidden="true" />
+      {texto}
+    </span>
+  );
+}
+
 /** Los campos que cambian según el tipo. Vive aparte para que el `switch` esté
  *  en un solo lugar y no repartido por el render.
  *
@@ -1076,16 +1109,25 @@ function CamposBloque({
   onCambio,
   onSubir,
   subiendo,
+  destinoSubida,
+  errorFoto,
 }: {
   bloque: BloqueNota;
   indice: number;
   onCambio: (cambios: Partial<BloqueNota>) => void;
-  /** Sube un archivo y devuelve su dirección. Sólo lo usa el bloque de foto. */
-  onSubir: (archivo: File) => Promise<string | null>;
+  /** Sube un archivo y devuelve su dirección. Lo usan el bloque de foto y el
+   *  retrato de la cita; `destino` dice cuál, para mostrar ahí el resultado. */
+  onSubir: (archivo: File, destino: string) => Promise<string | null>;
   /** El rótulo del botón mientras sube —lleva el avance adentro—, o `null` si
    *  no hay ninguna subida en curso. */
   subiendo: string | null;
+  /** Qué control pidió la última subida. Ver `destinoSubida` en el editor. */
+  destinoSubida: string | null;
+  errorFoto: string | null;
 }) {
+  // Este bloque es el dueño de la subida en curso (o de la que falló).
+  const destino = `bloque-${indice}`;
+  const esMia = destinoSubida === destino;
   if (bloque.tipo === "ficha") {
     return (
       <div className="mt-3 space-y-3">
@@ -1196,7 +1238,7 @@ function CamposBloque({
             subiendo && "opacity-60",
           )}
         >
-          {subiendo ?? "Reemplazar la foto"}
+          {(esMia && subiendo) || "Reemplazar la foto"}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
@@ -1205,10 +1247,11 @@ function CamposBloque({
             onChange={(e) => {
               const f = e.target.files?.[0];
               e.target.value = "";
-              if (f) void onSubir(f).then((url) => url && onCambio({ src: url }));
+              if (f) void onSubir(f, destino).then((url) => url && onCambio({ src: url }));
             }}
           />
         </label>
+        {esMia && errorFoto && <AvisoDeSubida texto={errorFoto} />}
         <input
           value={bloque.epigrafe ?? ""}
           onChange={(e) => onCambio({ epigrafe: e.target.value })}
@@ -1307,6 +1350,78 @@ function CamposBloque({
             className={campo}
             placeholder="Su cargo (opcional)"
           />
+        </div>
+      )}
+      {/*
+        El retrato de quien habla.
+
+        El dato existía desde siempre —el tipo, la validación del servidor y el
+        diario, que lo dibuja en un círculo al lado de la cita— pero el editor no
+        lo ofrecía: para ponerle cara a una declaración había que editar la base
+        a mano. Lo pidió la redacción, con el caso de una foto de la intendenta
+        junto a su cita.
+
+        Es opcional y queda así a propósito: sin foto de la persona el bloque
+        sigue siendo una cita correcta. En una publicación oficial, la cara
+        equivocada al lado de una declaración es peor que ninguna.
+
+        El diario la muestra en BLANCO Y NEGRO, como el impreso: se puede subir
+        a color, pero se va a ver en gris. Lo dice la ayuda de abajo para que no
+        parezca que la foto se arruinó.
+      */}
+      {bloque.tipo === "cita" && (
+        <div className="flex flex-wrap items-center gap-3">
+          {bloque.retrato ? (
+            // eslint-disable-next-line @next/next/no-img-element -- vista previa del panel, no del diario: no pasa por el optimizador
+            <img
+              src={bloque.retrato}
+              alt=""
+              className="h-12 w-12 shrink-0 rounded-full object-cover grayscale"
+            />
+          ) : null}
+          <label
+            className={cn(
+              "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-borde-campo px-3 py-1.5 text-[0.78rem] font-medium",
+              subiendo && "opacity-60",
+            )}
+          >
+            {(esMia && subiendo) ||
+              (bloque.retrato ? "Cambiar el retrato" : "Agregar un retrato")}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={subiendo !== null}
+              className="sr-only"
+              aria-label={`Retrato de quien lo dijo, en el bloque ${indice + 1}`}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                // Se limpia para que elegir el MISMO archivo dos veces seguidas
+                // —después de un error— vuelva a disparar el cambio.
+                e.target.value = "";
+                if (f) {
+                  void onSubir(f, destino).then((url) => url && onCambio({ retrato: url }));
+                }
+              }}
+            />
+          </label>
+          {bloque.retrato ? (
+            <button
+              type="button"
+              onClick={() => onCambio({ retrato: "" })}
+              className="text-[0.78rem] font-medium text-panel-tinta-3 underline-offset-2 hover:text-panel-tinta hover:underline"
+            >
+              Quitar
+            </button>
+          ) : null}
+          <span className="w-full text-[0.72rem] text-panel-tinta-3">
+            Opcional. En el diario se ve redondo y en blanco y negro, como en el
+            impreso.
+          </span>
+          {esMia && errorFoto && (
+            <span className="w-full">
+              <AvisoDeSubida texto={errorFoto} />
+            </span>
+          )}
         </div>
       )}
     </div>

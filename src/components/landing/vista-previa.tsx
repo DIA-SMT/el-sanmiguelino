@@ -93,9 +93,11 @@ export async function VistaPrevia() {
                 {principal.titulo}
               </Link>
             </h3>
-            <p className="mt-3 line-clamp-3 max-w-2xl text-pretty font-serif text-[0.98rem] italic leading-relaxed text-ink-2 sm:mt-4 sm:line-clamp-none sm:text-[1.02rem]">
-              {principal.bajada}
-            </p>
+            {principal.bajada && (
+              <p className="mt-3 line-clamp-3 max-w-2xl text-pretty font-serif text-[0.98rem] italic leading-relaxed text-ink-2 sm:mt-4 sm:line-clamp-none sm:text-[1.02rem]">
+                {principal.bajada}
+              </p>
+            )}
             {/* El arranque de la nota es lo más caro en alto y lo más
                 redundante con la bajada: en celular no entra. */}
             {arranque && (
@@ -128,9 +130,11 @@ export async function VistaPrevia() {
                       {nota.titulo}
                     </Link>
                   </h3>
-                  <p className="mt-1.5 hidden line-clamp-2 font-serif text-[0.85rem] leading-snug text-ink-3 sm:block">
-                    {nota.bajada}
-                  </p>
+                  {nota.bajada && (
+                    <p className="mt-1.5 hidden line-clamp-2 font-serif text-[0.85rem] leading-snug text-ink-3 sm:block">
+                      {nota.bajada}
+                    </p>
+                  )}
                 </div>
                 {nota.imagen && imagenDisponible(nota.imagen.src) && (
                   <Link

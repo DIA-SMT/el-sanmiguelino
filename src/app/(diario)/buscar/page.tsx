@@ -137,11 +137,11 @@ export default async function BuscarPage({
                           <mark>{fragmento.coincidencia}</mark>
                           {fragmento.despues}
                         </p>
-                      ) : (
+                      ) : nota.bajada ? (
                         <p className="mt-2.5 max-w-2xl text-pretty font-serif text-[0.92rem] leading-[1.7] text-ink-2">
                           {nota.bajada}
                         </p>
-                      )}
+                      ) : null}
 
                       <p className="meta mt-3">
                         {donde === "cuerpo" ? "En el cuerpo" : null}

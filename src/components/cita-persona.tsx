@@ -29,7 +29,9 @@ export function CitaPersona({
   texto: string;
   autor: string;
   cargo?: string;
-  /** Ruta bajo /public. Si no está el archivo, no se renderiza el círculo. */
+  /** Una ruta bajo /public o la dirección de una foto subida desde el panel
+   *  —las dos las acepta `imagenDisponible()`—. Si no hay, no se dibuja el
+   *  círculo. */
   retrato?: string;
   className?: string;
 }) {

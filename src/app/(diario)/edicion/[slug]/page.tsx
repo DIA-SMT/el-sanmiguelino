@@ -154,9 +154,11 @@ export default async function EdicionPage({
                     {nota.titulo}
                   </Link>
                 </h2>
-                <p className="mt-2 max-w-3xl font-serif text-[0.95rem] leading-relaxed text-ink-2">
-                  {nota.bajada}
-                </p>
+                {nota.bajada && (
+                  <p className="mt-2 max-w-3xl font-serif text-[0.95rem] leading-relaxed text-ink-2">
+                    {nota.bajada}
+                  </p>
+                )}
                 <p className="meta mt-2.5 inline-flex items-center gap-1.5">
                   <Clock className="h-3 w-3" aria-hidden="true" />
                   {nota.minutosLectura} min

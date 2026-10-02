@@ -102,9 +102,25 @@ function textoDeNota(nota: NotaCompleta): string {
   ].join(" ");
 }
 
+/**
+ * Lo que Migue anuncia antes de leer una nota en voz alta.
+ *
+ * Decía siempre "te leo el título y la bajada", y era cierto mientras la bajada
+ * fue obligatoria. Ahora es opcional: en una nota sin bajada se leen sólo la
+ * sección y el titular —ver `textoDeResumenDeNota`— y prometer una bajada que
+ * no llega deja al vecino esperando algo que no viene.
+ */
+function anuncioDeLectura(nota: { titulo: string; bajada: string }): string {
+  const que = nota.bajada.trim() ? "el título y la bajada" : "el título";
+  return `Te leo ${que} de “${nota.titulo}”. Tocá de nuevo para que pare.`;
+}
+
 function mejorParrafo(nota: NotaCompleta, tokens: string[]): string {
   const parrafos = nota.cuerpo.filter((b) => b.tipo === "parrafo");
-  let mejor = parrafos[0]?.texto ?? nota.bajada;
+  // `||` y no `??`: la bajada ahora es opcional y llega como cadena vacía, que
+  // `??` deja pasar. Una nota sin párrafos —sólo fichas o fotos— y sin bajada
+  // daba un fragmento vacío; con el titular, Migue siempre tiene qué citar.
+  let mejor = parrafos[0]?.texto || nota.bajada || nota.titulo;
   let mejorPuntaje = 0;
   for (const p of parrafos) {
     const propios = new Set(tokenizar(p.texto));
@@ -333,7 +349,7 @@ export async function POST(request: NextRequest) {
     if (abierta) {
       return responder(
         "leer",
-        `Te leo el título y la bajada de “${abierta.titulo}”. Tocá de nuevo para que pare.`,
+        anuncioDeLectura(abierta),
         {
           pregunta,
           notaSlug: abierta.slug,
@@ -424,7 +440,7 @@ export async function POST(request: NextRequest) {
       if (mejor && mejor.puntaje > 0 && mejor.puntaje > (segunda?.puntaje ?? 0)) {
         return responder(
           "leer",
-          `Te leo el título y la bajada de “${mejor.nota.titulo}”. Tocá de nuevo para que pare.`,
+          anuncioDeLectura(mejor.nota),
           {
             pregunta,
             notaSlug: mejor.nota.slug,
@@ -490,7 +506,7 @@ export async function POST(request: NextRequest) {
     if (ultima) {
       return responder(
         "leer",
-        `Te leo el título y la bajada de “${ultima.titulo}”. Tocá de nuevo para que pare.`,
+        anuncioDeLectura(ultima),
         {
           pregunta,
           notaSlug: ultima.slug,

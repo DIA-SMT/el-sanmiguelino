@@ -205,7 +205,13 @@ export async function guardarNotaAction(
       );
     }
     if (!textoNoVacio(titulo)) throw new Error("Falta el título.");
-    if (!textoNoVacio(bajada)) throw new Error("Falta la bajada.");
+    // La bajada es OPCIONAL. Se exigía, y la redacción avisó que no todas las
+    // notas la tienen: se terminaba inventando una para poder guardar. Si viene
+    // vacía se guarda vacía —la columna es texto no nulo, así que no hace falta
+    // migración— y cada pantalla que la muestra la omite.
+    if (bajada !== undefined && typeof bajada !== "string") {
+      throw new Error("La bajada tiene que ser texto.");
+    }
     if (!textoNoVacio(seccion)) throw new Error("Falta la sección.");
     if (!Array.isArray(cuerpo) || cuerpo.length === 0) {
       throw new Error("La nota no tiene cuerpo.");
@@ -215,7 +221,7 @@ export async function guardarNotaAction(
       slug,
       seccion,
       titulo,
-      bajada,
+      bajada: typeof bajada === "string" ? bajada.trim() : "",
       cuerpo: cuerpo.map(validarBloque),
       ...(textoNoVacio(slugOriginal) ? { slugOriginal } : {}),
       // Si no viene, el repo la manda a la edición en foco, como antes. Que
