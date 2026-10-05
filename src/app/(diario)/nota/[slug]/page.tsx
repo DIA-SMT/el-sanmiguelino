@@ -218,9 +218,13 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
          enlace —una dirección que no se validó no se ofrece—, y queda el
          título solo, para que la nota no tenga un hueco sin explicación.
 
-         El enlace de abajo va SIEMPRE: es lo que sirve sin señal, para verlo en
-         pantalla completa, y para quien no puede usar un mapa o una línea de
-         tiempo con el dedo. En un sitio del Estado aplica la Ley 26.653. */
+         El enlace de abajo es para verlo en pantalla completa y para quien no
+         puede usar un mapa o una línea de tiempo con el dedo. En un sitio del
+         Estado aplica la Ley 26.653. En el teléfono se esconde porque ahí el
+         interactivo no se incrusta y la tarjeta que va en su lugar ya trae ese
+         enlace (ver `InteractivoIncrustado`): serían dos botones seguidos para
+         lo mismo. Sin señal la tarjeta dice "Se abre con conexión." —el enlace
+         sólo abriría la página de error— y el botón vuelve solo con la señal. */
       const url = urlIncrustable(bloque.url);
       return (
         <figure className="figura-ancha">
@@ -242,7 +246,7 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="enlace mt-1.5 inline-flex items-center gap-1.5 font-medium"
+                className="enlace mt-1.5 inline-flex items-center gap-1.5 font-medium max-md:hidden"
               >
                 Abrir «{bloque.titulo}» en el Portal de Datos
                 <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />

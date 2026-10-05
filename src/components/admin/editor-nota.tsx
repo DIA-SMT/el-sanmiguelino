@@ -1377,7 +1377,7 @@ function CamposBloque({
           {!hayDireccion
             ? "Pegá la dirección del Portal de Datos, o el código de «Insertar» si lo tiene."
             : valida
-              ? "Listo: se va a ver adentro de la nota, con el enlace abajo."
+              ? "Listo: se va a ver adentro de la nota, con el enlace abajo. En el teléfono va una tarjeta que lo abre en el Portal."
               : `Esa dirección no es de un sitio habilitado. Por ahora se pueden incrustar elementos de ${SITIOS_INCRUSTABLES.join(", ")}.`}
         </span>
         <input
@@ -1425,7 +1425,8 @@ function CamposBloque({
             );
           })}
           <span className="text-[0.72rem] text-panel-tinta-3">
-            Más alto, para mapas o líneas de tiempo que necesitan pantalla.
+            Más alto, para mapas o líneas de tiempo que necesitan pantalla. En
+            el teléfono no cambia: ahí va la tarjeta.
           </span>
         </div>
       </div>

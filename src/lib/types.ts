@@ -116,9 +116,12 @@ export type BloqueNota =
       /**
        * Un elemento interactivo del Portal de Datos —una línea de tiempo, un
        * mapa— metido adentro de la nota. Se dibuja a todo el ancho, como la
-       * infografía, y SIEMPRE lleva debajo el enlace para abrirlo aparte: es lo
-       * que se ve sin señal, porque un sitio ajeno no se guarda para leer
-       * offline. Qué sitios se aceptan lo decide `src/lib/interactivos.ts`.
+       * infografía, y siempre se ofrece abrirlo aparte: de tablet para arriba
+       * con el enlace de abajo del recuadro; en el teléfono, donde no se
+       * incrusta, con la tarjeta que va en su lugar. Sin señal no se carga,
+       * porque un sitio ajeno no se guarda para leer offline, y el enlace queda
+       * para cuando vuelva. Qué sitios se aceptan lo decide
+       * `src/lib/interactivos.ts`.
        */
       tipo: "interactivo";
       url: string;
