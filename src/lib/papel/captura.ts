@@ -33,6 +33,10 @@ export async function capturarPapel(hoja: HTMLElement): Promise<CapturaPapel> {
     // franja; conservar sólo las imágenes que entran en el papel visible hace
     // que la preparación no dependa de recursos lejanos.
     filter: (nodo) => {
+      // Un interactivo es de otro sitio y no se puede fotografiar: sale una
+      // caja vacía. Se saltea, y en la foto queda el recuadro que lo envuelve,
+      // con su fondo y el título (ver `InteractivoIncrustado`).
+      if (nodo instanceof HTMLIFrameElement) return false;
       if (!(nodo instanceof HTMLImageElement)) return true;
       const imagen = nodo.getBoundingClientRect();
       return imagen.bottom >= arriba && imagen.top <= arriba + alto;

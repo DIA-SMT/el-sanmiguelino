@@ -192,7 +192,16 @@ function validarBloque(v: unknown, i: number): BloqueNota {
     // Este es el control que cuenta. El editor avisa antes, pero lo que llega
     // acá puede venir de cualquier lado: la URL de una Server Action es
     // pública para quien la conozca.
-    const url = typeof v.url === "string" ? urlIncrustable(v.url) : null;
+    // Vacío y rechazado son dos cosas distintas y se dicen distinto: un bloque
+    // recién convertido a interactivo no tiene dirección todavía, y decirle
+    // "no es de un sitio habilitado" a algo que no se escribió confunde.
+    if (!textoNoVacio(v.url)) {
+      throw new Error(
+        `El interactivo del bloque ${i + 1} no tiene dirección. Pegá la del ` +
+          `Portal de Datos o cambiale el tipo al bloque.`,
+      );
+    }
+    const url = urlIncrustable(v.url);
     if (!url) {
       throw new Error(
         `El interactivo del bloque ${i + 1} no es de un sitio habilitado. ` +

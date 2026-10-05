@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { WifiOff } from "lucide-react";
 import type { AltoInteractivo } from "@/lib/interactivos";
 import { cn } from "@/lib/utils";
@@ -52,6 +52,12 @@ export function InteractivoIncrustado({
   alto?: AltoInteractivo;
 }) {
   const conexion = useSyncExternalStore(suscribir, hayConexion, enElServidor);
+  /* Si ya cargó con señal, se queda aunque la señal se corte. El interactivo
+     sigue andando sin red con lo que ya bajó, y cambiarlo por el aviso lo
+     desarmaba: al volver la señal arrancaba de cero y se perdía el año, la
+     ficha abierta y el scroll. El aviso queda para lo que nunca llegó a
+     cargar. */
+  const [cargado, setCargado] = useState(false);
 
   /* El alto se queda corto a propósito, sobre todo en el teléfono: un recuadro
      de pantalla completa atrapa el dedo, que mueve el interactivo y no la nota,
@@ -60,7 +66,7 @@ export function InteractivoIncrustado({
   const altura =
     alto === "alto" ? "h-[min(85svh,720px)]" : "h-[min(70svh,560px)]";
 
-  if (!conexion) {
+  if (!conexion && !cargado) {
     return (
       <div
         className={cn(
@@ -77,15 +83,33 @@ export function InteractivoIncrustado({
     );
   }
 
+  /* El recuadro tiene su propio fondo y el título DETRÁS del interactivo.
+     Mientras el interactivo está en vivo lo tapa; pero el giro de página
+     fotografía la hoja (`src/lib/papel/captura.ts`) y lo de un sitio ajeno no
+     se puede fotografiar: salía una caja vacía durante el giro. La captura
+     saltea el <iframe>, así que en la foto queda esto, del mismo tamaño. */
   return (
-    <iframe
-      src={url}
-      title={titulo}
-      loading="lazy"
-      referrerPolicy="strict-origin-when-cross-origin"
-      sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-      allow="fullscreen"
-      className={cn("block w-full border border-line bg-paper-2", altura)}
-    />
+    <div className={cn("relative border border-line bg-paper-2", altura)}>
+      <p
+        aria-hidden="true"
+        className="absolute inset-0 grid place-items-center px-6 text-center font-serif text-[0.95rem] italic text-ink-2"
+      >
+        «{titulo}»
+      </p>
+      <iframe
+        src={url}
+        title={titulo}
+        loading="lazy"
+        referrerPolicy="strict-origin-when-cross-origin"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        allow="fullscreen"
+        // Sólo se da por cargado si había señal: si la red se cortó a mitad de
+        // camino, lo que cargó es la página de error y no hay que conservarla.
+        onLoad={() => {
+          if (navigator.onLine) setCargado(true);
+        }}
+        className="absolute inset-0 block h-full w-full"
+      />
+    </div>
   );
 }

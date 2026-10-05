@@ -96,5 +96,18 @@ export async function POST(request: NextRequest) {
     direccion,
     usuarioId: usuario.id,
   });
+  if (!r.ok) {
+    // 409: el correo ya tiene una suscripción de otra cuenta. El mensaje ayuda
+    // al caso legítimo —la misma persona con otra cuenta— sin decir de quién
+    // es ni qué dirección tiene cargada.
+    return NextResponse.json(
+      {
+        error:
+          "No pudimos anotar ese correo. Si ya te habías anotado, ingresá con " +
+          "la misma cuenta de Ciudadano Digital que usaste esa vez.",
+      },
+      { status: 409 },
+    );
+  }
   return NextResponse.json(r, { status: r.yaEstaba ? 200 : 201 });
 }

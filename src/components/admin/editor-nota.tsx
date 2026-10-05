@@ -106,6 +106,17 @@ const TIPOS: { valor: BloqueNota["tipo"]; nombre: string; ayuda: string }[] = [
     ayuda: "Una foto dentro del texto, con su epígrafe. Para páginas de fotos.",
   },
   {
+    /* Estuvo afuera desde que la digitalización creó el tipo para las
+       enumeraciones del impreso —las 67 plazas de agosto—, y esto no lo fuerza
+       el tipo: el selector no avisa si le falta uno. La redacción no podía
+       crear una lista, y al abrir una nota que ya la tenía el selector no
+       encontraba la opción y mostraba "Párrafo": tocarlo creyendo que se
+       corregía un párrafo convertía la lista. */
+    valor: "lista",
+    nombre: "Lista",
+    ayuda: "Una enumeración: un ítem por renglón, como en el impreso.",
+  },
+  {
     valor: "interactivo",
     nombre: "Interactivo",
     ayuda:
@@ -1307,20 +1318,20 @@ function CamposBloque({
     /* Una lista se edita como texto, un ítem por renglón. Es la forma en que
        cualquiera escribe una lista sin pensarlo, y evita inventar una interfaz
        de filas con su botón de agregar y su botón de borrar para algo que en el
-       impreso son nombres sueltos. Los renglones vacíos se descartan al
-       guardar, así que sobra un Enter de más. */
+       impreso son nombres sueltos.
+
+       **Lo escrito se guarda CRUDO mientras se tipea; lo limpia el servidor
+       al guardar** (`validarBloque` descarta los renglones vacíos y recorta
+       los espacios). Antes se limpiaba acá, en cada tecla: el Enter que abre
+       un renglón nuevo quedaba vacío, el filtro lo borraba y el cuadro volvía
+       a dibujarse sin él, igual que un espacio al final. No se podía escribir
+       una lista desde cero. Estuvo así sin que nadie lo notara porque "Lista"
+       no aparecía en el selector; al sumarla quedó a la vista. */
     return (
       <div className="mt-3 space-y-3">
         <textarea
           value={bloque.items.join("\n")}
-          onChange={(e) =>
-            onCambio({
-              items: e.target.value
-                .split("\n")
-                .map((l) => l.trim())
-                .filter(Boolean),
-            })
-          }
+          onChange={(e) => onCambio({ items: e.target.value.split("\n") })}
           rows={Math.min(14, Math.max(4, bloque.items.length + 1))}
           aria-label={`Ítems del bloque ${indice + 1}, uno por renglón`}
           className={cn(campo, "resize-y")}
@@ -1329,6 +1340,9 @@ function CamposBloque({
         <input
           value={bloque.titulo ?? ""}
           onChange={(e) => onCambio({ titulo: e.target.value })}
+          // Sin esto, Enter en el título publicaba la nota entera: es el único
+          // campo de una línea del cuerpo que se había quedado sin la guarda.
+          {...sinEnviarConEnter}
           aria-label={`Título de la lista del bloque ${indice + 1}`}
           className={campo}
           placeholder="Título de la lista (opcional)"

@@ -26,7 +26,9 @@ export type ResultadoSuscripcion =
   | { ok: true; yaEstaba: false }
   /** Ya había una suscripción con ese correo. NO es un error: apretar el botón
    *  dos veces no puede parecer una falla del sitio. */
-  | { ok: true; yaEstaba: true };
+  | { ok: true; yaEstaba: true }
+  /** Ese correo ya lo anotó OTRA cuenta, y no se toca. Ver `suscribir`. */
+  | { ok: false; motivo: "ajena" };
 
 export async function suscribir(datos: {
   nombre: string;
@@ -38,18 +40,34 @@ export async function suscribir(datos: {
   const email = datos.email.trim().toLowerCase();
   const existente = await db().suscripcion.findUnique({
     where: { email },
-    select: { id: true },
+    select: { usuarioId: true },
   });
   if (existente) {
-    // Se actualizan los datos: si alguien se anota de nuevo es porque se mudó
-    // o se equivocó, y la última vez que lo escribió es la buena.
+    /*
+     * Sólo la MISMA cuenta que se anotó puede cambiar sus datos.
+     *
+     * Antes se actualizaba sin preguntar de quién era —"si alguien se anota de
+     * nuevo es porque se mudó"—, y eso dejaba un agujero: cualquiera con
+     * sesión que supiera el correo de otra persona le cambiaba la dirección y,
+     * de paso, se quedaba con la suscripción, porque pasaba a figurar con SU
+     * cuenta. El dueño dejaba de recibir el diario sin enterarse y sin rastro
+     * de quién lo había hecho.
+     *
+     * Las filas de antes del 2026-09-01 traen el id que repartía el login de
+     * prueba y no coinciden con nadie: esas quedan como están, que es lo
+     * seguro. Si alguna de esas personas se muda, la cambia el municipio.
+     */
+    if (existente.usuarioId !== datos.usuarioId) {
+      return { ok: false, motivo: "ajena" };
+    }
+    // La misma persona anotándose de nuevo: se mudó o se equivocó, y la última
+    // vez que lo escribió es la buena.
     await db().suscripcion.update({
       where: { email },
       data: {
         nombre: datos.nombre,
         edad: datos.edad,
         direccion: datos.direccion,
-        usuarioId: datos.usuarioId,
       },
     });
     return { ok: true, yaEstaba: true };

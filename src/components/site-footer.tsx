@@ -34,7 +34,10 @@ export async function SiteFooter() {
               porque no es navegación: es algo que se hace una vez, y el pie es
               donde uno mira cuando ya leyó. */}
           <div className="mt-4 flex justify-center">
-            <SuscripcionPapel nombre={usuario?.nombre ?? ""} />
+            <SuscripcionPapel
+              nombre={usuario?.nombre ?? ""}
+              conSesion={usuario !== null}
+            />
           </div>
           {/* El archivo se llega desde el pie, que está en todas las páginas.
               En la bandera competiría con las secciones de la edición en curso,

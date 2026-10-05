@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Mailbox, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,11 +32,14 @@ const etiqueta =
   "block font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink-2";
 
 export function SuscripcionPapel({
-  /** El de la sesión de Cidituc. Vacío si no hay sesión —la landing es
-   *  pública—, y ahí el formulario queda como estaba. */
+  /** El de la sesión de Cidituc. Vacío si no hay sesión. */
   nombre = "",
+  /** Si quien mira ingresó. Sin sesión el formulario no se puede enviar —la
+   *  API lo rechaza—, así que en su lugar se explica cómo anotarse. */
+  conSesion,
 }: {
   nombre?: string;
+  conSesion: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -122,7 +126,26 @@ export function SuscripcionPapel({
             </Dialog.Close>
           </header>
 
-          {listo ? (
+          {!conSesion ? (
+            /* Sin sesión no se muestra el formulario: no se puede enviar. El
+               pie aparece también en la portada, que es pública, y ahí el
+               formulario se completaba entero y al mandarlo contestaba "No
+               autenticado". Anotarse pide ingresar porque se guarda una
+               dirección: sin identidad, cualquiera podría anotar a otro. */
+            <div className="space-y-4 px-5 py-7 text-center">
+              <p className="font-serif text-[0.98rem] leading-relaxed text-ink-2">
+                Para anotarte necesitás ingresar con tu cuenta de Ciudadano
+                Digital. Es la misma que usás para los trámites de la
+                Municipalidad.
+              </p>
+              <Link
+                href="/login"
+                className="pressable inline-flex items-center gap-2 border border-ink bg-ink px-4 py-2.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-paper transition-colors hover:bg-accent hover:text-accent-contrast"
+              >
+                Ingresar
+              </Link>
+            </div>
+          ) : listo ? (
             <div className="px-5 py-9 text-center">
               <Check
                 className="mx-auto h-8 w-8 text-accent"

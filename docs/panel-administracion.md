@@ -1363,13 +1363,34 @@ hay que llevarle el diario a la casa. Por eso la tabla está aparte, el repo es
 `server-only`, y la pantalla del panel lo dice en un cartel.
 
 El formulario pone el correo y la dirección **primero**, y el nombre y la edad
-en una fila propia al final. No es estético: cuando llegue el SSO de Cidituc
-esos dos van a venir de ahí y esa fila se va entera sin mover el resto.
+en una fila propia al final. Se pensó para que esa fila se fuera entera cuando
+llegara el SSO de Cidituc, pero Cidituc no tiene edad ni domicilio: sólo el
+nombre llega prellenado, y editable (ver `suscripcion-papel.tsx`). El correo
+queda a mano por decisión.
 
-Si alguien se anota dos veces con el mismo correo **no es un error**: es la
-misma persona apretando el botón de nuevo, o alguien que se mudó. Se actualizan
-los datos y se le avisa que se actualizaron. Un cartel de error ahí parecería
-una falla del sitio.
+**Anotarse pide haber ingresado.** Se guarda un domicilio, y sin identidad
+cualquiera podría anotar a otro. El pie está también en la portada, que es
+pública: ahí el diálogo no muestra el formulario —antes se completaba entero y
+al mandarlo contestaba "No autenticado"— sino una línea que explica y un botón
+a `/login`.
+
+Si alguien se anota dos veces con el mismo correo **desde la misma cuenta, no
+es un error**: es la misma persona apretando el botón de nuevo, o alguien que se
+mudó. Se actualizan nombre, edad y dirección y se le avisa que se actualizaron
+(200). Un cartel de error ahí parecería una falla del sitio.
+
+**Desde otra cuenta, no se toca nada.** Antes se actualizaba sin mirar de quién
+era la fila, y eso dejaba un agujero: cualquiera con sesión que supiera el
+correo de un vecino le cambiaba la dirección y se quedaba con la suscripción,
+porque la fila pasaba a figurar con su cuenta. El dueño dejaba de recibir el
+diario sin enterarse. Ahora contesta 409 con un mensaje que ayuda al caso
+legítimo —la misma persona con otra cuenta: "ingresá con la que usaste esa
+vez"— sin decir de quién es el correo ni qué dirección tiene. Y el `usuarioId`
+de una fila no se reescribe nunca.
+
+Las filas de antes del 2026-09-01 traen el id que repartía el login de prueba y
+no coinciden con ninguna cuenta real: quedan congeladas, que es lo seguro. Si
+alguna de esas personas se muda, la cambia el municipio.
 
 ### Dos cosas del CSV que no son obvias
 
