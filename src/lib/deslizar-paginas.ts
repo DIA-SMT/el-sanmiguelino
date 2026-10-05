@@ -59,8 +59,14 @@ function umbral(ancho: number): number {
  *  `[data-capa-flotante]` y no sólo `[role='dialog']`: un menú desplegable no
  *  es un diálogo —ponerle ese rol para que lo ataje esta guardia sería mentirle
  *  al lector de pantalla— pero el dedo que está adentro tampoco es del papel.
- *  Sin esto, deslizar sobre la lista de números pasaba de página por debajo. */
+ *  Sin esto, deslizar sobre la lista de números pasaba de página por debajo.
+ *
+ *  Tampoco es del papel nada mientras haya algo en pantalla completa —un
+ *  interactivo del Portal—: la nota queda escondida detrás, y pasar de página
+ *  la desmonta y saca al lector de la pantalla completa sin que lo haya
+ *  pedido. */
 function esZonaAjena(objetivo: EventTarget | null): boolean {
+  if (document.fullscreenElement) return true;
   if (!(objetivo instanceof Element)) return false;
   if (objetivo.closest("[role='dialog'], [data-capa-flotante]")) return true;
 

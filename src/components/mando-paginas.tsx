@@ -189,6 +189,12 @@ export function MandoPaginas({ paginas }: { paginas: PaginaEdicion[] }) {
       ) {
         return;
       }
+      // Ni con algo en pantalla completa —un interactivo del Portal—: la nota
+      // está escondida detrás, las flechas la movían a ciegas y al llegar al
+      // borde pasaban de página, que desmonta el interactivo y saca de la
+      // pantalla completa. Va antes del preventDefault: las flechas son del
+      // que está en pantalla completa.
+      if (document.fullscreenElement) return;
 
       e.preventDefault();
       // Mientras la hoja gira no se scrollea: la captura de la cara que entra

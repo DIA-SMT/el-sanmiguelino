@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, cookieMuerta } from "@/lib/auth/cookie";
 import { AUTH_CIDITUC_OBLIGATORIA } from "@/lib/auth/config";
+import { respuestaSinSesion } from "@/lib/interactivos-aviso";
 
 /**
  * Gate de acceso con Cidituc. Públicas: la landing (/), /login, las rutas de
@@ -46,6 +47,22 @@ export function proxy(request: NextRequest) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
     return NextResponse.next();
+  }
+
+  // `/interactivo` es lo que carga el recuadro de un interactivo adentro de la
+  // nota. Mandarlo a /login ponía la pantalla de ingreso del diario adentro del
+  // recuadro —sesión vencida con la nota abierta, o cerrada en otra pestaña—.
+  // Va un aviso aislado, como el resto de lo que sale de esa ruta.
+  if (
+    AUTH_CIDITUC_OBLIGATORIA &&
+    !tieneSesion &&
+    pathname === "/interactivo"
+  ) {
+    const res = respuestaSinSesion(null);
+    if (!muerta) return res;
+    const conBorrado = new NextResponse(res.body, res);
+    conBorrado.cookies.delete(SESSION_COOKIE);
+    return conBorrado;
   }
 
   if (AUTH_CIDITUC_OBLIGATORIA && !esPublica && !tieneSesion) {

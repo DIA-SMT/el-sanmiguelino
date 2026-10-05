@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Clock, ExternalLink } from "lucide-react";
+import { ArrowLeft, Clock } from "lucide-react";
 import { InteractivoIncrustado } from "@/components/interactivo-incrustado";
 import { urlIncrustable } from "@/lib/interactivos";
 import { ViewTransition } from "react";
@@ -218,44 +218,30 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
          enlace —una dirección que no se validó no se ofrece—, y queda el
          título solo, para que la nota no tenga un hueco sin explicación.
 
-         El enlace de abajo es para verlo en pantalla completa y para quien no
-         puede usar un mapa o una línea de tiempo con el dedo. En un sitio del
-         Estado aplica la Ley 26.653. En el teléfono se esconde porque ahí el
-         interactivo no se incrusta y la tarjeta que va en su lugar ya trae ese
-         enlace (ver `InteractivoIncrustado`): serían dos botones seguidos para
-         lo mismo. Sin señal la tarjeta dice "Se abre con conexión." —el enlace
-         sólo abriría la página de error— y el botón vuelve solo con la señal. */
+         El pie —descripción, enlace y pantalla completa— lo arma el propio
+         `InteractivoIncrustado`: depende de cosas que sólo se saben en el
+         navegador (el ancho, la señal, si se puede poner en pantalla
+         completa). */
       const url = urlIncrustable(bloque.url);
       return (
         <figure className="figura-ancha">
-          {url && (
+          {url ? (
             <InteractivoIncrustado
               url={url}
               titulo={bloque.titulo}
+              descripcion={bloque.descripcion}
               alto={bloque.alto}
             />
-          )}
-          <figcaption className="mt-2.5 font-sans text-[0.74rem] leading-snug text-ink-3">
-            {bloque.descripcion && (
-              <span className="block text-pretty text-ink-2">
-                {bloque.descripcion}
-              </span>
-            )}
-            {url ? (
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="enlace mt-1.5 inline-flex items-center gap-1.5 font-medium max-md:hidden"
-              >
-                Abrir «{bloque.titulo}» en el Portal de Datos
-                <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
-                <span className="sr-only">(se abre en otra pestaña)</span>
-              </a>
-            ) : (
+          ) : (
+            <figcaption className="mt-2.5 font-sans text-[0.74rem] leading-snug text-ink-3">
+              {bloque.descripcion && (
+                <span className="block text-pretty text-ink-2">
+                  {bloque.descripcion}
+                </span>
+              )}
               <span className="mt-1 block">{bloque.titulo}</span>
-            )}
-          </figcaption>
+            </figcaption>
+          )}
         </figure>
       );
     }

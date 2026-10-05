@@ -54,7 +54,29 @@ export function urlIncrustable(entrada: string): string | null {
   if (!(SITIOS_INCRUSTABLES as readonly string[]).includes(url.hostname)) {
     return null;
   }
+  // Ni otro puerto ni usuario y contraseña. `hostname` no incluye el puerto,
+  // y `https://smtendatos.gob.ar:8443/` es OTRO sitio que nadie revisó: desde
+  // que el servidor del diario baja la página (`/interactivo`), aceptarlo
+  // dejaba usar el diario para tantear los puertos del Portal. Un `:443`
+  // escrito a mano no molesta: la URL lo normaliza a vacío.
+  if (url.port !== "" || url.username || url.password) return null;
   return url.toString();
+}
+
+/**
+ * La dirección para el <iframe>: la versión del diario, sin el menú ni el
+ * título del Portal y a la medida del recuadro (ver
+ * `src/lib/interactivos-servidor.ts`). Recibe una que ya pasó por
+ * `urlIncrustable`. Los enlaces para abrirlo aparte van a la dirección del
+ * Portal tal cual: en su pestaña, la página entera se lee bien.
+ */
+export function direccionIncrustada(
+  url: string,
+  tema: "light" | "dark",
+): string {
+  const parametros = new URLSearchParams({ u: url });
+  if (tema === "dark") parametros.set("tema", "dark");
+  return `/interactivo?${parametros}`;
 }
 
 /** El alto del recuadro, por nombre y no en píxeles: un número en un campo del
