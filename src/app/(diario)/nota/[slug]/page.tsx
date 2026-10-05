@@ -29,6 +29,7 @@ import { seccionesDeEdicion, slugificarSeccion } from "@/lib/data/secciones";
 import { numeroDeNota, paginasDeEdicion } from "@/lib/data/paginas";
 import { FoliadoDeLaPagina } from "@/components/foliado-visible";
 import { getUsuario } from "@/lib/auth/session";
+import { cn } from "@/lib/utils";
 import type { BloqueNota } from "@/lib/types";
 
 export async function generateMetadata({
@@ -61,16 +62,56 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
           className="my-7"
         />
       );
-    case "destacado":
+    case "destacado": {
       /* Una frase del propio texto, subrayada. En el impreso es un filete
          grueso arriba y la frase en la sans del diario, más grande que el
          cuerpo pero sin llegar al titular. Sin comillas ni autor: no es una
-         cita, es el redactor levantando la voz sobre su propia idea. */
-      return (
-        <p className="my-7 border-t-2 border-ink pt-4 font-sans text-[1.12rem] font-medium leading-[1.35] text-ink">
-          {bloque.texto}
-        </p>
+         cita, es el redactor levantando la voz sobre su propia idea.
+
+         Acepta hasta un par de párrafos —cada renglón es uno— y el estilo lo
+         elige la redacción. Antes el texto se pintaba entero en un solo <p>:
+         los puntos y aparte desaparecían y todo salía en negrita, que es lo
+         que reportaron. */
+      const parrafos = bloque.texto
+        .split(/\n+/)
+        .map((p) => p.trim())
+        .filter(Boolean);
+      /* Negrita es UN solo peso, el de siempre (500), venga de donde venga.
+
+         Estuvo en tres: ausente 500, `true` 600 y `false` 400. Eso hacía que
+         apagar y volver a prender "Negrita" en un destacado publicado lo
+         dejara más grueso que antes —de 500 a 600— con el botón exactamente
+         igual que al empezar: la pantalla escondía la diferencia. 500 es,
+         además, lo que la redacción llamaba negrita cuando reportó que salía
+         "en negrita sola". Sólo `false` lo baja a normal. */
+      const peso = bloque.negrita === false ? "font-normal" : "font-medium";
+      const letra = cn(
+        "font-sans text-[1.12rem] leading-[1.35] text-ink",
+        peso,
+        bloque.cursiva && "italic",
       );
+
+      /* Un solo párrafo se dibuja con el MISMO elemento y las mismas clases de
+         siempre. No es prolijidad: los trece destacados publicados son de un
+         párrafo, y así salen idénticos sin depender de que un envoltorio nuevo
+         no les cambie nada. */
+      if (parrafos.length <= 1) {
+        return (
+          <p className={cn("my-7 border-t-2 border-ink pt-4", letra)}>
+            {parrafos[0] ?? bloque.texto}
+          </p>
+        );
+      }
+      return (
+        <div className="my-7 border-t-2 border-ink pt-4">
+          {parrafos.map((p, i) => (
+            <p key={i} className={cn(letra, i > 0 && "mt-3")}>
+              {p}
+            </p>
+          ))}
+        </div>
+      );
+    }
     case "ficha":
       /* Recuadro de datos. El marco de esquinas redondeadas es del impreso y
          es el único lugar del diario donde hay una curva: todo lo demás son

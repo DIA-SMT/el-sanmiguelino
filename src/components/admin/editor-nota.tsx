@@ -92,7 +92,7 @@ const TIPOS: { valor: BloqueNota["tipo"]; nombre: string; ayuda: string }[] = [
   {
     valor: "destacado",
     nombre: "Destacado",
-    ayuda: "Una frase de la propia nota, subrayada. Sin autor.",
+    ayuda: "Una frase de la propia nota, resaltada. Sin autor. Hasta un par de párrafos.",
   },
   {
     valor: "ficha",
@@ -134,6 +134,11 @@ function convertirBloque(
           : bloque.texto;
 
   switch (tipo) {
+    case "destacado":
+      // Un destacado NUEVO arranca en normal: lo pidió la redacción, que veía
+      // salir todo en negrita sin haberlo elegido. Los que ya existen no pasan
+      // por acá —no se convierten—, así que conservan su estilo.
+      return { tipo: "destacado", texto, negrita: false };
     case "cita":
       return {
         tipo: "cita",
@@ -1329,9 +1334,67 @@ function CamposBloque({
             ? "Lo que dijo, entre comillas no: las pone el diario"
             : bloque.tipo === "subtitulo"
               ? "El subtítulo"
-              : "El texto"
+              : bloque.tipo === "destacado"
+                ? "La frase. Cada renglón es un párrafo."
+                : "El texto"
         }
       />
+      {/*
+        El estilo del destacado, a pedido de la redacción: normal, negrita y/o
+        cursiva, que se combinan.
+
+        Son botones de alternar —como la barra de un procesador de texto— y no
+        tildes: cada uno se dibuja en el estilo que pone, así se lee qué hace sin
+        leer la etiqueta. `aria-pressed` es lo que le dice a un lector de
+        pantalla que está prendido.
+
+        "Negrita" se ve prendida también cuando el bloque no eligió nada
+        (`negrita` ausente): así están los destacados que trajo el impreso, que
+        se dibujan resaltados. Mostrarla apagada sería mentir sobre lo que se ve
+        en el diario.
+      */}
+      {bloque.tipo === "destacado" && (
+        <div
+          role="group"
+          aria-label={`Estilo del destacado del bloque ${indice + 1}`}
+          className="flex flex-wrap items-center gap-panel-controles"
+        >
+          {(
+            [
+              {
+                campo: "negrita" as const,
+                rotulo: "Negrita",
+                prendido: bloque.negrita !== false,
+                clase: "font-bold",
+              },
+              {
+                campo: "cursiva" as const,
+                rotulo: "Cursiva",
+                prendido: bloque.cursiva === true,
+                clase: "italic",
+              },
+            ]
+          ).map((o) => (
+            <button
+              key={o.campo}
+              type="button"
+              aria-pressed={o.prendido}
+              onClick={() => onCambio({ [o.campo]: !o.prendido })}
+              className={cn(
+                botonFantasmaChico,
+                o.clase,
+                o.prendido &&
+                  "border-panel-tinta bg-panel-tinta text-panel-fondo hover:bg-panel-tinta hover:text-panel-fondo",
+              )}
+            >
+              {o.rotulo}
+            </button>
+          ))}
+          <span className="text-[0.72rem] text-panel-tinta-3">
+            Sin ninguno, va en letra normal.
+          </span>
+        </div>
+      )}
       {bloque.tipo === "cita" && (
         <div className="grid gap-3 sm:grid-cols-2">
           <input

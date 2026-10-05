@@ -79,6 +79,21 @@ function validarBloque(v: unknown, i: number): BloqueNota {
     if (!textoNoVacio(v.texto)) {
       throw new Error(`El bloque ${i + 1} (${tipo}) está vacío.`);
     }
+    if (tipo === "destacado") {
+      // Las dos opciones de estilo sobreviven a la proyección; sin esto se
+      // perdían en el primer guardado, igual que cualquier campo que no esté
+      // acá. `=== true` / `=== false` y no un truthy: `negrita` AUSENTE es un
+      // estado propio —el de los destacados del impreso— y no hay que
+      // inventarle un valor. Ver el tipo.
+      return {
+        tipo: "destacado",
+        texto: v.texto,
+        ...(v.negrita === true || v.negrita === false
+          ? { negrita: v.negrita }
+          : {}),
+        ...(v.cursiva === true ? { cursiva: true } : {}),
+      };
+    }
     return { tipo, texto: v.texto } as BloqueNota;
   }
 

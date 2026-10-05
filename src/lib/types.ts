@@ -23,7 +23,27 @@ export type BloqueNota =
     }
   /** Frase del propio texto, promovida a destacado. No lleva comillas ni
    *  autor: no es una cita, es el redactor subrayando su propia idea. */
-  | { tipo: "destacado"; texto: string }
+  | {
+      tipo: "destacado";
+      /** Uno o dos párrafos: cada renglón es uno. */
+      texto: string;
+      /**
+       * El peso. **Que falte no es lo mismo que `false`**, y es a propósito.
+       *
+       * Ausente es como estaban los trece destacados que trajo la
+       * digitalización del impreso, resaltados como en el papel: se siguen
+       * dibujando igual. `false` es "normal", que es como arranca uno nuevo
+       * desde el panel —la redacción pidió que dejara de salir en negrita sola—
+       * y `true` es negrita elegida. Si ausente valiera `false`, los números ya
+       * publicados perderían el resaltado sin que nadie los toque.
+       *
+       * Ausente y `true` se DIBUJAN igual (el mismo peso): ver el bloque en
+       * `nota/[slug]/page.tsx` para el porqué. La diferencia entre los dos sólo
+       * importa en el dato; en la pantalla, "Negrita" significa una sola cosa.
+       */
+      negrita?: boolean;
+      cursiva?: boolean;
+    }
   /**
    * Una foto DENTRO del cuerpo, con su epígrafe.
    *
