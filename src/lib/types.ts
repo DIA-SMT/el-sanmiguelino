@@ -1,6 +1,8 @@
 /** Entidades del diario. La persistencia real (Postgres + Prisma) se define
  *  con el equipo; mientras tanto los repos in-memory implementan estas formas. */
 
+import type { AltoInteractivo } from "@/lib/interactivos";
+
 export interface Usuario {
   /** id del usuario en Cidituc */
   id: string;
@@ -109,6 +111,23 @@ export type BloqueNota =
       tipo: "lista";
       items: string[];
       titulo?: string;
+    }
+  | {
+      /**
+       * Un elemento interactivo del Portal de Datos —una línea de tiempo, un
+       * mapa— metido adentro de la nota. Se dibuja a todo el ancho, como la
+       * infografía, y SIEMPRE lleva debajo el enlace para abrirlo aparte: es lo
+       * que se ve sin señal, porque un sitio ajeno no se guarda para leer
+       * offline. Qué sitios se aceptan lo decide `src/lib/interactivos.ts`.
+       */
+      tipo: "interactivo";
+      url: string;
+      /** Obligatorio: es el nombre del recuadro para un lector de pantalla y el
+       *  texto del enlace. Un recuadro sin nombre, en un sitio del Estado, es
+       *  una caja muda. */
+      titulo: string;
+      descripcion?: string;
+      alto?: AltoInteractivo;
     };
 
 export interface ImagenNota {

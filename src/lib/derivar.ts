@@ -64,6 +64,12 @@ export function textoDeBloque(bloque: BloqueNota): string {
       // exactamente la sopa que este bloque vino a deshacer. El buscador corta
       // fragmentos sobre esta misma cadena, así que ahí se ve.
       return [bloque.titulo, ...bloque.items].filter(Boolean).join(". ");
+    case "interactivo":
+      // El título y la descripción, nunca la dirección. Así buscar "línea de
+      // tiempo" encuentra la nota, y Migue sabe que trae un interactivo y de
+      // qué es; una URL en el índice no la busca nadie y ensucia lo que Migue
+      // lee.
+      return [bloque.titulo, bloque.descripcion].filter(Boolean).join(". ");
     default: {
       const _exhaustivo: never = bloque;
       return _exhaustivo;

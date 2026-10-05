@@ -277,6 +277,11 @@ function textoDeBloqueArmado(b: BloqueNota): string {
   if (b.tipo === "lista") {
     return [b.titulo, ...b.items].filter(Boolean).join(" ");
   }
+  // La digitalización no produce interactivos —un PDF no los tiene—, pero el
+  // tipo es de todos los bloques y hay que decir qué texto le corresponde.
+  if (b.tipo === "interactivo") {
+    return [b.titulo, b.descripcion].filter(Boolean).join(" ");
+  }
   return b.texto;
 }
 

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft, Clock, ExternalLink } from "lucide-react";
+import { InteractivoIncrustado } from "@/components/interactivo-incrustado";
+import { urlIncrustable } from "@/lib/interactivos";
 import { ViewTransition } from "react";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
@@ -205,6 +207,54 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
           </ul>
         </div>
       );
+    case "interactivo": {
+      /* Un interactivo del Portal de Datos —la línea de tiempo, el mapa de
+         esculturas—, a todo el ancho de la nota como la infografía: metido en
+         una columna de 340px no se puede usar.
+
+         La dirección se vuelve a mirar acá, no sólo al guardar: los scripts de
+         digitalización escriben en la base sin pasar por la acción del panel.
+         Si no es de un sitio habilitado, no se dibuja ni el recuadro ni el
+         enlace —una dirección que no se validó no se ofrece—, y queda el
+         título solo, para que la nota no tenga un hueco sin explicación.
+
+         El enlace de abajo va SIEMPRE: es lo que sirve sin señal, para verlo en
+         pantalla completa, y para quien no puede usar un mapa o una línea de
+         tiempo con el dedo. En un sitio del Estado aplica la Ley 26.653. */
+      const url = urlIncrustable(bloque.url);
+      return (
+        <figure className="figura-ancha">
+          {url && (
+            <InteractivoIncrustado
+              url={url}
+              titulo={bloque.titulo}
+              alto={bloque.alto}
+            />
+          )}
+          <figcaption className="mt-2.5 font-sans text-[0.74rem] leading-snug text-ink-3">
+            {bloque.descripcion && (
+              <span className="block text-pretty text-ink-2">
+                {bloque.descripcion}
+              </span>
+            )}
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="enlace mt-1.5 inline-flex items-center gap-1.5 font-medium"
+              >
+                Abrir «{bloque.titulo}» en el Portal de Datos
+                <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                <span className="sr-only">(se abre en otra pestaña)</span>
+              </a>
+            ) : (
+              <span className="mt-1 block">{bloque.titulo}</span>
+            )}
+          </figcaption>
+        </figure>
+      );
+    }
     default:
       return (
         <p className="texto-diario font-serif text-[0.97rem] leading-[1.72] text-ink">

@@ -26,6 +26,7 @@ import { anotar } from "@/lib/repos/auditoria";
 import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import { MOTIVOS_DE_BAJA } from "@/lib/types";
 import type { BloqueNota, NotaBorrador } from "@/lib/types";
+import { SITIOS_INCRUSTABLES, urlIncrustable } from "@/lib/interactivos";
 
 /**
  * Acciones de escritura del panel.
@@ -184,6 +185,36 @@ function validarBloque(v: unknown, i: number): BloqueNota {
       // campos llegan a la base, así que lo que no esté acá se pierde en el
       // primer guardado y la figura vuelve a meterse en una columna.
       ...(v.anchoCompleto === true ? { anchoCompleto: true } : {}),
+    };
+  }
+
+  if (tipo === "interactivo") {
+    // Este es el control que cuenta. El editor avisa antes, pero lo que llega
+    // acá puede venir de cualquier lado: la URL de una Server Action es
+    // pública para quien la conozca.
+    const url = typeof v.url === "string" ? urlIncrustable(v.url) : null;
+    if (!url) {
+      throw new Error(
+        `El interactivo del bloque ${i + 1} no es de un sitio habilitado. ` +
+          `Por ahora se pueden incrustar elementos del Portal de Datos ` +
+          `(${SITIOS_INCRUSTABLES.join(", ")}). Si es de otro lado, ponelo ` +
+          `como enlace dentro de un párrafo.`,
+      );
+    }
+    if (!textoNoVacio(v.titulo)) {
+      throw new Error(
+        `El interactivo del bloque ${i + 1} no tiene título. Hace falta: es lo ` +
+          `que escucha quien usa lector de pantalla, y el texto del enlace.`,
+      );
+    }
+    return {
+      tipo: "interactivo",
+      url,
+      titulo: v.titulo.trim(),
+      ...(textoNoVacio(v.descripcion)
+        ? { descripcion: v.descripcion.trim() }
+        : {}),
+      ...(v.alto === "alto" ? { alto: "alto" as const } : {}),
     };
   }
 

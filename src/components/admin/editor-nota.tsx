@@ -25,6 +25,7 @@ import {
 } from "@/components/admin/piezas";
 import type { BloqueNota, NotaCompleta } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { SITIOS_INCRUSTABLES, urlIncrustable } from "@/lib/interactivos";
 
 /**
  * Editor de una nota.
@@ -104,6 +105,12 @@ const TIPOS: { valor: BloqueNota["tipo"]; nombre: string; ayuda: string }[] = [
     nombre: "Foto",
     ayuda: "Una foto dentro del texto, con su epígrafe. Para páginas de fotos.",
   },
+  {
+    valor: "interactivo",
+    nombre: "Interactivo",
+    ayuda:
+      "Una línea de tiempo, un mapa u otro elemento del Portal de Datos, a todo el ancho de la nota.",
+  },
 ];
 
 /**
@@ -131,7 +138,11 @@ function convertirBloque(
           ? // Una lista que se convierte en otra cosa vuelve a ser sus ítems,
             // uno por renglón: es como se escribió y como se vuelve a editar.
             bloque.items.join("\n")
-          : bloque.texto;
+          : bloque.tipo === "interactivo"
+            ? // Lo que un humano escribió ahí es el título; la dirección no es
+              // texto de nadie y no tiene sentido como párrafo.
+              bloque.titulo
+            : bloque.texto;
 
   switch (tipo) {
     case "destacado":
@@ -167,6 +178,11 @@ function convertirBloque(
           .map((l) => l.trim())
           .filter(Boolean),
       };
+    case "interactivo":
+      // El texto que traía pasa a ser el título. La dirección queda vacía y la
+      // exige `validarBloque` al guardar, igual que la foto sin archivo:
+      // convertir un párrafo en interactivo no puede inventar uno.
+      return { tipo: "interactivo", url: "", titulo: texto };
     default:
       return { tipo, texto };
   }
@@ -1317,6 +1333,87 @@ function CamposBloque({
           className={campo}
           placeholder="Título de la lista (opcional)"
         />
+      </div>
+    );
+  }
+
+  if (bloque.tipo === "interactivo") {
+    /* El aviso de la dirección se calcula en vivo, con la MISMA regla que usa
+       el servidor (`urlIncrustable`): así quien pega una dirección de otro
+       sitio se entera acá y no al apretar Guardar. El control de verdad sigue
+       siendo el del servidor. */
+    const valida = bloque.url.trim() ? urlIncrustable(bloque.url) : null;
+    const hayDireccion = bloque.url.trim() !== "";
+    return (
+      <div className="mt-3 space-y-3">
+        <input
+          value={bloque.url}
+          onChange={(e) => onCambio({ url: e.target.value })}
+          {...sinEnviarConEnter}
+          aria-label={`Dirección del interactivo del bloque ${indice + 1}`}
+          aria-describedby={`bloque-${indice}-interactivo-ayuda`}
+          className={cn(campo, "font-mono text-[0.82rem]")}
+          placeholder="https://smtendatos.gob.ar/apps/…"
+        />
+        <span
+          id={`bloque-${indice}-interactivo-ayuda`}
+          className="block text-[0.72rem]"
+          style={hayDireccion && !valida ? { color: tintaAlerta } : undefined}
+        >
+          {!hayDireccion
+            ? "Pegá la dirección del Portal de Datos, o el código de «Insertar» si lo tiene."
+            : valida
+              ? "Listo: se va a ver adentro de la nota, con el enlace abajo."
+              : `Esa dirección no es de un sitio habilitado. Por ahora se pueden incrustar elementos de ${SITIOS_INCRUSTABLES.join(", ")}.`}
+        </span>
+        <input
+          value={bloque.titulo}
+          onChange={(e) => onCambio({ titulo: e.target.value })}
+          {...sinEnviarConEnter}
+          aria-label={`Título del interactivo del bloque ${indice + 1}`}
+          className={campo}
+          placeholder="Qué es: «La historia de la ciudad, 1565–2026»"
+        />
+        <input
+          value={bloque.descripcion ?? ""}
+          onChange={(e) => onCambio({ descripcion: e.target.value })}
+          {...sinEnviarConEnter}
+          aria-label={`Descripción del interactivo del bloque ${indice + 1}`}
+          className={campo}
+          placeholder="Una línea que lo presente (opcional)"
+        />
+        <div
+          role="group"
+          aria-label={`Alto del interactivo del bloque ${indice + 1}`}
+          className="flex flex-wrap items-center gap-panel-controles"
+        >
+          {(
+            [
+              { valor: "normal", rotulo: "Normal" },
+              { valor: "alto", rotulo: "Más alto" },
+            ] as const
+          ).map((o) => {
+            const prendido = (bloque.alto ?? "normal") === o.valor;
+            return (
+              <button
+                key={o.valor}
+                type="button"
+                aria-pressed={prendido}
+                onClick={() => onCambio({ alto: o.valor })}
+                className={cn(
+                  botonFantasmaChico,
+                  prendido &&
+                    "border-panel-tinta bg-panel-tinta text-panel-fondo hover:bg-panel-tinta hover:text-panel-fondo",
+                )}
+              >
+                {o.rotulo}
+              </button>
+            );
+          })}
+          <span className="text-[0.72rem] text-panel-tinta-3">
+            Más alto, para mapas o líneas de tiempo que necesitan pantalla.
+          </span>
+        </div>
       </div>
     );
   }
