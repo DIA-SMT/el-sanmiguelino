@@ -8,25 +8,31 @@ import { cn } from "@/lib/utils";
  * existe en /public, muestra la foto real; si no, un placeholder duotono con
  * trama de semitono (estética de foto de diario).
  *
- * **Las fotos verticales no se recortan.** El diario tiene un recorte de 8:5,
- * que es el del impreso y el que llevan todas las fotos apaisadas. Meter ahí
- * una foto vertical es perder dos tercios de la imagen, y lo primero que se va
- * es la cara: la tapa de septiembre salió con Duki decapitado. Anclar el
- * recorte arriba tampoco alcanza —esa foto tenía aire sobre la cabeza y quedó
- * mostrando el fondo—.
+ * **Ninguna foto se recorta.** Se muestra con su propia proporción, la que
+ * sale de leer su encabezado (`medirImagen`).
  *
- * Así que si la foto es más alta que ancha se la muestra **con su propia
- * proporción, en una columna angosta**, que es lo que hace un diario con una
- * foto vertical: no la estira a lo ancho de la página. Si no se puede medir
- * —una imagen local, o el servidor no contesta— se cae al recorte de siempre,
- * que es lo correcto para todo lo apaisado.
+ * Antes había un recorte fijo de 8:5, el del impreso, para todo lo apaisado.
+ * Dos veces mostró por qué no sirve:
+ * - Una foto vertical perdía dos tercios, y lo primero que se iba era la cara:
+ *   la tapa de septiembre salió con Duki decapitado. Desde entonces las
+ *   verticales van con su proporción, **en una columna angosta**, que es lo que
+ *   hace un diario con una foto parada: no la estira a lo ancho de la página.
+ * - Una panorámica (el Paseo Alberdi de octubre, casi 2,6:1) perdía más de un
+ *   tercio del ancho, y con él los rótulos que tenía encima —"Escultura del
+ *   Libro Monumental", "Tótem interactivo"— y el epígrafe impreso en la foto.
+ *   Lo que se recorta de una foto así no es aire: es lo que la foto dice.
+ *
+ * Si no se puede medir (el servidor de las fotos no contesta), va la caja de
+ * proporción fija, pero con la foto ENTERA adentro (`object-contain`): una
+ * banda de papel a los costados antes que un rótulo cortado.
  */
 export async function FiguraNota({
   alt,
   epigrafe,
   src,
   className,
-  /** proporción del recorte; por defecto el 8:5 del impreso */
+  /** La caja cuando la foto no se puede medir (y la del dibujo de reemplazo);
+   *  por defecto el 8:5 del impreso. La foto no se recorta igual. */
   proporcion = "aspect-[8/5]",
   /** true para la foto principal de la página: es el elemento LCP y se
    *  precarga desde el <head> (en Next 16 esto es `preload`, no `priority`) */
@@ -36,15 +42,6 @@ export async function FiguraNota({
    *  de la página; acá va debajo del epígrafe, más chica y en versalitas, que
    *  es como la lleva un diario cuando no puede girarla. */
   credito,
-  /**
-   * Respeta la proporción real de la imagen en vez del recorte 8:5.
-   *
-   * Es para las infografías: el recorte apaisado les come un 6,7% del ancho, y
-   * en una infografía ese margen no es aire sino el borde del recuadro y el
-   * principio de los rótulos. Una foto sí se puede recortar —para eso está el
-   * 8:5 del impreso—; un gráfico no, porque lo que se corta es información.
-   */
-  sinRecorte = false,
 }: {
   alt: string;
   epigrafe: string;
@@ -54,6 +51,11 @@ export async function FiguraNota({
   prioridad?: boolean;
   sizes?: string;
   credito?: string;
+  /**
+   * Era "respetar la proporción real en vez del recorte 8:5", para las
+   * infografías. Ahora ninguna figura se recorta, así que no cambia nada; queda
+   * para no tocar a quien lo pasa.
+   */
   sinRecorte?: boolean;
 }) {
   const real = imagenDisponible(src);
@@ -70,12 +72,12 @@ export async function FiguraNota({
             "foto-editorial relative",
             vertical
               ? "mx-auto w-full max-w-[22rem]"
-              : sinRecorte && medidas
+              : medidas
                 ? "w-full"
                 : cn("w-full", proporcion),
           )}
           style={
-            (vertical || sinRecorte) && medidas
+            medidas
               ? { aspectRatio: `${medidas.ancho} / ${medidas.alto}` }
               : undefined
           }
@@ -89,7 +91,13 @@ export async function FiguraNota({
             // ven.
             sizes={vertical ? "(min-width: 640px) 352px, 100vw" : sizes}
             preload={prioridad}
-            className="foto-asienta object-cover"
+            // Con la caja a la medida de la foto, `object-cover` no recorta
+            // nada (y no deja el filo de un píxel que deja `contain` al
+            // redondear). Sin medidas, `contain`: entera, aunque sobre papel.
+            className={cn(
+              "foto-asienta",
+              medidas ? "object-cover" : "object-contain",
+            )}
           />
         </div>
       ) : (

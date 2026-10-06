@@ -1,13 +1,16 @@
+import { open } from "node:fs/promises";
+import path from "node:path";
 import { cache } from "react";
 
 /**
  * Cuánto mide una imagen, leyendo su encabezado.
  *
  * Existe porque las fotos de las notas son **remotas** —viven en el Storage de
- * Supabase— y `next/image` no puede saber su tamaño: por eso se dibujan con
- * `fill` dentro de una caja de proporción fija. Con una foto apaisada eso es el
- * recorte del impreso y está bien; con una vertical se come dos tercios de la
- * foto, y lo primero que se va es la cara. Pasó con la tapa de septiembre.
+ * Supabase— y `next/image` no puede saber su tamaño: se dibujan con `fill`, y
+ * la caja tiene que tener la proporción de la foto. Con una caja fija, una
+ * vertical perdía dos tercios —lo primero que se iba era la cara, pasó con la
+ * tapa de septiembre— y una panorámica perdía los costados, con los rótulos
+ * que tenía encima (el Paseo Alberdi de octubre).
  *
  * No se guarda el tamaño en la base a propósito: habría que migrar el esquema y
  * volver a subir todas las fotos que ya están, y esto arregla también las
@@ -85,20 +88,44 @@ function leerEncabezado(b: Uint8Array): Medidas | null {
   return null;
 }
 
+/** Una medida absurda es peor que ninguna: con null, la figura muestra la foto
+ *  entera dentro de una caja fija (ver `FiguraNota`). */
+function valida(medidas: Medidas | null): Medidas | null {
+  if (!medidas || medidas.ancho < 2 || medidas.alto < 2) return null;
+  return medidas;
+}
+
+/**
+ * Las fotos que viven en `/public` —las históricas, commiteadas— se miden
+ * leyendo el archivo. Antes sólo se medían las remotas, y una foto local caía
+ * siempre en la caja de proporción fija: una panorámica salía recortada.
+ */
+async function medirLocal(ruta: string): Promise<Medidas | null> {
+  const publica = path.join(process.cwd(), "public");
+  const archivo = path.join(publica, ruta.split("?")[0]);
+  // Nada fuera de /public, aunque la ruta traiga `..`.
+  if (!archivo.startsWith(publica + path.sep)) return null;
+  const manejador = await open(archivo, "r");
+  try {
+    const bytes = new Uint8Array(65536);
+    const { bytesRead } = await manejador.read(bytes, 0, bytes.length, 0);
+    return valida(leerEncabezado(bytes.subarray(0, bytesRead)));
+  } finally {
+    await manejador.close();
+  }
+}
+
 export const medirImagen = cache(
   async (url: string): Promise<Medidas | null> => {
-    if (!url.startsWith("http")) return null;
     try {
+      if (url.startsWith("/")) return await medirLocal(url);
+      if (!url.startsWith("http")) return null;
       const res = await fetch(url, {
         headers: { Range: "bytes=0-65535" },
         next: { revalidate: UN_MES },
       });
       if (!res.ok) return null;
-      const medidas = leerEncabezado(new Uint8Array(await res.arrayBuffer()));
-      // Una medida absurda es peor que ninguna: con null se cae a la caja de
-      // proporción fija, que es lo que había antes.
-      if (!medidas || medidas.ancho < 2 || medidas.alto < 2) return null;
-      return medidas;
+      return valida(leerEncabezado(new Uint8Array(await res.arrayBuffer())));
     } catch {
       return null;
     }
