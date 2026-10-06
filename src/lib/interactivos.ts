@@ -66,17 +66,49 @@ export function urlIncrustable(entrada: string): string | null {
 /**
  * La dirección para el <iframe>: la versión del diario, sin el menú ni el
  * título del Portal y a la medida del recuadro (ver
- * `src/lib/interactivos-servidor.ts`). Recibe una que ya pasó por
- * `urlIncrustable`. Los enlaces para abrirlo aparte van a la dirección del
- * Portal tal cual: en su pestaña, la página entera se lee bien.
+ * `src/lib/interactivos-servidor.ts`).
+ *
+ * Se pide por NOTA Y LUGAR DEL BLOQUE, no por la dirección del Portal: el
+ * servidor la saca de la nota publicada. Así `/interactivo` —que es público,
+ * como leer— sólo baja lo que el diario de verdad publicó, y no queda como un
+ * intermediario al que cualquiera le puede pedir cualquier página del Portal.
+ * Los enlaces para abrirlo aparte van a la dirección del Portal tal cual: en su
+ * pestaña, la página entera se lee bien.
  */
 export function direccionIncrustada(
-  url: string,
+  notaSlug: string,
+  indice: number,
   tema: "light" | "dark",
+  /** La del Portal que tiene ese bloque. No se manda: la ruta la saca de la
+   *  nota. Sólo deja su huella (`v`), ver abajo. */
+  url: string,
 ): string {
-  const parametros = new URLSearchParams({ u: url });
+  const parametros = new URLSearchParams({
+    nota: notaSlug,
+    bloque: String(indice),
+    v: huella(url),
+  });
   if (tema === "dark") parametros.set("tema", "dark");
   return `/interactivo?${parametros}`;
+}
+
+/*
+ * `v`: para que la dirección del recuadro cambie cuando cambia lo que muestra.
+ *
+ * El navegador guarda la respuesta diez minutos por dirección. Pedida sólo por
+ * nota y lugar, si en el panel se cambiaba la dirección del bloque —o se
+ * insertaba otro antes y se corrían los lugares—, el recuadro seguía mostrando
+ * el interactivo viejo mientras el título y el enlace ya decían el nuevo. La
+ * ruta ignora `v`: sigue sacando la dirección de la nota, así que esto no le
+ * permite a nadie pedir otra página. Es una suma de control común (djb2), no
+ * un secreto.
+ */
+function huella(texto: string): string {
+  let h = 5381;
+  for (let i = 0; i < texto.length; i++) {
+    h = ((h << 5) + h + texto.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
 }
 
 /** El alto del recuadro, por nombre y no en píxeles: un número en un campo del

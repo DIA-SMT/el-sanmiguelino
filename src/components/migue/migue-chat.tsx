@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { LoaderCircle, RefreshCw, Send, Square, X } from "lucide-react";
+import { LoaderCircle, LogIn, RefreshCw, Send, Square, X } from "lucide-react";
 import { CuerpoMigue, RetratoMigue } from "@/components/migue/retrato-migue";
+import { rutaDeIngreso } from "@/lib/auth/destino";
+import { useRutaActual } from "@/lib/auth/usar-ruta-actual";
 import { useLecturaEnVoz } from "@/lib/voz/usar-voz";
 import { cn } from "@/lib/utils";
 
@@ -20,10 +23,46 @@ const SUGERENCIAS = [
   "¿Qué hay en la agenda cultural?",
 ];
 
+/* La marca de "volver del ingreso con el chat abierto". Guarda DESDE QUÉ
+   PÁGINA se pidió el ingreso, y al montarse el chat se saca siempre: si la
+   persona no llegó a ingresar ("Seguir leyendo", atrás, un error de Cidituc),
+   una marca colgada abría el chat sola en otra página, horas después, en un
+   ingreso que no lo había pedido. Va en sessionStorage —se va con la pestaña—
+   y con try/catch: puede no estar (ventana privada, datos del sitio
+   bloqueados), y eso no puede romper el chat. */
+const MARCA_ABRIR = "sm-abrir-migue";
+function marcarParaAbrir(ruta: string) {
+  try {
+    sessionStorage.setItem(MARCA_ABRIR, ruta);
+  } catch {}
+}
+function sacarMarcaParaAbrir(): string | null {
+  try {
+    const ruta = sessionStorage.getItem(MARCA_ABRIR);
+    sessionStorage.removeItem(MARCA_ABRIR);
+    return ruta;
+  } catch {
+    return null;
+  }
+}
+
 /** Vive en el layout del diario: la conversación sobrevive al paso de página
- *  y el contexto (la nota abierta) sale del pathname. */
-export function MigueChat() {
+ *  y el contexto (la nota abierta) sale del pathname.
+ *
+ *  **Preguntarle a Migue pide ingresar**, aunque leer sea libre: cada respuesta
+ *  la paga el municipio, y el tope por persona necesita saber quién pregunta
+ *  (ver `src/lib/migue/tope.ts`). Sin sesión el botón sigue estando y el chat
+ *  se abre igual, pero en lugar de las sugerencias y el campo va la invitación
+ *  a ingresar, que vuelve a esta misma página con el chat abierto. Así no se
+ *  manda una pregunta para recibir un rechazo disfrazado de error de conexión.
+ *
+ *  El layout lo monta con `key` según haya sesión: al salir de la cuenta el
+ *  chat arranca de cero, sin la conversación de quien estaba. */
+export function MigueChat({ conSesion }: { conSesion: boolean }) {
   const pathname = usePathname();
+  // A dónde vuelve el "Ingresar": la página con su query.
+  const rutaActual = useRutaActual();
+  const enlaceIngreso = useRef<HTMLAnchorElement>(null);
   const notaSlug = pathname.startsWith("/nota/")
     ? pathname.slice("/nota/".length)
     : undefined;
@@ -32,6 +71,10 @@ export function MigueChat() {
   const [texto, setTexto] = useState("");
   const [cargando, setCargando] = useState(false);
   const [errorUltima, setErrorUltima] = useState<string | null>(null);
+  /** La API contestó que la sesión ya no vale (vencida, o cerrada en otra
+   *  pestaña) o que la cuenta está bloqueada. */
+  const [rechazo, setRechazo] = useState<"sesion" | "bloqueado" | null>(null);
+  const puedePreguntar = conSesion && rechazo === null;
   const reducirMovimiento = useReducedMotion();
   const listaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -64,6 +107,24 @@ export function MigueChat() {
     return () => window.removeEventListener("migue:abrir", abrir);
   }, []);
 
+  // De vuelta del ingreso que se pidió desde el chat, en la misma página: se
+  // reabre solo. La marca se saca siempre, haya sesión o no. En un setTimeout
+  // y no en el cuerpo del efecto, para no encadenar un render más sobre el de
+  // la hidratación.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const desde = sacarMarcaParaAbrir();
+      if (conSesion && desde === rutaActual) setAbierto(true);
+    });
+    return () => clearTimeout(t);
+  }, [conSesion, rutaActual]);
+
+  // Si la API rechaza la pregunta, el foco va a "Ingresar": el campo donde
+  // estaba acaba de desaparecer.
+  useEffect(() => {
+    if (rechazo === "sesion") enlaceIngreso.current?.focus();
+  }, [rechazo]);
+
   const enviar = useCallback(
     async (pregunta: string) => {
       const limpia = pregunta.trim();
@@ -90,6 +151,13 @@ export function MigueChat() {
             historial: anteriores,
           }),
         });
+        if (res.status === 401 || res.status === 403) {
+          // No es un problema de conexión y reintentar no lo arregla: se saca
+          // la pregunta que no se pudo hacer y se explica qué pasa.
+          setMensajes((prev) => prev.slice(0, -1));
+          setRechazo(res.status === 401 ? "sesion" : "bloqueado");
+          return;
+        }
         if (!res.ok) throw new Error();
         const data: { respuesta: string; notaSlug?: string; leer?: string } =
           await res.json();
@@ -280,7 +348,7 @@ export function MigueChat() {
                   className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
                   aria-live="polite"
                 >
-                  {mensajes.length === 0 && (
+                  {puedePreguntar && mensajes.length === 0 && (
                     <div className="space-y-3.5">
                       <div className="flex items-end gap-1">
                         <CuerpoMigue className="h-28 w-auto" />
@@ -352,37 +420,70 @@ export function MigueChat() {
                       </button>
                     </div>
                   )}
+
+                  {/* La invitación va AL FINAL del historial y no arriba: si la
+                      sesión vence en medio de una charla, el historial ya está
+                      bajado hasta el fondo, y arriba quedaba fuera de la vista,
+                      con el campo de texto desaparecido. Sin sesión el
+                      historial está vacío y se ve igual que antes. */}
+                  {!puedePreguntar && (
+                    <div className="space-y-3.5">
+                      <div className="flex items-end gap-1">
+                        <CuerpoMigue className="h-28 w-auto" />
+                        <p className="mb-3 flex-1 font-serif text-[0.95rem] leading-relaxed text-ink-2">
+                          {rechazo === "bloqueado"
+                            ? "Tu cuenta no puede usar a Migue. Las notas se siguen leyendo igual."
+                            : rechazo === "sesion"
+                              ? "Se te venció la sesión. Ingresá de nuevo para seguir preguntando."
+                              : "¡Hola! Soy Migue. Para preguntarme sobre las notas, ingresá con tu cuenta de Ciudadano Digital."}
+                        </p>
+                      </div>
+                      {rechazo !== "bloqueado" && (
+                        <Link
+                          ref={enlaceIngreso}
+                          href={rutaDeIngreso(rutaActual)}
+                          onClick={() => marcarParaAbrir(rutaActual)}
+                          className="pressable flex w-full items-center justify-center gap-2 bg-accent px-4 py-3 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-accent-contrast hover:bg-accent-strong"
+                        >
+                          <LogIn className="h-4 w-4" aria-hidden="true" />
+                          Ingresar para preguntarle
+                        </Link>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Input */}
-                <form
-                  className="flex items-center gap-2 border-t border-line bg-paper-2 px-3 py-3"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    enviar(texto);
-                  }}
-                >
-                  <label htmlFor="migue-input" className="sr-only">
-                    Escribí tu pregunta para Migue
-                  </label>
-                  <input
-                    id="migue-input"
-                    ref={inputRef}
-                    value={texto}
-                    onChange={(e) => setTexto(e.target.value)}
-                    placeholder="Preguntale a Migue…"
-                    autoComplete="off"
-                    className="h-10 flex-1 border border-line bg-chrome px-3 font-serif text-[0.9rem] text-ink transition-colors placeholder:italic placeholder:text-ink-3 focus:border-accent"
-                  />
-                  <button
-                    type="submit"
-                    disabled={cargando || texto.trim() === ""}
-                    aria-label="Enviar pregunta"
-                    className="pressable flex h-10 w-10 shrink-0 items-center justify-center bg-accent text-accent-contrast hover:bg-accent-strong disabled:opacity-40"
+                {/* Input: sólo para quien puede preguntar. */}
+                {puedePreguntar && (
+                  <form
+                    className="flex items-center gap-2 border-t border-line bg-paper-2 px-3 py-3"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      enviar(texto);
+                    }}
                   >
-                    <Send className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </form>
+                    <label htmlFor="migue-input" className="sr-only">
+                      Escribí tu pregunta para Migue
+                    </label>
+                    <input
+                      id="migue-input"
+                      ref={inputRef}
+                      value={texto}
+                      onChange={(e) => setTexto(e.target.value)}
+                      placeholder="Preguntale a Migue…"
+                      autoComplete="off"
+                      className="h-10 flex-1 border border-line bg-chrome px-3 font-serif text-[0.9rem] text-ink transition-colors placeholder:italic placeholder:text-ink-3 focus:border-accent"
+                    />
+                    <button
+                      type="submit"
+                      disabled={cargando || texto.trim() === ""}
+                      aria-label="Enviar pregunta"
+                      className="pressable flex h-10 w-10 shrink-0 items-center justify-center bg-accent text-accent-contrast hover:bg-accent-strong disabled:opacity-40"
+                    >
+                      <Send className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </form>
+                )}
               </motion.div>
             </Dialog.Content>
           </Dialog.Portal>

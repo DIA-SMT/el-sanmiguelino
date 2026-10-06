@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo_Black, Newsreader, Poppins } from "next/font/google";
 import { FondoPanorama } from "@/components/fondo-panorama";
 import { PuenteServiceWorker } from "@/components/pwa/puente-service-worker";
+import { OPEN_GRAPH_BASE, SITIO_URL } from "@/lib/compartir";
 import "./globals.css";
 
 /**
@@ -54,12 +55,16 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
+  /* Para que las imágenes de la vista previa salgan con dirección completa:
+     WhatsApp y Google no resuelven una ruta relativa. Ver `src/lib/compartir.ts`. */
+  metadataBase: SITIO_URL,
   title: {
     default: "El Sanmiguelino",
     template: "%s · El Sanmiguelino",
   },
   description:
-    "El diario digital mensual de la Municipalidad de San Miguel de Tucumán. Exclusivo para usuarios de Cidituc.",
+    "El diario digital mensual de la Municipalidad de San Miguel de Tucumán: las obras, la cultura y las historias de la ciudad, para leer como un diario de papel.",
+  openGraph: OPEN_GRAPH_BASE,
   /* El nombre bajo el icono en la pantalla de inicio del iPhone. Sin esto iOS
      puede tomar el `<title>` de la página desde la que se agregó, y agregarlo
      desde una nota dejaría el icono con el título de la nota. El resto de la

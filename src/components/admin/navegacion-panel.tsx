@@ -371,7 +371,7 @@ export function BarraLateralPanel({ usuario }: { usuario: Usuario }) {
         {/* Plegada, el chip se queda con el monograma: el nombre completo no
             entra en 80px y `sm:not-sr-only` no lo puede saber, porque mira el
             ancho de la ventana y no el del hueco. */}
-        <UserChip usuario={usuario} soloMonograma={plegada} />
+        <UserChip nombre={usuario.nombre} soloMonograma={plegada} />
       </div>
     </aside>
   );

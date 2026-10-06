@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { ArrowLeft, Search } from "lucide-react";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
@@ -10,15 +9,17 @@ import { getBuscables, getResumenEdicion } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import { buscarEnEdicion, MINIMO_CONSULTA } from "@/lib/data/buscar";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
-import { getUsuario } from "@/lib/auth/session";
+import { usuarioActual } from "@/lib/auth/dal";
 
-export const metadata: Metadata = { title: "Buscar" };
+// Fuera de los buscadores: cada `?q=` es una página distinta que consulta la
+// base, y un rastreador las inventaría sin fin. También está en robots.ts.
+export const metadata: Metadata = { title: "Buscar", robots: { index: false } };
 
 export default async function BuscarPage({
   searchParams,
 }: PageProps<"/buscar">) {
-  const usuario = await getUsuario();
-  if (!usuario) redirect("/login");
+  // Leer es libre: sin sesión, `usuario` es null y la página se arma igual.
+  const usuario = await usuarioActual();
 
   const [edicion, buscables] = await Promise.all([
     getResumenEdicion(),

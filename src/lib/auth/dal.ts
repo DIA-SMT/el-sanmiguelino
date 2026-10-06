@@ -45,7 +45,13 @@ export const sesionActual = cache(async (): Promise<Sesion | null> => {
 });
 
 /**
- * ¿Puede participar? Comentar, votar, preguntarle a Migue, suscribirse.
+ * ¿Puede participar? Comentar, votar, preguntarle a Migue, suscribirse, pedir
+ * la voz de Migue para una nota.
+ *
+ * **Es la regla del diario abierto**: leer es libre (las páginas y el GET de
+ * comentarios usan `usuarioActual()`, que puede dar null), y todo lo que
+ * escribe o cuesta plata pasa por acá. No aflojarla a "hay usuario" en ninguna
+ * de esas rutas: es la que hace morder el bloqueo.
  *
  * Devuelve el motivo en vez de un `Response` porque las rutas que la usan arman
  * su propio JSON, y para que este archivo no tenga que importar `next/server`.

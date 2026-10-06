@@ -1,9 +1,17 @@
 # Ingreso con Cidituc
 
-Cidituc (Ciudadano Digital) es la **única** puerta al diario completo. No hay
-usuario y contraseña propios, no hay invitados con sesión: `/` y `/login` son
-públicas y todo lo demás pide sesión, y la única forma de conseguir una es volver
-del derivador municipal con un token que valide el backend de Cidituc.
+Cidituc (Ciudadano Digital) es la **única** puerta para participar en el diario.
+**Leer es libre** (desde 2026-10-05): la tapa, las notas, las ediciones, el
+archivo, el buscador y los comentarios se ven sin ingresar. Ingresar se pide para
+comentar, votar, preguntarle a Migue, pedir la voz de Migue y anotarse para
+recibirlo en papel (`sesionParaParticipar()` en `src/lib/auth/dal.ts`), y el
+panel sigue respondiendo 404 a quien no es administrador.
+
+No hay usuario y contraseña propios, no hay invitados con sesión: la única forma
+de conseguir una es volver del derivador municipal con un token que valide el
+backend de Cidituc. Cada "Ingresar" lleva a `/login?volverA=<la página>`, y al
+volver de Cidituc se cae en esa misma página —con su `?` y su `#`—
+(`src/lib/auth/destino.ts`).
 
 ## Las tres piezas
 
@@ -162,9 +170,10 @@ VITE_APP_SANMIGUELINO_CALLBACK_URL=http://localhost:3000/auth/cidituc/callback
 Vite incrusta las variables al servir: si la pestaña ya estaba abierta,
 `Ctrl+Shift+R`.
 
-Para leer el diario sin ingresar mientras se trabaja en otra cosa, `AUTH_CIDITUC=0`
-apaga el gate. Eso deja pasar **sin sesión**, o sea también sin usuario: no es una
-forma de entrar al panel.
+El interruptor `AUTH_CIDITUC=0` ya no existe. Servía para leer sin ingresar en
+desarrollo, y desde que leer es libre no hace falta; lo único que le quedaba era
+inventar un usuario "Desarrollo local" que podía comentar y anotarse en papel
+contra la base de producción.
 
 ## Códigos de error
 

@@ -157,11 +157,14 @@ export async function VistaPrevia() {
 
             <p className="hidden pt-5 font-serif text-[0.9rem] italic leading-relaxed text-ink-3 sm:block">
               La edición completa —{indice.length} notas, columnas y la voz de
-              los vecinos— estará disponible próximamente.
+              los vecinos— se lee libre.
             </p>
-            <span className="mt-1 inline-flex pt-4 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-accent">
-              Próximamente
-            </span>
+            <Link
+              href="/diario"
+              className="enlace mt-1 inline-flex pt-4 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em]"
+            >
+              Leer la edición
+            </Link>
           </div>
         </div>
       </div>

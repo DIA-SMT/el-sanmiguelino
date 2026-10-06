@@ -12,6 +12,7 @@ import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import { registrarIngreso } from "@/lib/repos/usuarios";
 import type { ErrorIngreso } from "@/lib/auth/cidituc/errores";
 import { SESSION_COOKIE, TTL_SESION_SEG } from "@/lib/auth/cookie";
+import { DESTINO_POR_DEFECTO, destinoSeguro } from "@/lib/auth/destino";
 import { crearToken } from "@/lib/auth/session";
 
 /**
@@ -52,26 +53,20 @@ const OPCIONES_COOKIE = {
 };
 
 /**
- * ¿Es un destino interno? Sólo rutas de este sitio.
+ * Una dirección de este sitio, armada desde una ruta que puede traer `?` y `#`.
  *
- * `//otro.sitio` y `/\otro.sitio` son URLs absolutas para el navegador aunque
- * empiecen con barra: sin este chequeo, el callback sería un redirector abierto
- * y bastaría un enlace preparado para mandar a alguien afuera desde nuestro
- * dominio.
+ * Antes la ruta entera iba a `url.pathname`, y ahí `?` y `#` quedan
+ * codificados: volver a `/nota/x#columna-lector` daba `/nota/x%23columna-lector`,
+ * una 404 justo después de pasar por Cidituc. La ruta ya viene saneada por
+ * `destinoSeguro` (o es una constante de acá); igual se toman sólo sus partes y
+ * se les pone NUESTRO origen.
  */
-const DESTINO_POR_DEFECTO = "/diario";
-
-function destinoSeguro(valor: string | null | undefined): string {
-  if (!valor || !valor.startsWith("/")) return DESTINO_POR_DEFECTO;
-  if (valor.startsWith("//") || valor.startsWith("/\\")) return DESTINO_POR_DEFECTO;
-  return valor;
-}
-
-function interna(request: NextRequest, pathname: string, search = "") {
+function interna(request: NextRequest, ruta: string) {
   const url = request.nextUrl.clone();
-  url.pathname = pathname;
-  url.search = search;
-  url.hash = "";
+  const destino = new URL(ruta, url.origin);
+  url.pathname = destino.pathname;
+  url.search = destino.search;
+  url.hash = destino.hash;
   return url;
 }
 
@@ -85,7 +80,7 @@ function conError(request: NextRequest, error: ErrorIngreso) {
   if (destino !== DESTINO_POR_DEFECTO) parametros.set("volverA", destino);
 
   const res = NextResponse.redirect(
-    interna(request, "/login", `?${parametros}`),
+    interna(request, `/login?${parametros}`),
     303,
   );
   res.cookies.set(COOKIE_FLUJO, "", { ...OPCIONES_COOKIE, maxAge: 0 });

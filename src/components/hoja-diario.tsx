@@ -1,4 +1,6 @@
 import { PasadorPaginas } from "@/components/pasador-paginas";
+import { usuarioActual } from "@/lib/auth/dal";
+import { edicionEnFoco } from "@/lib/auth/vista-previa";
 import { paginasDeEdicion } from "@/lib/data/paginas";
 import { getIndice, getIndiceDe, getResumenEdicion } from "@/lib/repos/edicion";
 import { cn } from "@/lib/utils";
@@ -50,6 +52,19 @@ export async function HojaDiario({
       ? -1
       : paginas.findIndex((p) => p.numero === numeroPagina);
 
+  /*
+   * Sólo se guarda para leer sin conexión la página que no es de nadie: sin
+   * sesión y sin vista previa. Leer es libre, y la copia guardada en un
+   * teléfono no puede llevar el nombre de quien la vio ni una edición que
+   * todavía no salió: el siguiente que use el teléfono, sin señal, vería las
+   * dos cosas. A quien ingresó el service worker le guarda la versión sin
+   * sesión, que baja aparte (ver `navegar` en `public/sw.js`).
+   *
+   * Falla cerrado: una página que no dice que es anónima no se guarda.
+   * `usuarioActual` y `edicionEnFoco` están memoizadas: la página ya las pidió.
+   */
+  const anonima = (await usuarioActual()) === null && (await edicionEnFoco()) === null;
+
   return (
     /* `data-sin-conexion` le dice al service worker que la página se dibujó
        entera y se puede guardar para leer sin señal. Va acá porque ésta es la
@@ -59,7 +74,7 @@ export async function HojaDiario({
        `MARCA` en `public/sw.js`. */
     <div
       className={cn("hoja grano mx-auto w-full max-w-6xl", className)}
-      data-sin-conexion="guardable"
+      data-sin-conexion={anonima ? "guardable" : "con-sesion"}
     >
       {children}
 

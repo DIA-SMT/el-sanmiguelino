@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { MandoPaginas } from "@/components/mando-paginas";
 import { ProveedorFoliado } from "@/components/foliado-visible";
 import { MigueChat } from "@/components/migue/migue-chat";
@@ -17,19 +16,26 @@ import { db } from "@/lib/db";
  *  El índice de páginas se calcula en el server y baja como props: son solo
  *  números, rutas y títulos, así el cliente no se lleva la edición entera.
  *
- *  Y por eso mismo este layout **verifica la sesión por su cuenta**, además de
- *  hacerlo cada página. No es defensa en profundidad decorativa: el layout se
- *  renderiza y se transmite ANTES que la página, así que su `redirect()` no lo
- *  cubre. Con un token de firma inválida pero bien formado —que cualquiera
- *  puede fabricar, porque el proxy sólo mira la estructura— el índice completo
- *  de la edición viajaba entero al atacante: los títulos van en los
- *  `aria-label` de las flechas y en las props serializadas.
+ *  Leer es libre: el índice de la edición PUBLICADA es público por diseño, y
+ *  este layout ya no pide sesión. Lo que sigue protegido es la edición en foco
+ *  —la vista previa de una edición que todavía no salió—, y eso lo cubre
+ *  `edicionEnFoco()`, que exige administrador con la firma verificada. Nunca
+ *  aflojarlo a "hay usuario": cualquier lector con sesión vería las ediciones
+ *  futuras.
  *
- *  Regla general: el componente que TIENE los datos es el que tiene que pedir
- *  permiso. */
+ *  Regla general, que sigue valiendo: el componente que TIENE los datos es el
+ *  que tiene que pedir permiso. El layout se transmite ANTES que la página, así
+ *  que un control que sólo esté en la página no lo cubre.
+ *
+ *  **No cachear este layout ni las páginas** (`revalidate`, `use cache`,
+ *  `force-static`, un Cache-Control propio) mientras su HTML dependa de quién
+ *  mira: el nombre en la cabecera, la vista previa de un administrador. Un
+ *  render guardado le serviría a toda la ciudad lo de uno solo — en el peor
+ *  caso, la edición sin publicar. Hoy son dinámicas porque leen cookies. */
 export default async function DiarioLayout({ children }: LayoutProps<"/">) {
-  const usuario = await usuarioActual();
-  if (!usuario) redirect("/login");
+  // Para Migue: sin sesión el chat invita a ingresar en lugar de mandar una
+  // pregunta que la API va a rechazar.
+  const conSesion = (await usuarioActual()) !== null;
 
   // `edicionEnFoco()` ya verifica que sea administrador: para un lector esto
   // es siempre null y no cuesta nada.
@@ -89,7 +95,9 @@ export default async function DiarioLayout({ children }: LayoutProps<"/">) {
           {children}
           <MandoPaginas paginas={paginasDeEdicion(await getIndice())} />
         </ProveedorFoliado>
-        <MigueChat />
+        {/* La `key` lo vuelve a montar al entrar o salir de la cuenta: la
+            conversación de quien estaba no queda en pantalla para el siguiente. */}
+        <MigueChat key={conSesion ? "con-sesion" : "sin-sesion"} conSesion={conSesion} />
       </div>
     </>
   );

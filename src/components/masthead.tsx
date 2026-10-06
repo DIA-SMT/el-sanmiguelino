@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { LayoutDashboard } from "lucide-react";
 import { LogoSanmiguelino } from "@/components/brand/logos";
+import { EnlaceIngresar } from "@/components/enlace-ingresar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
 import { SeccionesNav } from "@/components/secciones-nav";
 import { esAdmin } from "@/lib/auth/dal";
+import { edicionEnFoco } from "@/lib/auth/vista-previa";
 import { getPublicadas, getResumenEdicion } from "@/lib/repos/edicion";
 import type { SeccionInfo } from "@/lib/data/secciones";
 import type { EdicionResumen, Usuario } from "@/lib/types";
@@ -57,7 +59,8 @@ export async function Masthead({
    *  acá sale a dónde apunta "Notas" y qué mes rotula el selector. */
   edicion: EdicionResumen;
   secciones: SeccionInfo[];
-  usuario: Usuario;
+  /** null sin sesión: leer es libre. En lugar del nombre va "Ingresar". */
+  usuario: Usuario | null;
   seccionActiva?: string;
   /** Folio de la página. Presente = cabecera interior chica; ausente = tapa. */
   pagina?: number;
@@ -81,10 +84,11 @@ export async function Masthead({
   // El folio interior es lo único que `pagina` decide, así que en un facsímil
   // —donde no se dibuja— la distinción tapa/interior no aplica.
   const esInterior = typeof pagina === "number";
-  const [puedeAdministrar, ediciones, enLaCalle] = await Promise.all([
+  const [puedeAdministrar, ediciones, enLaCalle, enFoco] = await Promise.all([
     esAdmin(),
     getPublicadas(),
     getResumenEdicion(),
+    edicionEnFoco(),
   ]);
   /* Si esta cabecera es la del número que el diario está sirviendo. De eso
      depende que exista la pestaña "Portada": en el archivo no hay portada —la
@@ -126,7 +130,19 @@ export async function Masthead({
                 </Link>
               )}
               <ThemeToggle />
-              <UserChip usuario={usuario} />
+              {/* Sólo el nombre: el chip es de cliente y lo que se le pasa
+                  viaja dentro del HTML. El id de Cidituc no hace falta para
+                  mostrar un nombre. */}
+              {/* En la vista previa de una edición, salir de la cuenta lleva a
+                  la tapa: sin sesión, esa edición es un 404. */}
+              {usuario ? (
+                <UserChip
+                  nombre={usuario.nombre}
+                  salirA={enFoco ? "/diario" : undefined}
+                />
+              ) : (
+                <EnlaceIngresar />
+              )}
             </div>
           </div>
         </div>

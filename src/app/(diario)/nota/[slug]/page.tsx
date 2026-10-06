@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock } from "lucide-react";
 import { InteractivoIncrustado } from "@/components/interactivo-incrustado";
@@ -30,7 +30,10 @@ import {
 import { seccionesDeEdicion, slugificarSeccion } from "@/lib/data/secciones";
 import { numeroDeNota, paginasDeEdicion } from "@/lib/data/paginas";
 import { FoliadoDeLaPagina } from "@/components/foliado-visible";
-import { getUsuario } from "@/lib/auth/session";
+import { usuarioActual } from "@/lib/auth/dal";
+import { firmaPublica } from "@/lib/auth/cidituc/nombre";
+import { metadataDeNota } from "@/lib/compartir";
+import { imagenDisponible } from "@/lib/data/imagenes";
 import { cn } from "@/lib/utils";
 import type { BloqueNota } from "@/lib/types";
 
@@ -39,10 +42,26 @@ export async function generateMetadata({
 }: PageProps<"/nota/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const nota = await getNota(slug);
-  return { title: nota?.titulo ?? "Nota" };
+  if (!nota) return { title: "Nota" };
+  // Con la nota que se puede LEER, nunca con la que se edita: ver
+  // `metadataDeNota`.
+  return metadataDeNota({
+    ...nota,
+    fotoDisponible: imagenDisponible(nota.imagen?.src),
+  });
 }
 
-function Bloque({ bloque }: { bloque: BloqueNota }) {
+function Bloque({
+  bloque,
+  notaSlug,
+  indice,
+}: {
+  bloque: BloqueNota;
+  /** De qué nota y en qué lugar del cuerpo: el interactivo se pide por eso, no
+   *  por su dirección (ver `src/app/interactivo/route.ts`). */
+  notaSlug: string;
+  indice: number;
+}) {
   switch (bloque.tipo) {
     case "subtitulo":
       return (
@@ -228,6 +247,8 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
           {url ? (
             <InteractivoIncrustado
               url={url}
+              notaSlug={notaSlug}
+              indice={indice}
               titulo={bloque.titulo}
               descripcion={bloque.descripcion}
               alto={bloque.alto}
@@ -255,8 +276,10 @@ function Bloque({ bloque }: { bloque: BloqueNota }) {
 }
 
 export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
-  const usuario = await getUsuario();
-  if (!usuario) redirect("/login");
+  // Leer es libre: sin sesión, `usuario` es null y la página se arma igual.
+  const usuario = await usuarioActual();
+  // La firma con la que opina quien mira: abreviada, como la ve el resto.
+  const firma = usuario ? firmaPublica(usuario.nombre) : null;
 
   const { slug } = await params;
   const nota = await getNota(slug);
@@ -435,7 +458,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                 paginas={suEdicion.pdf.paginas}
               />
 
-              <ColumnaDelLector notaSlug={nota.slug} usuario={usuario} />
+              <ColumnaDelLector notaSlug={nota.slug} firma={firma} />
             </main>
 
             <SiteFooter />
@@ -511,10 +534,13 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                       contesta "¿cuánto me lleva esto?", y escuchar en vez de
                       leer se decide antes de leer. El texto se arma acá, en el
                       servidor, para que el click no tenga que resolver nada. */}
+                  {/* La voz de Migue la paga el municipio y pide sesión; sin
+                      `fuente`, quien no ingresó escucha con la voz del
+                      navegador directamente, sin un pedido que va a rebotar. */}
                   <BotonEscuchar
                     separador
                     texto={textoDeResumenDeNota(nota)}
-                    fuente={{ que: "nota", slug: nota.slug }}
+                    fuente={usuario ? { que: "nota", slug: nota.slug } : undefined}
                   />
                 </div>
                 {/* El facsímil, para una página que salió en papel. Va debajo
@@ -559,7 +585,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                   />
                 )}
                 {nota.cuerpo.map((bloque, i) => (
-                  <Bloque key={i} bloque={bloque} />
+                  <Bloque key={i} bloque={bloque} notaSlug={nota.slug} indice={i} />
                 ))}
               </div>
 
@@ -577,7 +603,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
 
             <NotasRelacionadas notaSlug={nota.slug} />
 
-            <ColumnaDelLector notaSlug={nota.slug} usuario={usuario} />
+            <ColumnaDelLector notaSlug={nota.slug} firma={firma} />
           </main>
 
           <SiteFooter />

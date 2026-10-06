@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { ArrowLeft, Newspaper } from "lucide-react";
 import { HojaDiario } from "@/components/hoja-diario";
 import { SiteFooter } from "@/components/site-footer";
 import { getPublicadas, getResumenEdicion } from "@/lib/repos/edicion";
-import { getUsuario } from "@/lib/auth/session";
 
 export const metadata = { title: "Archivo" };
 
@@ -20,8 +18,6 @@ export const metadata = { title: "Archivo" };
  * que viene no está acá, y una vacía tampoco: nunca fue un número del diario.
  */
 export default async function ArchivoPage() {
-  const usuario = await getUsuario();
-  if (!usuario) redirect("/login");
 
   const [publicadas, enLaCalle] = await Promise.all([
     getPublicadas(),

@@ -5,7 +5,6 @@ import {
   TTL_SESION_SEG,
   VERSION_TOKEN,
 } from "@/lib/auth/cookie";
-import { AUTH_CIDITUC_OBLIGATORIA } from "@/lib/auth/config";
 import type { Usuario } from "@/lib/types";
 
 // Se re-exporta para no romper a quien ya lo importaba desde acá.
@@ -96,15 +95,10 @@ export function verificarToken(token: string | undefined): Usuario | null {
 /** Usuario de la sesión actual (server components y route handlers). */
 export async function getUsuario(): Promise<Usuario | null> {
   const jar = await cookies();
-  const usuario = verificarToken(jar.get(SESSION_COOKIE)?.value);
-  if (usuario) return usuario;
-
-  // El interruptor documentado para desarrollo tiene que atravesar también
-  // las páginas del diario: el proxy deja pasar la request, y este usuario
-  // local evita que cada página vuelva a mandarla al login. En producción el
-  // interruptor no se puede usar porque la configuración lo mantiene activo.
-  if (!AUTH_CIDITUC_OBLIGATORIA) {
-    return { id: "local-dev", nombre: "Desarrollo local" };
-  }
-  return null;
+  // Sin sesión, nadie. Acá hubo un usuario inventado ("Desarrollo local") para
+  // el interruptor AUTH_CIDITUC=0, que servía para leer sin ingresar. Desde que
+  // leer es libre el interruptor no tiene razón de ser, y ese usuario pasaba
+  // los controles de participar: con el interruptor puesto se podía comentar,
+  // anotarse para el papel y gastar Migue contra la base de producción.
+  return verificarToken(jar.get(SESSION_COOKIE)?.value);
 }

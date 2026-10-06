@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { LogoSanmiguelino, LogoSubsecretaria } from "@/components/brand/logos";
 import { SuscripcionPapel } from "@/components/suscripcion-papel";
-import { getUsuario } from "@/lib/auth/session";
+import { usuarioActual } from "@/lib/auth/dal";
 
 /**
  * El pie pregunta quién está leyendo, y es sólo para el formulario de
  * suscripción: si hay sesión, el nombre ya lo sabemos y no se lo pedimos de
- * nuevo. En la landing —que es pública— no hay sesión y el formulario queda
- * como estaba, con todos los campos vacíos.
+ * nuevo. Sin sesión —leer es libre—, el formulario explica que anotarse pide
+ * ingresar. `usuarioActual` y no `getUsuario` suelto: está memoizado, y la
+ * página y el layout ya lo pidieron en el mismo render.
  */
 export async function SiteFooter() {
-  const usuario = await getUsuario();
+  const usuario = await usuarioActual();
   return (
     <footer className="mt-auto border-t-[3px] border-double border-ink bg-paper-2">
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[auto_1fr_auto] md:items-center md:gap-12">

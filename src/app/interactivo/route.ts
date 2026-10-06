@@ -1,17 +1,23 @@
 import type { NextRequest } from "next/server";
-import { usuarioActual } from "@/lib/auth/dal";
 import { urlIncrustable } from "@/lib/interactivos";
 import {
   CABECERAS_INTERACTIVO,
   paginaDeAviso,
-  respuestaSinSesion,
 } from "@/lib/interactivos-aviso";
 import { prepararInteractivo } from "@/lib/interactivos-servidor";
+import { getNota } from "@/lib/repos/edicion";
 
 /**
  * El interactivo del Portal de Datos, ajustado para la nota (ver
  * `src/lib/interactivos-servidor.ts`). Lo pide el <iframe> de
- * `InteractivoIncrustado`: `/interactivo?u=<dirección del Portal>&tema=dark`.
+ * `InteractivoIncrustado`: `/interactivo?nota=<slug>&bloque=<n>&tema=dark`.
+ *
+ * **Es público, como leer la nota.** Por eso no recibe una dirección: recibe
+ * una nota y el lugar del bloque, y la dirección sale de la nota. `getNota`
+ * sólo devuelve notas de ediciones que ya se pueden leer —salvo la vista previa
+ * de un administrador—, y la dirección vuelve a pasar por `urlIncrustable`. Lo
+ * único que esta ruta puede bajar del Portal es lo que el diario publicó: no es
+ * un intermediario al que se le pueda pedir cualquier página.
  *
  * **Se sirve aislado, aunque viva en nuestro dominio.** Es una página ajena con
  * sus scripts, y servida desde acá correría con los permisos del diario: podría
@@ -21,39 +27,35 @@ import { prepararInteractivo } from "@/lib/interactivos-servidor";
  * trata como de un origen anónimo, sin acceso a nuestras cookies, a nuestro
  * almacenamiento ni a la página que la contiene —aunque alguien la abra directo
  * en una pestaña—. El <iframe> repite el sandbox; las dos cosas juntas, para
- * que olvidarse de una no abra nada.
- *
- * Además:
+ * que olvidarse de una no abra nada. Además:
  * - `frame-ancestors 'self'`: sólo el diario la puede meter en un recuadro.
  * - `form-action 'none'`: no puede mandar formularios. Un falso "Ingresá con
  *   Ciudadano Digital" adentro de la nota no tendría a dónde enviar nada.
  * - `base-uri`: el único <base> que vale es el que pone el diario, del Portal.
- * - Sólo se piden direcciones que pasan `urlIncrustable` —los sitios de
- *   `SITIOS_INCRUSTABLES`, sin otro puerto—, y las redirecciones se validan
- *   antes de seguirlas. La ruta no es un proxy abierto.
- *
- * **La sesión se verifica acá, con su firma.** El gate de `src/proxy.ts` sólo
- * mira la forma de la cookie: una inventada con un vencimiento lejano pasa.
- * Las páginas lo cubren porque el layout del diario verifica la firma, pero un
- * route handler no pasa por ningún layout. Sin esto, cualquiera usaba el
- * servidor del diario para bajar páginas del Portal. Va antes de mirar la
- * dirección, para que sin sesión no se pueda tantear cuáles se aceptan.
  *
  * No va bajo `/api/` porque devuelve una página, no datos, y el gate de `/api/`
- * responde JSON.
+ * pide sesión.
  */
-export async function GET(request: NextRequest) {
-  if (!(await usuarioActual())) return respuestaSinSesion(null);
 
-  const url = urlIncrustable(request.nextUrl.searchParams.get("u") ?? "");
+const SIN_GUARDAR = { ...CABECERAS_INTERACTIVO, "Cache-Control": "no-store" };
+
+export async function GET(request: NextRequest) {
+  const parametros = request.nextUrl.searchParams;
+  const slug = parametros.get("nota") ?? "";
+  const indice = Number(parametros.get("bloque"));
+  const nota = slug && Number.isInteger(indice) && indice >= 0
+    ? await getNota(slug)
+    : null;
+  const bloque = nota?.cuerpo[indice];
+  const url =
+    bloque?.tipo === "interactivo" ? urlIncrustable(bloque.url) : null;
   if (!url) {
     return new Response(
-      paginaDeAviso("Ese interactivo no es de un sitio habilitado.", null),
-      { status: 400, headers: { ...CABECERAS_INTERACTIVO, "Cache-Control": "no-store" } },
+      paginaDeAviso("Este interactivo no está disponible.", null),
+      { status: 404, headers: SIN_GUARDAR },
     );
   }
-  const tema =
-    request.nextUrl.searchParams.get("tema") === "dark" ? "dark" : "light";
+  const tema = parametros.get("tema") === "dark" ? "dark" : "light";
 
   let r: Awaited<ReturnType<typeof prepararInteractivo>>;
   try {
@@ -64,14 +66,16 @@ export async function GET(request: NextRequest) {
   if (!r.ok) {
     return new Response(
       paginaDeAviso("No se pudo traer el interactivo del Portal de Datos.", url),
-      { status: 502, headers: { ...CABECERAS_INTERACTIVO, "Cache-Control": "no-store" } },
+      { status: 502, headers: SIN_GUARDAR },
     );
   }
   return new Response(r.html, {
     headers: {
       ...CABECERAS_INTERACTIVO,
-      // Privada: depende de la sesión. Diez minutos alcanzan para que pasar
-      // de página y volver no la baje de nuevo.
+      // Sólo en el navegador de quien mira, no en una caché compartida: en la
+      // vista previa de un administrador la nota puede no estar publicada.
+      // Diez minutos alcanzan para que pasar de página y volver no la baje
+      // de nuevo; la copia del Portal ya la guarda el servidor.
       "Cache-Control": "private, max-age=600",
     },
   });

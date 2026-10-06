@@ -97,11 +97,15 @@ function avisarTema(marco: HTMLIFrameElement | null, tema: Tema) {
  */
 function MarcoInteractivo({
   url,
+  notaSlug,
+  indice,
   titulo,
   tema,
   alCargar,
 }: {
   url: string;
+  notaSlug: string;
+  indice: number;
   titulo: string;
   tema: Tema;
   alCargar: () => void;
@@ -129,7 +133,7 @@ function MarcoInteractivo({
     <iframe
       key={directo ? "directo" : "copia"}
       ref={marco}
-      src={directo ? url : direccionIncrustada(url, temaAlMontar)}
+      src={directo ? url : direccionIncrustada(notaSlug, indice, temaAlMontar, url)}
       title={titulo}
       loading="lazy"
       referrerPolicy="strict-origin-when-cross-origin"
@@ -197,12 +201,18 @@ function MarcoInteractivo({
  */
 export function InteractivoIncrustado({
   url,
+  notaSlug,
+  indice,
   titulo,
   descripcion,
   alto = "normal",
 }: {
-  /** Ya validada con `urlIncrustable`. */
+  /** Ya validada con `urlIncrustable`. Es la del enlace "Abrir en el Portal";
+   *  el recuadro se pide por `notaSlug` e `indice` (ver `direccionIncrustada`). */
   url: string;
+  notaSlug: string;
+  /** El lugar del bloque en el cuerpo de la nota. */
+  indice: number;
   titulo: string;
   descripcion?: string;
   alto?: AltoInteractivo;
@@ -397,6 +407,8 @@ export function InteractivoIncrustado({
             {montado && (
               <MarcoInteractivo
                 url={url}
+                notaSlug={notaSlug}
+                indice={indice}
                 titulo={titulo}
                 tema={tema}
                 // Sólo se da por cargado si había señal: si la red se cortó a

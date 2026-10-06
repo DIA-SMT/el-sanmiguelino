@@ -26,12 +26,12 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "El Sanmiguelino",
     short_name: "Sanmiguelino",
     description:
-      "El diario digital mensual de la Municipalidad de San Miguel de Tucumán. Exclusivo para usuarios de Cidituc.",
+      "El diario digital mensual de la Municipalidad de San Miguel de Tucumán: las obras, la cultura y las historias de la ciudad, para leer como un diario de papel.",
     lang: "es-AR",
     dir: "ltr",
-    /* Arranca en el diario y no en la landing: quien instala la aplicación ya
-       es lector. Sin sesión, el proxy lo manda a /login, y de ahí vuelve al
-       diario. */
+    /* Arranca en el diario y no en la presentación: quien instala la
+       aplicación ya es lector. Leer es libre, así que abre directo, con o sin
+       sesión. */
     start_url: "/diario",
     scope: "/",
     display: "standalone",

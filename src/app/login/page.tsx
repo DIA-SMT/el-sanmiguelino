@@ -1,16 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { LogoSanmiguelino, LogoSubsecretaria } from "@/components/brand/logos";
 import { textoDeError } from "@/lib/auth/cidituc/errores";
+import { usuarioActual } from "@/lib/auth/dal";
+import { destinoSeguro } from "@/lib/auth/destino";
 import { getResumenEdicion } from "@/lib/repos/edicion";
 import { BotonIngresar } from "./boton-ingresar";
 
-export const metadata: Metadata = { title: "Ingresar" };
+export const metadata: Metadata = {
+  title: "Ingresar",
+  robots: { index: false },
+};
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { volverA, error } = await searchParams;
-  const destino = typeof volverA === "string" ? volverA : "/diario";
+  // Saneado ACÁ y no sólo en el arranque del ingreso: el destino también es el
+  // href de "Seguir leyendo", y un `volverA=//otro.sitio` sin sanear haría del
+  // dominio municipal un redirector abierto.
+  const destino = destinoSeguro(typeof volverA === "string" ? volverA : null);
+  // Quien ya ingresó no tiene nada que hacer acá: vuelve a lo que estaba
+  // haciendo. Con la firma verificada, no con la forma de la cookie (ver
+  // src/proxy.ts).
+  if (await usuarioActual()) redirect(destino);
   // Un intento que volvió mal desde Cidituc. Se nombra el motivo: "no se pudo
   // ingresar" a secas deja a la persona sin saber si reintentar o avisar.
   const aviso = textoDeError(error);
@@ -29,12 +42,14 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <p className="meta">Diario digital · {edicion.mes}</p>
         </div>
 
+        {/* Leer es libre: el ingreso es para participar. Lo dice así porque la
+            mayoría llega acá desde un "Ingresá para opinar" en el medio de una
+            nota, y tiene que saber que no pierde la lectura. */}
         <p className="mt-7 text-pretty font-serif text-[0.98rem] leading-[1.7] text-ink-2">
-          La edición digital es{" "}
-          <strong className="font-semibold text-ink">
-            exclusiva para usuarios de Cidituc
-          </strong>
-          . Ingresá con tu cuenta para leer el diario del mes.
+          Ingresá con tu cuenta de{" "}
+          <strong className="font-semibold text-ink">Ciudadano Digital</strong>{" "}
+          para opinar en las notas, preguntarle a Migue y recibir el diario en
+          papel. Para leer no hace falta.
         </p>
 
         {aviso && (
@@ -49,14 +64,14 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <BotonIngresar destino={destino} />
 
         <Link
-          href="/"
+          href={destino}
           className="group mt-5 inline-flex items-center gap-2 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink-3 transition-colors hover:text-accent"
         >
           <ArrowLeft
             className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-1"
             aria-hidden="true"
           />
-          Volver a la página principal
+          Seguir leyendo
         </Link>
 
         <div className="rule-thin mt-9 pt-6">

@@ -1,20 +1,33 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, cookieMuerta } from "@/lib/auth/cookie";
-import { AUTH_CIDITUC_OBLIGATORIA } from "@/lib/auth/config";
-import { respuestaSinSesion } from "@/lib/interactivos-aviso";
 
 /**
- * Gate de acceso con Cidituc. Públicas: la landing (/), /login, las rutas de
- * auth y la página de aviso sin conexión (/sin-conexion); el manifest y el
- * service worker ni pasan por acá (ver el `matcher`). Todo el resto del diario
- * requiere sesión.
+ * El proxy del diario. **Leer es libre**: ninguna página de lectura pide sesión.
+ * Cidituc se pide para participar —comentar, votar, preguntarle a Migue,
+ * anotarse para el papel—, y eso lo controla cada API con
+ * `sesionParaParticipar()`, que verifica la firma. Antes todo el diario estaba
+ * detrás del ingreso y este archivo mandaba a /login a quien no tuviera sesión.
  *
- * El proxy hace un chequeo *estructural* del token (versión y vencimiento), no
- * criptográfico: la firma se verifica del lado servidor en cada página y API.
- * Lo que sí aporta acá es distinguir una cookie ausente de una vencida, para
- * poder borrarla — si no, el navegador manda para siempre una cookie muerta,
- * el proxy la ve "presente" y manda a /login, /login ve sesión y manda al
- * diario: bucle infinito.
+ * Lo que queda acá:
+ *
+ * - Las rutas de `/api` piden sesión, salvo el ingreso en sí y LEER los
+ *   comentarios de una nota (`GET /api/comentarios`, exacto: ni el POST de la
+ *   misma ruta ni los votos, que cuelgan de ella). Es un atajo para cortar
+ *   temprano: el control de verdad está en cada handler, porque acá sólo se
+ *   mira la FORMA de la cookie (versión y vencimiento), no la firma.
+ *
+ * - `/admin` no se toca acá a propósito. Responde 404 por su cuenta
+ *   (`requerirAdmin()`), con o sin sesión, para no anunciar que existe. Mandar
+ *   a /login sólo desde /admin sería decirlo.
+ *
+ * - Con sesión, la raíz va a la tapa: la presentación es para quien llega sin
+ *   cuenta. `/login` ya no se redirige acá: lo decide la página, con la firma
+ *   verificada. Con una cookie de firma vieja (si se rota el secreto) el proxy
+ *   la ve "viva", y mandarla a la tapa desde /login dejaba a la persona sin
+ *   poder volver a ingresar hasta que venciera.
+ *
+ * - Una cookie vencida se borra, en cualquier ruta. Si no, el navegador la
+ *   manda para siempre.
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -23,68 +36,22 @@ export function proxy(request: NextRequest) {
   const muerta = Boolean(bruta) && cookieMuerta(bruta);
   const tieneSesion = Boolean(bruta) && !muerta;
 
-  // `/auth/cidituc/*` es el ingreso en sí —el que manda al derivador municipal y
-  // el que recibe la vuelta con el token—. Tiene que ser público por definición:
-  // quien pasa por ahí todavía no tiene sesión, y si el gate lo mandara a /login
-  // el ingreso no podría completarse nunca.
-  const esAuth =
-    pathname.startsWith("/api/auth/") || pathname.startsWith("/auth/cidituc/");
-  // `/sin-conexion` la pide el service worker al instalarse, que puede ser en la
-  // landing y sin sesión. Detrás del gate el pedido terminaría en /login, que
-  // no trae la marca de página guardable, y sin sesión el worker no llegaría a
-  // instalarse nunca.
-  const esPublica =
-    pathname === "/" ||
-    pathname === "/login" ||
-    pathname === "/sin-conexion" ||
-    esAuth;
-
-  // Las API responden su propio 401 (un redirect HTML no le sirve a un fetch).
-  // Antes /api/* quedaba enteramente fuera del gate: cualquiera sin sesión
-  // podía postear comentarios o consultar a Migue.
   if (pathname.startsWith("/api/")) {
-    if (!esAuth && !tieneSesion) {
+    const esAuth = pathname.startsWith("/api/auth/");
+    const leeComentarios =
+      request.method === "GET" && pathname === "/api/comentarios";
+    if (!esAuth && !leeComentarios && !tieneSesion) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
-    return NextResponse.next();
   }
 
-  // `/interactivo` es lo que carga el recuadro de un interactivo adentro de la
-  // nota. Mandarlo a /login ponía la pantalla de ingreso del diario adentro del
-  // recuadro —sesión vencida con la nota abierta, o cerrada en otra pestaña—.
-  // Va un aviso aislado, como el resto de lo que sale de esa ruta.
-  if (
-    AUTH_CIDITUC_OBLIGATORIA &&
-    !tieneSesion &&
-    pathname === "/interactivo"
-  ) {
-    const res = respuestaSinSesion(null);
-    if (!muerta) return res;
-    const conBorrado = new NextResponse(res.body, res);
-    conBorrado.cookies.delete(SESSION_COOKIE);
-    return conBorrado;
-  }
-
-  if (AUTH_CIDITUC_OBLIGATORIA && !esPublica && !tieneSesion) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.search =
-      pathname === "/diario" ? "" : `?volverA=${encodeURIComponent(pathname)}`;
-    const res = NextResponse.redirect(url);
-    if (muerta) res.cookies.delete(SESSION_COOKIE);
-    return res;
-  }
-
-  // Con sesión, la landing y el login van directo al diario.
-  if (tieneSesion && (pathname === "/" || pathname === "/login")) {
+  if (tieneSesion && pathname === "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/diario";
     url.search = "";
     return NextResponse.redirect(url);
   }
 
-  // Cookie muerta en una ruta pública: se limpia acá para que la próxima
-  // navegación arranque sin ella.
   if (muerta) {
     const res = NextResponse.next();
     res.cookies.delete(SESSION_COOKIE);

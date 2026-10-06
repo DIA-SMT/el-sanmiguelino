@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeft, Clock } from "lucide-react";
 import { HojaDiario } from "@/components/hoja-diario";
 import { Masthead } from "@/components/masthead";
@@ -7,7 +7,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { getIndiceDe, getPublicadas, getResumenEdicion } from "@/lib/repos/edicion";
 import { numeroDeNota } from "@/lib/data/paginas";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
-import { getUsuario } from "@/lib/auth/session";
+import { usuarioActual } from "@/lib/auth/dal";
 
 /**
  * El sumario de un número: su foliado y sus titulares.
@@ -38,8 +38,8 @@ import { getUsuario } from "@/lib/auth/session";
 export default async function EdicionPage({
   params,
 }: PageProps<"/edicion/[slug]">) {
-  const usuario = await getUsuario();
-  if (!usuario) redirect("/login");
+  // Leer es libre: sin sesión, `usuario` es null y la página se arma igual.
+  const usuario = await usuarioActual();
 
   const { slug } = await params;
   const [enLaCalle, publicadas] = await Promise.all([

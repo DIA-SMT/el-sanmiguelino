@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
@@ -15,7 +15,7 @@ import {
   seccionesDeEdicion,
   slugificarSeccion,
 } from "@/lib/data/secciones";
-import { getUsuario } from "@/lib/auth/session";
+import { usuarioActual } from "@/lib/auth/dal";
 
 export async function generateMetadata({
   params,
@@ -28,8 +28,8 @@ export async function generateMetadata({
 export default async function SeccionPage({
   params,
 }: PageProps<"/seccion/[slug]">) {
-  const usuario = await getUsuario();
-  if (!usuario) redirect("/login");
+  // Leer es libre: sin sesión, `usuario` es null y la página se arma igual.
+  const usuario = await usuarioActual();
 
   const { slug } = await params;
   const [edicion, indice] = await Promise.all([

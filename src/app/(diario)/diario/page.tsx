@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ViewTransition } from "react";
-import { redirect } from "next/navigation";
 import { Masthead } from "@/components/masthead";
 import { CitaPersona } from "@/components/cita-persona";
 import { SiteFooter } from "@/components/site-footer";
@@ -15,7 +14,7 @@ import {
   getIndice,
   getResumenEdicion,
 } from "@/lib/repos/edicion";
-import { getUsuario } from "@/lib/auth/session";
+import { usuarioActual } from "@/lib/auth/dal";
 import { transicionPagina } from "@/lib/transiciones";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
 import { numeroDeNota } from "@/lib/data/paginas";
@@ -32,8 +31,8 @@ function citaDe(nota: NotaCompleta) {
 }
 
 export default async function Portada() {
-  const usuario = await getUsuario();
-  if (!usuario) redirect("/login");
+  // Leer es libre: sin sesión, `usuario` es null y la página se arma igual.
+  const usuario = await usuarioActual();
 
   const [edicion, indice] = await Promise.all([
     getResumenEdicion(),
@@ -200,9 +199,11 @@ export default async function Portada() {
                     y sigue siendo otro control, para otra vuelta; el sumario
                     LEÍDO ya existe y está en la pestaña "Notas". */}
                 <div className="mt-5">
+                  {/* Sin sesión, la voz del navegador: la de Migue pide
+                      ingresar (ver la nota). */}
                   <BotonEscuchar
                     texto={textoDeResumenDeTapa(edicion, principal)}
-                    fuente={{ que: "tapa" }}
+                    fuente={usuario ? { que: "tapa" } : undefined}
                     etiqueta="Escuchar la tapa"
                     descripcion="la tapa de esta edición"
                   />

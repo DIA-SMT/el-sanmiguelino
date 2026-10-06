@@ -5,10 +5,11 @@ import { suscribir } from "@/lib/repos/suscripciones";
 /**
  * Anotarse para recibir El Sanmiguelino en papel.
  *
- * Pide sesión, como todo lo que escribe: el diario entero está detrás del gate
- * de Cidituc, así que esto no es un formulario abierto a internet. Cuando el
- * SSO real esté, `nombre` y `edad` van a venir de ahí y el formulario va a
- * pedir sólo correo y domicilio.
+ * Pide sesión, como todo lo que escribe. Leer el diario es libre, pero esto
+ * guarda un domicilio: sin identidad, cualquiera podría anotar a otro, así que
+ * no es un formulario abierto a internet. El nombre llega prellenado de
+ * Cidituc; la edad y el domicilio Cidituc no los tiene, y el correo queda a
+ * mano por decisión.
  *
  * Las validaciones son del servidor, no del formulario: lo que valida el
  * navegador es una comodidad para quien escribe, no una defensa.

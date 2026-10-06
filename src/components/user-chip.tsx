@@ -1,17 +1,21 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOut } from "lucide-react";
 import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
+import { olvidarBorradores } from "@/lib/borradores";
 import { olvidarPaginasGuardadas } from "@/lib/pwa";
-import type { Usuario } from "@/lib/types";
+import { salida } from "@/lib/salida";
 
 export function UserChip({
-  usuario,
+  nombre: nombreCrudo,
   soloMonograma = false,
+  salirA,
 }: {
-  usuario: Usuario;
+  /** Sólo el nombre, no el usuario entero: este componente es de cliente y lo
+   *  que recibe viaja dentro del HTML. */
+  nombre: string;
   /**
    * Deja el nombre para el lector de pantalla y muestra sólo el monograma, a
    * cualquier ancho.
@@ -23,8 +27,13 @@ export function UserChip({
    * regla que alcance el marcado ajeno se rompe al primer cambio de acá.
    */
   soloMonograma?: boolean;
+  /** A dónde ir al cerrar sesión, si quedarse no sirve. Lo decide quien lo
+   *  monta: la cabecera lo pasa durante la vista previa de una edición, que sin
+   *  sesión es un 404. */
+  salirA?: string;
 }) {
   const router = useRouter();
+  const ruta = usePathname();
   const [saliendo, setSaliendo] = useState(false);
 
   // Se normaliza también acá y no sólo al ingresar. Normalizar en el login es la
@@ -32,7 +41,7 @@ export function UserChip({
   // antes de que existiera `nombreDeDiario` arrastra el nombre en mayúsculas
   // hasta ocho horas, y no hay motivo para que alguien tenga que volver a entrar
   // para que su nombre se vea bien. La función es pura y no importa nada.
-  const nombre = nombreDeDiario(usuario.nombre);
+  const nombre = nombreDeDiario(nombreCrudo);
 
   async function cerrarSesion() {
     setSaliendo(true);
@@ -41,7 +50,18 @@ export function UserChip({
       // Después del logout y no antes: si el POST falla, la sesión sigue
       // abierta y las páginas guardadas siguen siendo de esta persona.
       await olvidarPaginasGuardadas();
-      router.push("/");
+      // Y los comentarios a medio escribir que esperaban un nuevo ingreso: no
+      // son del que viene (ver `src/lib/borradores.ts`).
+      olvidarBorradores();
+      // Leer es libre: quien sale de su cuenta se queda en lo que estaba
+      // leyendo, ahora sin nombre. Antes iba a "/", que para alguien sin
+      // sesión es la presentación. Desde el panel o desde la vista previa de
+      // una edición, en cambio, se va a la tapa: sin sesión los dos son 404.
+      const destino = salirA ?? (ruta.startsWith("/admin") ? "/diario" : null);
+      // El "Ingresar" que aparece en lugar de este chip toma el foco y avisa
+      // que se cerró la sesión (ver `src/lib/salida.ts`).
+      salida.reciente = true;
+      if (destino) router.push(destino);
       router.refresh();
     } catch {
       setSaliendo(false);

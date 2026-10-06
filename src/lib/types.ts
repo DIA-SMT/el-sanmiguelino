@@ -304,6 +304,28 @@ export interface Comentario {
   estado: EstadoComentario;
 }
 
+/**
+ * Comentario como sale del servidor hacia cualquier lector (ver
+ * `src/lib/comentarios-publicos.ts`).
+ *
+ * Es una forma aparte y no `Comentario` recortado en el cliente porque lo que
+ * importa es lo que NO viaja: ni el id de Cidituc del autor —el identificador
+ * estable entre las apps del municipio— ni su nombre completo. Desde que leer
+ * es libre esto lo puede pedir cualquiera, nota por nota.
+ */
+export interface ComentarioPublico {
+  id: string;
+  notaSlug: string;
+  /** La firma pública: primer nombre e inicial del apellido ("Alfredo B."). */
+  autor: string;
+  texto: string;
+  fecha: string; // ISO
+  likes: number;
+  dislikes: number;
+  /** El voto de quien pregunta; null sin sesión. */
+  miVoto: 1 | -1 | null;
+}
+
 /** Comentario como lo ve la moderación: con el rastro de la baja. */
 export interface ComentarioModerable extends Comentario {
   ocultadoPor?: string;

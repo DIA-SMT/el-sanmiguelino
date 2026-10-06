@@ -114,3 +114,34 @@ export function nombreDeDiario(bruto: string): string {
     })
     .join("");
 }
+
+/**
+ * Cómo firma un vecino en público: el primer nombre y la inicial del apellido.
+ * "Alfredo Agustin Brito" → "Alfredo B.".
+ *
+ * Desde que leer el diario es libre, los comentarios los ve cualquiera y los
+ * puede indexar un buscador. Hasta entonces sólo los veía gente con cuenta de
+ * Ciudadano Digital. El nombre completo queda para la moderación; lo público,
+ * y el "Firmás como" del formulario —que tiene que mostrar lo mismo que va a
+ * ver el resto—, va abreviado.
+ *
+ * El nombre se guarda en un solo texto (nombre y apellido de Cidituc pegados),
+ * sin la marca de dónde empieza el apellido. Se toma la ÚLTIMA palabra: en
+ * Argentina lo común son varios nombres de pila y un apellido, así que acierta
+ * casi siempre. Con un apellido doble da la inicial del segundo —"María José
+ * Pérez García" → "María G."—, que no es la que usaría la persona pero igual
+ * cumple lo que importa: no publicar el nombre entero. Un nombre de una sola
+ * palabra, o el "Vecino/a" de quien no cargó nombre, queda como está.
+ */
+export function firmaPublica(bruto: string): string {
+  // Se parte por cualquier espacio, por coma ("PEREZ,JUAN") y por los
+  // caracteres invisibles de formato (un espacio de ancho cero): con un
+  // espacio común solo, esos nombres quedaban en una sola "palabra" y salían
+  // enteros. El guion no: "Jean-Pierre" es un nombre, no dos.
+  const palabras = nombreDeDiario(bruto)
+    .split(/[\s,\p{Cf}]+/u)
+    .filter(Boolean);
+  if (palabras.length < 2) return palabras.join(" ");
+  const inicial = Array.from(palabras[palabras.length - 1])[0] ?? "";
+  return `${palabras[0]} ${inicial.toLocaleUpperCase("es")}.`;
+}

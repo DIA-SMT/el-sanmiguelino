@@ -1,4 +1,5 @@
-import { MessageCircle, Newspaper, ThumbsUp } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, MessageCircle, Newspaper, ThumbsUp } from "lucide-react";
 import { LogoHoja, LogoSanmiguelino } from "@/components/brand/logos";
 import { DiarioEnPerspectiva } from "@/components/landing/diario-en-perspectiva";
 import { VistaPrevia } from "@/components/landing/vista-previa";
@@ -24,12 +25,15 @@ const QUE_TRAE = [
     icono: ThumbsUp,
     titulo: "La palabra del lector",
     texto:
-      "Cada nota tiene su columna del lector: dejá tu opinión firmada con tu usuario y acompañá con un “me gusta” las voces con las que coincidís.",
+      "Cada nota tiene su columna del lector: ingresá con tu cuenta de Ciudadano Digital, dejá tu opinión y acompañá con un “me gusta” las voces con las que coincidís.",
   },
 ];
 
-/** Landing pública: presenta El Sanmiguelino y anuncia su próxima apertura.
- *  El diario completo vive detrás del gate, en /diario. */
+/** La presentación de El Sanmiguelino, para quien llega por la dirección
+ *  principal sin haber ingresado (con sesión, el proxy manda directo a la
+ *  tapa). Antes anunciaba "Próximamente", cuando el diario era sólo para
+ *  quien ingresaba; desde que leer es libre, cada "Próximamente" es un
+ *  "Leer la edición" que lleva a la tapa del mes. */
 export default async function Landing() {
   const [edicion, indice] = await Promise.all([
     getResumenEdicion(),
@@ -50,9 +54,12 @@ export default async function Landing() {
           </span>
           <span className="flex items-center gap-2.5">
             <ThemeToggle />
-            <span className="font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-accent-strong">
-              Próximamente
-            </span>
+            <Link
+              href="/diario"
+              className="font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-accent-strong transition-colors hover:text-ink"
+            >
+              Leer la edición
+            </Link>
           </span>
         </div>
       </header>
@@ -88,11 +95,22 @@ export default async function Landing() {
                 de los vecinos.
               </p>
               <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-4">
-                <span className="inline-flex items-center bg-accent px-7 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-accent-contrast shadow-control">
-                  Próximamente
-                </span>
-                <p className="font-serif text-sm italic text-ink-2">
-                  El acceso al diario estará disponible próximamente.
+                <Link
+                  href="/diario"
+                  className="pressable group inline-flex items-center gap-2.5 bg-accent px-7 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-accent-contrast shadow-control hover:bg-accent-strong"
+                >
+                  Leer la edición de {edicion.mes}
+                  <ArrowRight
+                    className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
+                    aria-hidden="true"
+                  />
+                </Link>
+                <p className="max-w-xs font-serif text-sm italic text-ink-2">
+                  Se lee libre. Para opinar y preguntarle a Migue,{" "}
+                  <Link href="/login" className="enlace not-italic">
+                    ingresá con Ciudadano Digital
+                  </Link>
+                  .
                 </p>
               </div>
 
@@ -180,12 +198,18 @@ export default async function Landing() {
               La edición de {edicion.mes} ya está en la calle
             </h2>
             <p className="max-w-xl font-serif text-[1.05rem] leading-relaxed text-ink-2">
-              Muy pronto vas a poder leerla como se lee un diario: pasando
-              páginas.
+              Leela como se lee un diario: pasando páginas.
             </p>
-            <span className="inline-flex bg-ink px-7 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-paper">
-              Próximamente
-            </span>
+            <Link
+              href="/diario"
+              className="pressable group inline-flex items-center gap-2.5 bg-ink px-7 py-3.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-paper hover:bg-accent hover:text-accent-contrast"
+            >
+              Leer la edición
+              <ArrowRight
+                className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
+                aria-hidden="true"
+              />
+            </Link>
           </div>
         </section>
       </main>

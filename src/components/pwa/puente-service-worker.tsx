@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { avisarRutaMostrada } from "@/lib/pwa";
 
@@ -34,6 +34,22 @@ const WORKER_ACTIVO =
  */
 export function PuenteServiceWorker() {
   const ruta = usePathname();
+  const router = useRouter();
+
+  /*
+   * Al volver la señal, la página se vuelve a armar. Lo que se guarda para
+   * leer sin conexión es la versión SIN SESIÓN de cada página (ver
+   * `public/sw.js`): quien ingresó y abrió la aplicación sin señal la ve sin su
+   * nombre, y al reconectarse seguía viendo "Ingresar" —y a Migue pidiéndole
+   * que ingrese— hasta recargar, porque el layout no se vuelve a pedir en una
+   * navegación interna. `router.refresh()` rearma todo con la cookie. `online`
+   * sólo dispara después de haber estado sin red: es un pedido por reconexión.
+   */
+  useEffect(() => {
+    const alVolverLaSenal = () => router.refresh();
+    window.addEventListener("online", alVolverLaSenal);
+    return () => window.removeEventListener("online", alVolverLaSenal);
+  }, [router]);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;

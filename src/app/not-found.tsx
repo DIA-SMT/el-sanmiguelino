@@ -14,8 +14,11 @@ export default function NotFound() {
         <p className="mt-4 text-pretty font-serif text-[0.98rem] leading-[1.7] text-ink-2">
           Puede que la nota se haya movido o que el enlace esté mal escrito.
         </p>
+        {/* A la tapa del diario y no a "/": desde que leer es libre, quien no
+            ingresó también llega acá (un enlace viejo compartido), y para él
+            "/" es la presentación, no la portada. */}
         <Link
-          href="/"
+          href="/diario"
           className="pressable group mt-7 inline-flex items-center gap-2.5 bg-ink px-6 py-3 font-sans text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-paper hover:bg-accent hover:text-accent-contrast"
         >
           Ir a la portada

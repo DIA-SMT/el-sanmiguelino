@@ -1,10 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Mailbox, X } from "lucide-react";
+import { rutaDeIngreso } from "@/lib/auth/destino";
+import { useRutaActual } from "@/lib/auth/usar-ruta-actual";
 import { cn } from "@/lib/utils";
+
+/* La marca de "volver del ingreso con el formulario abierto". Guarda DESDE
+   QUÉ PÁGINA se pidió el ingreso, y se saca siempre al montarse: el pie está
+   en todas las páginas, y una marca que quedó colgada (la persona tocó "Seguir
+   leyendo", volvió atrás, o Cidituc dio error) abría el formulario solo en
+   otra página, horas después. En sessionStorage —se va con la pestaña— y con
+   try/catch: puede no estar (ventana privada, datos del sitio bloqueados). */
+const MARCA_ABRIR = "sm-abrir-papel";
+function marcarParaAbrir(ruta: string) {
+  try {
+    sessionStorage.setItem(MARCA_ABRIR, ruta);
+  } catch {}
+}
+function sacarMarcaParaAbrir(): string | null {
+  try {
+    const ruta = sessionStorage.getItem(MARCA_ABRIR);
+    sessionStorage.removeItem(MARCA_ABRIR);
+    return ruta;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Anotarse para recibir El Sanmiguelino en papel.
@@ -41,7 +65,12 @@ export function SuscripcionPapel({
   nombre?: string;
   conSesion: boolean;
 }) {
+  // A dónde vuelve el "Ingresar": esta página, con su query.
+  const ruta = useRutaActual();
   const [abierto, setAbierto] = useState(false);
+  /** La API rechazó el envío: la sesión se venció mientras el formulario
+   *  estaba abierto, o la cuenta está bloqueada. */
+  const [rechazo, setRechazo] = useState<"sesion" | "bloqueado" | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState<"nuevo" | "actualizado" | null>(null);
@@ -51,6 +80,18 @@ export function SuscripcionPapel({
     email: "",
     direccion: "",
   });
+
+  // De vuelta del ingreso que se pidió desde acá, en la misma página: el
+  // formulario se reabre solo. La marca se saca siempre, haya sesión o no. En
+  // un setTimeout y no en el cuerpo del efecto, para no encadenar un render
+  // más sobre el de la hidratación.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const desde = sacarMarcaParaAbrir();
+      if (conSesion && desde === ruta) setAbierto(true);
+    });
+    return () => clearTimeout(t);
+  }, [conSesion, ruta]);
 
   function editar(clave: keyof typeof datos, valor: string) {
     setError(null);
@@ -68,6 +109,13 @@ export function SuscripcionPapel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(datos),
       });
+      if (res.status === 401 || res.status === 403) {
+        // No es un dato mal cargado: se venció la sesión (la página se armó
+        // con sesión, por ejemplo la aplicación retomada al otro día) o la
+        // cuenta está bloqueada. "No autenticado" a secas no decía qué hacer.
+        setRechazo(res.status === 401 ? "sesion" : "bloqueado");
+        return;
+      }
       const cuerpo = await res.json();
       if (!res.ok) {
         setError(cuerpo.error ?? "No se pudo guardar.");
@@ -88,6 +136,7 @@ export function SuscripcionPapel({
     if (!v) {
       setListo(null);
       setError(null);
+      setRechazo(null);
     }
   }
 
@@ -138,8 +187,10 @@ export function SuscripcionPapel({
                 Digital. Es la misma que usás para los trámites de la
                 Municipalidad.
               </p>
+              {/* Vuelve a esta misma página, con el formulario abierto. */}
               <Link
-                href="/login"
+                href={rutaDeIngreso(ruta)}
+                onClick={() => marcarParaAbrir(ruta)}
                 className="pressable inline-flex items-center gap-2 border border-ink bg-ink px-4 py-2.5 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-paper transition-colors hover:bg-accent hover:text-accent-contrast"
               >
                 Ingresar
@@ -226,6 +277,28 @@ export function SuscripcionPapel({
                   className="border border-red-300 bg-red-50 px-3 py-2 font-sans text-[0.8rem] text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
                 >
                   {error}
+                </p>
+              )}
+              {rechazo && (
+                <p
+                  role="alert"
+                  className="border border-red-300 bg-red-50 px-3 py-2 font-sans text-[0.8rem] text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                >
+                  {rechazo === "bloqueado" ? (
+                    "Tu cuenta no puede anotarse para recibir el diario en papel."
+                  ) : (
+                    <>
+                      Se venció tu sesión.{" "}
+                      <Link
+                        href={rutaDeIngreso(ruta)}
+                        onClick={() => marcarParaAbrir(ruta)}
+                        className="font-semibold underline"
+                      >
+                        Ingresá de nuevo
+                      </Link>{" "}
+                      y anotate: el formulario se vuelve a abrir.
+                    </>
+                  )}
                 </p>
               )}
 

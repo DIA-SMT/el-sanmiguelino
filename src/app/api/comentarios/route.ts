@@ -1,29 +1,40 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getUsuario } from "@/lib/auth/session";
-import { sesionParaParticipar } from "@/lib/auth/dal";
+import { sesionParaParticipar, usuarioActual } from "@/lib/auth/dal";
+import { aPublico } from "@/lib/comentarios-publicos";
 import { comentariosRepo } from "@/lib/repos/comentarios";
 import { notaExiste } from "@/lib/repos/edicion";
 
 /**
- * El GET se queda con  y NO pasa por .
+ * Leer los comentarios de una nota es LIBRE, como leer la nota: sin sesión no
+ * hay "mi voto" y nada más cambia. Por eso el GET usa `usuarioActual()` —sólo
+ * para saber de quién es el voto— y no `sesionParaParticipar()`. A alguien
+ * bloqueado tampoco se le esconde lo publicado: se le impide escribir. El POST
+ * de acá abajo y los votos sí piden sesión, que es donde tiene que morder.
  *
- * Leer los comentarios de una nota no es participar: son públicos para
- * cualquiera que tenga sesión, y a alguien bloqueado no se le esconde lo que ya
- * está publicado — se le impide escribir. El POST de acá abajo y la fila de
- * votos sí lo chequean, que es donde el bloqueo tiene que morder.
+ * Lo que sale es `aPublico()`: sin el id de Cidituc del autor y con la firma
+ * abreviada. `notaExiste` respeta qué ediciones se pueden leer: una nota de
+ * una edición que todavía no salió da 404, salvo en la vista previa de un
+ * administrador.
+ *
+ * `no-store`: la respuesta lleva el voto de quien pregunta. Una caché
+ * compartida le serviría el voto de uno a todos.
  */
-export async function GET(request: NextRequest) {
-  const usuario = await getUsuario();
-  if (!usuario) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+const PRIVADA = { "Cache-Control": "private, no-store" };
 
+export async function GET(request: NextRequest) {
   const notaSlug = request.nextUrl.searchParams.get("nota");
   if (!notaSlug || !(await notaExiste(notaSlug))) {
-    return NextResponse.json({ error: "Nota inexistente" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Nota inexistente" },
+      { status: 404, headers: PRIVADA },
+    );
   }
-  const comentarios = await comentariosRepo.listar(notaSlug, usuario.id);
-  return NextResponse.json({ comentarios });
+  const usuario = await usuarioActual();
+  const comentarios = await comentariosRepo.listar(notaSlug, usuario?.id ?? null);
+  return NextResponse.json(
+    { comentarios: comentarios.map(aPublico) },
+    { headers: PRIVADA },
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -63,11 +74,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Se guarda el nombre completo —lo necesita la moderación— y sale la firma
+  // pública.
   const comentario = await comentariosRepo.crear({
     notaSlug: body.notaSlug,
     usuarioId: usuario.id,
     usuarioNombre: usuario.nombre,
     texto,
   });
-  return NextResponse.json({ comentario }, { status: 201 });
+  return NextResponse.json(
+    { comentario: aPublico(comentario) },
+    { status: 201, headers: PRIVADA },
+  );
 }

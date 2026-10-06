@@ -1,8 +1,7 @@
 /**
- * Lo que comparten las dos puertas de `/interactivo`: la ruta
- * (`src/app/interactivo/route.ts`) y el gate de sesión (`src/proxy.ts`), que
- * contesta antes que la ruta cuando no hay sesión. Sin `server-only` porque el
- * proxy también lo usa.
+ * Las cabeceras y los avisos de `/interactivo` (`src/app/interactivo/route.ts`).
+ * Aparte de la ruta para que un aviso salga SIEMPRE con las mismas cabeceras
+ * que el interactivo.
  */
 
 import { SITIOS_INCRUSTABLES } from "@/lib/interactivos";
@@ -49,18 +48,4 @@ export function paginaDeAviso(mensaje: string, url: string | null): string {
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Interactivo</title>
 <style>html,body{height:100%;margin:0}body{display:grid;place-items:center;padding:24px;box-sizing:border-box;font:15px/1.5 Georgia,serif;font-style:italic;color:#555;background:#efe9dc;text-align:center}a{color:#1a5fb4}@media (prefers-color-scheme:dark){body{background:#1d222b;color:#b8bfca}a{color:#7fb0ff}}</style></head>
 <body><div><p>${escapar(mensaje)}</p>${enlace}</div></body></html>`;
-}
-
-/** El aviso de "sin sesión", listo para devolver. */
-export function respuestaSinSesion(url: string | null): Response {
-  return new Response(
-    paginaDeAviso(
-      "Tu sesión en el diario venció. Volvé a ingresar para ver el interactivo.",
-      url,
-    ),
-    {
-      status: 401,
-      headers: { ...CABECERAS_INTERACTIVO, "Cache-Control": "no-store" },
-    },
-  );
 }

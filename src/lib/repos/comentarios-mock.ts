@@ -88,7 +88,7 @@ function seed(): Store {
 const g = globalThis as typeof globalThis & { __smComentarios?: Store };
 const store: Store = (g.__smComentarios ??= seed());
 
-function proyectar(row: ComentarioRow, usuarioId: string): Comentario {
+function proyectar(row: ComentarioRow, usuarioId: string | null): Comentario {
   let likes = 0;
   let dislikes = 0;
   let miVoto: 1 | -1 | null = null;
@@ -97,7 +97,7 @@ function proyectar(row: ComentarioRow, usuarioId: string): Comentario {
     if (comentarioId !== row.id) continue;
     if (valor === 1) likes++;
     else dislikes++;
-    if (votante === usuarioId) miVoto = valor;
+    if (usuarioId !== null && votante === usuarioId) miVoto = valor;
   }
   return {
     id: row.id,
@@ -130,8 +130,11 @@ const porFecha = (a: ComentarioRow, b: ComentarioRow) =>
   b.fecha.localeCompare(a.fecha);
 
 export const comentariosMockRepo = {
-  /** Lo que ve un lector: sólo lo publicado. */
-  async listar(notaSlug: string, usuarioId: string): Promise<Comentario[]> {
+  /** Lo que ve un lector: sólo lo publicado. `usuarioId` es null sin sesión. */
+  async listar(
+    notaSlug: string,
+    usuarioId: string | null,
+  ): Promise<Comentario[]> {
     return store.comentarios
       .filter((c) => c.notaSlug === notaSlug && visible(c))
       .sort(porFecha)
@@ -171,14 +174,17 @@ export const comentariosMockRepo = {
     return proyectar(row, datos.usuarioId);
   },
 
-  /** valor null quita el voto; 1/-1 lo fija (reemplaza el contrario). */
+  /** valor null quita el voto; 1/-1 lo fija (reemplaza el contrario).
+   *  `soloPublicado`: ver el motor Postgres. */
   async votar(
     comentarioId: string,
     usuarioId: string,
     valor: 1 | -1 | null,
+    soloPublicado = false,
   ): Promise<Comentario | null> {
     const row = store.comentarios.find((c) => c.id === comentarioId);
     if (!row) return null;
+    if (soloPublicado && !visible(row)) return null;
     const clave = `${comentarioId}:${usuarioId}`;
     if (valor === null) store.votos.delete(clave);
     else store.votos.set(clave, valor);

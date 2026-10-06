@@ -72,23 +72,26 @@
  * hoja de todas las páginas del diario, y aparece en el HTML sólo si la hoja
  * se dibujó. Sin marca queda la copia anterior.
  *
- * ## Las páginas guardadas son de quien inició sesión
+ * ## Las páginas guardadas no son de nadie
  *
- * El diario es exclusivo para usuarios de Cidituc, y lo guardado para leer sin
- * conexión es lo que vio esa persona, con su nombre en la cabecera. Así que se
- * borra en los dos momentos en que deja de ser suyo:
+ * Leer el diario es libre, y lo que se guarda para leer sin conexión es la
+ * versión SIN SESIÓN de cada página: sin el nombre de quien la vio en la
+ * cabecera y sin la vista previa de un administrador. `HojaDiario` pone la
+ * marca de guardable sólo en esa versión; a una página armada con sesión le
+ * pone otra, y no se guarda. Para quien ingresó, la versión sin sesión se baja
+ * aparte, sin cookies (`credentials: "omit"`), y sólo si la copia falta o
+ * está vieja.
  *
- * - Al cerrar sesión: el botón manda `olvidar-paginas` (`src/lib/pwa.ts`).
- * - Cada vez que se muestra /login. El proxy manda al diario a quien tiene
- *   sesión, así que si /login se dibuja es porque no la hay. Es lo que ve quien
- *   tenía la sesión vencida, y se llega de las dos maneras: con la aplicación
- *   abierta, el siguiente toque es un pedido RSC que el proxy redirige y /login
- *   aparece por navegación interna. La página avisa `mostrando` también en ese
- *   caso, y `navegar()` lo ve además cuando es una navegación completa, por si
- *   la página no llega a hidratar.
+ * Antes era al revés: el diario era sólo para quien ingresaba, lo guardado
+ * llevaba su nombre, y se borraba al cerrar sesión y cada vez que se mostraba
+ * /login. Con la lectura abierta una sesión vence sin pasar por /login, y ese
+ * borrado ya no alcanzaba: el siguiente que usara el teléfono, sin señal,
+ * habría visto el nombre del anterior.
  *
- * Una copia que se empezó a pedir antes del borrado no se escribe después
- * (ver `generacion`).
+ * Al cerrar sesión se sigue borrando —el botón manda `olvidar-paginas`
+ * (`src/lib/pwa.ts`)—, pero ahora es higiene: que en un teléfono compartido
+ * no quede la lista de qué notas leyó alguien. Una copia que se empezó a
+ * pedir antes del borrado no se escribe después (ver `generacion`).
  *
  * El borrado lo hace siempre este archivo y no la página, aunque la página
  * también ve las cachés: así los nombres y la regla de qué se conserva viven en
@@ -129,6 +132,10 @@ const SE_GUARDA = /^\/(?:diario$|archivo$|nota\/|edicion\/|seccion\/)/;
  *  `="` literal, sólo aparece en el HTML dibujado: en el payload RSC la misma
  *  propiedad viaja como JSON y se escribe distinto. */
 const MARCA = 'data-sin-conexion="guardable"';
+
+/** La que pone `HojaDiario` cuando la página se armó con sesión o con la vista
+ *  previa de un administrador: se dibujó entera, pero no se guarda. */
+const MARCA_CON_SESION = 'data-sin-conexion="con-sesion"';
 
 /** Cuántas páginas y fotos se guardan como mucho. Son un techo para que el
  *  teléfono no termine guardando el archivo entero, no una medida de la
@@ -172,6 +179,10 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       // `reload` para que no la traiga de la caché HTTP de un build anterior.
+      // CON las cookies del sitio, a propósito: en las direcciones de prueba
+      // de Vercel con protección, sin la cookie de Vercel esto da 401 y el
+      // worker no se instalaba nunca. La página no lee la sesión —es estática—
+      // y tiene que seguir así: es la única copia que no se borra.
       const respuesta = await fetch(SIN_CONEXION, { cache: "reload" });
       // Si no llega, la instalación falla y se reintenta en la próxima visita.
       // Un service worker sin su página de aviso es peor que ninguno.
@@ -235,17 +246,9 @@ async function navegar(event, url) {
     const respuesta =
       (await event.preloadResponse) || (await fetch(event.request));
 
-    // Una navegación sigue las redirecciones del lado del navegador, así que
-    // acá una redirección llega opaca y no dice a dónde va. Lo que sí se ve
-    // es /login respondiendo con su página, y eso sólo pasa sin sesión: a
-    // quien la tiene, el proxy lo manda al diario antes de llegar a la página.
-    if (url.pathname === "/login" && respuesta.ok) {
-      event.waitUntil(olvidarPaginas());
-    } else if (SE_GUARDA.test(url.pathname) && esGuardable(respuesta)) {
+    if (SE_GUARDA.test(url.pathname) && esGuardable(respuesta)) {
       const copia = respuesta.clone();
-      event.waitUntil(
-        guardarUnaVez(clavePagina(url), async () => copia, inicio),
-      );
+      event.waitUntil(guardarSinSesion(clavePagina(url), copia, inicio));
     }
     return respuesta;
   } catch {
@@ -266,7 +269,6 @@ async function navegar(event, url) {
 async function mostrando(ruta) {
   const url = new URL(ruta, self.location.origin);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname === "/login") return olvidarPaginas();
   if (!SE_GUARDA.test(url.pathname)) return;
 
   const inicio = generacion;
@@ -277,11 +279,11 @@ async function mostrando(ruta) {
     await tocar(cache, clave, guardada, inicio);
     return;
   }
-  // Sin encabezados RSC, el servidor contesta el documento completo. Si la
-  // sesión venció, el proxy redirige a /login y `esGuardable` lo descarta.
+  // Sin encabezados RSC, el servidor contesta el documento completo. Sin
+  // cookies, la versión sin sesión: la que se guarda (ver arriba).
   await guardarUnaVez(
     clave,
-    () => fetch(clave, { credentials: "same-origin" }),
+    () => fetch(clave, { credentials: "omit" }),
     inicio,
   );
 }
@@ -315,6 +317,35 @@ async function primeroLaCache(event, nombre, tope) {
 /** Guarda la página `clave` con la respuesta que traiga `obtener()`, salvo que
  *  ya se esté guardando. Si no hay red o la respuesta no sirve, queda la copia
  *  que había. `inicio` es la `generacion` de cuando se empezó a pedir. */
+/**
+ * Lo que llegó por una navegación completa. Si es la versión sin sesión, se
+ * guarda tal cual. Si se armó con sesión —lo dice su marca—, se baja la versión
+ * sin sesión aparte, pero sólo si la copia falta o está vieja: quien ingresó no
+ * tiene que costar dos pedidos al servidor en cada página.
+ *
+ * Una página SIN marca (una nota que no existe, la base que falló a mitad de
+ * camino) no se vuelve a pedir: llegaría igual, y era un segundo render
+ * completo por nada.
+ */
+async function guardarSinSesion(clave, copia, inicio) {
+  if (enCurso.has(clave)) return;
+  enCurso.add(clave);
+  try {
+    const html = await copia.text();
+    if (await guardarPagina(clave, new Response(html), inicio)) return;
+    if (!html.includes(MARCA_CON_SESION)) return;
+    const cache = await caches.open(PAGINAS);
+    const guardada = await cache.match(clave);
+    if (guardada && Date.now() - bajada(guardada) < REFRESCO_MS) return;
+    const sinSesion = await fetch(clave, { credentials: "omit" });
+    if (esGuardable(sinSesion)) await guardarPagina(clave, sinSesion, inicio);
+  } catch {
+    // Sin red, o el servidor no contestó: no hay nada nuevo que guardar.
+  } finally {
+    enCurso.delete(clave);
+  }
+}
+
 async function guardarUnaVez(clave, obtener, inicio) {
   if (enCurso.has(clave)) return;
   enCurso.add(clave);
@@ -480,7 +511,7 @@ function bajada(respuesta) {
 }
 
 /** Una copia se guarda sólo de una respuesta entera y propia: ni una
- *  redirección (la de una sesión vencida lleva a /login) ni un error. */
+ *  redirección ni un error. */
 function esGuardable(respuesta) {
   return (
     respuesta.status === 200 &&

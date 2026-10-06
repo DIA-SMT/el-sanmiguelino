@@ -1,12 +1,10 @@
-/**
- * Gate de Cidituc: ACTIVO. La landing (/), /login y las rutas del ingreso son
- * públicas; el diario completo requiere sesión.
- *
- * Para desarrollo se puede apagar con `AUTH_CIDITUC=0`. Ojo: apagarlo deja pasar
- * a todo el mundo *sin sesión*, así que tampoco hay usuario — no es una forma de
- * entrar al panel, es una forma de leer el diario sin ingresar.
+/*
+ * Leer el diario es libre. Cidituc se pide para participar: comentar, votar,
+ * preguntarle a Migue y anotarse para recibirlo en papel (ver
+ * `sesionParaParticipar` en `src/lib/auth/dal.ts`). Antes todo el diario
+ * estaba detrás del ingreso, con un interruptor `AUTH_CIDITUC=0` para leer sin
+ * ingresar en desarrollo; se fue con el gate.
  */
-export const AUTH_CIDITUC_OBLIGATORIA = process.env.AUTH_CIDITUC !== "0";
 
 function limpio(valor: string | undefined): string {
   return valor?.trim() ?? "";

@@ -415,11 +415,10 @@ En tres capas, porque la sesión dura ocho horas y no se renueva sola:
 3. **El callback del ingreso**: no se emite sesión nueva, y se borra la que
    hubiera quedado viva.
 
-**Lo que el bloqueo NO hace todavía**: cortarle la lectura a quien ya tenga
-sesión abierta. Sigue leyendo el diario hasta que se le venza, como mucho ocho
-horas. Chequearlo en `(diario)/layout.tsx` costaría una consulta por vista de
-página de **cada lector**, y quedó fuera de esta etapa. El GET de comentarios
-tampoco lo chequea a propósito: leer lo que ya está publicado no es participar.
+**Lo que el bloqueo NO hace**: cortarle la lectura. Desde 2026-10-05 leer el
+diario es libre para cualquiera, con o sin cuenta, así que bloquear a alguien es
+impedirle participar, no leer. El GET de comentarios tampoco lo chequea: leer lo
+que ya está publicado no es participar.
 
 ### Dos cosas que aparecieron al verificar
 
@@ -1705,7 +1704,7 @@ pantalla del panel, es una regresión.
   la calle dejó de ser la del semillero.
 - `npx tsc --noEmit`, `eslint` de lo tocado y `npm run build`.
 - Lo visual se miró con un banco de pruebas temporal (una ruta con datos
-  inventados y `AUTH_CIDITUC=0`, borrado al terminar): el navegador integrado no
+  inventados y `AUTH_CIDITUC=0` —un interruptor que ya no existe—, borrado al terminar): el navegador integrado no
   tiene sesión de Cidituc, así que `/admin` no se puede abrir desde ahí. Se
   verificaron los tres estados del comentario, las dos ceremonias nuevas, los
   filtros y el paginado, la barra plegada y desplegada, la ficha de edición y la

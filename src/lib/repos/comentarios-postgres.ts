@@ -65,19 +65,24 @@ interface FilaVoto {
 /** Los votos vienen como filas y el contrato pide contadores. Se cuentan acá y
  *  no con un `groupBy` aparte para no hacer dos viajes: el listado de una nota
  *  trae sus votos en el mismo `include`. */
-function contar(votos: FilaVoto[], usuarioId: string) {
+function contar(votos: FilaVoto[], usuarioId: string | null) {
   let likes = 0;
   let dislikes = 0;
   let miVoto: 1 | -1 | null = null;
   for (const v of votos) {
     if (v.valor === 1) likes++;
     else dislikes++;
-    if (v.usuarioId === usuarioId) miVoto = v.valor === 1 ? 1 : -1;
+    if (usuarioId !== null && v.usuarioId === usuarioId) {
+      miVoto = v.valor === 1 ? 1 : -1;
+    }
   }
   return { likes, dislikes, miVoto };
 }
 
-function proyectar(fila: FilaComentario, usuarioId: string): Comentario {
+function proyectar(
+  fila: FilaComentario,
+  usuarioId: string | null,
+): Comentario {
   return {
     id: fila.id,
     notaSlug: fila.notaSlug,
@@ -111,8 +116,12 @@ const CON_VOTOS = { votos: true } as const;
 
 export function crearComentariosPostgresRepo(db: ClienteComentarios) {
   return {
-    /** Lo que ve un lector: sólo lo publicado. */
-    async listar(notaSlug: string, usuarioId: string): Promise<Comentario[]> {
+    /** Lo que ve un lector: sólo lo publicado. `usuarioId` es null sin
+     *  sesión —leer es libre—, y entonces no hay "mi voto". */
+    async listar(
+      notaSlug: string,
+      usuarioId: string | null,
+    ): Promise<Comentario[]> {
       const filas = await db.comentario.findMany({
         where: { notaSlug, estado: "publicado" },
         orderBy: { fecha: "desc" },
@@ -153,16 +162,25 @@ export function crearComentariosPostgresRepo(db: ClienteComentarios) {
       return proyectar(fila, datos.usuarioId);
     },
 
-    /** valor null quita el voto; 1/-1 lo fija (reemplaza el contrario). */
+    /**
+     * valor null quita el voto; 1/-1 lo fija (reemplaza el contrario).
+     *
+     * `soloPublicado` lo pide la API de los lectores: un comentario en revisión
+     * o dado de baja no se vota, y votarlo devolvía su texto y su autor. Va
+     * como opción y no fijo porque el contrato prueba a propósito que los votos
+     * de un comentario oculto se conservan.
+     */
     async votar(
       comentarioId: string,
       usuarioId: string,
       valor: 1 | -1 | null,
+      soloPublicado = false,
     ): Promise<Comentario | null> {
       const existe = await db.comentario.findUnique({
         where: { id: comentarioId },
       });
       if (!existe) return null;
+      if (soloPublicado && existe.estado !== "publicado") return null;
 
       if (valor === null) {
         // Puede no haber voto que borrar —quitar dos veces seguidas—, y eso no
