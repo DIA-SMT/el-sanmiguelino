@@ -25,17 +25,28 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { Newspaper, X } from "lucide-react";
 import { PaginaPdf } from "@/components/pdf/pagina-pdf";
+import { rotuloDeFolios } from "@/lib/data/paginas";
 
 export function VerFacsimil({
   url,
-  pagina,
+  paginas,
   mes,
 }: {
   url: string;
-  pagina: number;
+  /**
+   * Las páginas del impreso que muestra la nota, en orden. Casi siempre una;
+   * dos cuando la nota ocupaba dos páginas del papel y la redacción las unió
+   * (ver `NotaResumen.pdfHasta`). Van una debajo de la otra, como se
+   * hojearían: mostrar sólo la primera dejaría la segunda sin forma de verse.
+   */
+  paginas: number[];
   mes: string;
 }) {
-  const etiqueta = `Página ${pagina} de El Sanmiguelino, ${mes}, tal como salió impresa`;
+  if (paginas.length === 0) return null;
+  const rotulo = rotuloDeFolios({
+    desde: paginas[0],
+    hasta: paginas[paginas.length - 1],
+  });
 
   return (
     <Dialog.Root>
@@ -61,7 +72,7 @@ export function VerFacsimil({
         >
           <header className="flex items-center justify-between gap-4 border-b border-ink bg-paper-2 px-4 py-3">
             <Dialog.Title className="font-sans text-[0.8rem] font-bold uppercase tracking-[0.14em] text-ink">
-              Página {pagina} · {mes}
+              {rotulo} · {mes}
             </Dialog.Title>
             <Dialog.Close asChild>
               <button
@@ -74,8 +85,15 @@ export function VerFacsimil({
             </Dialog.Close>
           </header>
 
-          <div className="overflow-y-auto p-3 sm:p-4">
-            <PaginaPdf url={url} pagina={pagina} etiqueta={etiqueta} />
+          <div className="grid gap-6 overflow-y-auto p-3 sm:p-4">
+            {paginas.map((pagina) => (
+              <PaginaPdf
+                key={pagina}
+                url={url}
+                pagina={pagina}
+                etiqueta={`Página ${pagina} de El Sanmiguelino, ${mes}, tal como salió impresa`}
+              />
+            ))}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

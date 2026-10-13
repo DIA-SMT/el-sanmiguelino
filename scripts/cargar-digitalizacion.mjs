@@ -126,6 +126,86 @@ if (!origen.pdfUrl) {
   process.exit(1);
 }
 
+/*
+ * Lo que este script NO sabe hacer, mirado ANTES de escribir nada.
+ *
+ * El panel aprendió tres cosas que este script todavía no
+ * (`guardarDigitalizacion()` en src/lib/repos/edicion-pdf.ts), y en esos
+ * tres casos el script se llevaría puesto trabajo de la redacción:
+ *
+ * - páginas UNIDAS: una nota que el papel tiene en dos páginas sale partida,
+ *   y la redacción la une borrando la segunda. El panel deja esa página
+ *   adentro de la anterior; el script la volvería a crear y pisaría el texto;
+ * - páginas RENOMBRADAS: el script escribe por slug, así que no encontraría la
+ *   página y la borraría al final, con sus comentarios;
+ * - notas ESCRITAS: el script las borra con lo que sobra.
+ *
+ * Mientras no los aprenda, se frena y manda al panel.
+ */
+
+/**
+ * Por qué este script no puede escribir sobre `notas`, o [] si puede.
+ *
+ * Se pregunta dos veces: antes de subir las figuras —para no subir nada si
+ * igual se va a frenar— y otra vez adentro de la transacción, sobre las filas
+ * que de verdad se van a pisar. Subir las figuras tarda, y en el medio alguien
+ * pudo unir una página, renombrarla o escribir una nota desde el panel.
+ *
+ * `pdfPaginas` es el largo que la edición tenía ANTES de esta corrida: una
+ * página que falta más allá no es una unión, es que el PDF nuevo es más largo.
+ */
+function queNoSabeHacer(notas, pdfPaginas, slugDestino) {
+  const yaEstaban = new Set(notas.map((n) => n.pdfPagina).filter((n) => n !== null));
+  const unidas = yaEstaban.has(1)
+    ? paginas
+        .map((p) => p.pagina)
+        .filter((n) => n > 1 && n <= pdfPaginas && !yaEstaban.has(n))
+    : [];
+  const renombradas = notas.filter(
+    (n) => n.pdfPagina !== null && n.slug !== `${slugDestino}-p${n.pdfPagina}`,
+  );
+  const escritas = notas.filter((n) => n.pdfPagina === null);
+  return [
+    unidas.length > 0 &&
+      `tiene ${unidas.length === 1 ? "la página" : "las páginas"} ${unidas.join(", ")} unida${unidas.length === 1 ? "" : "s"} a la anterior`,
+    renombradas.length > 0 &&
+      `tiene páginas con el slug cambiado (${renombradas.map((n) => n.slug).join(", ")})`,
+    escritas.length > 0 &&
+      `tiene ${escritas.length} ${escritas.length === 1 ? "nota escrita" : "notas escritas"} que este script borraría`,
+  ].filter(Boolean);
+}
+
+const AL_PANEL =
+  "Cargá la digitalización desde el panel (Ediciones → Digitalizar de nuevo), que respeta todo eso.";
+
+const slugDestino = vistaPrevia ? `${edicionSlug}-digital` : edicionSlug;
+const destinoAntes = await db.edicion.findUnique({
+  where: { slug: slugDestino },
+  select: {
+    mes: true,
+    pdfPaginas: true,
+    notas: { select: { slug: true, pdfPagina: true } },
+  },
+});
+const pdfPaginasAntes = destinoAntes?.pdfPaginas ?? 0;
+{
+  // El json tiene que ser del PDF que la edición tiene cargado. Uno de otro
+  // archivo —`digitalizar.mjs` escribe siempre en la misma carpeta— pisaría
+  // las páginas con otro texto, y si es más corto borraría las del final.
+  const ultimaDelJson = Math.max(...paginas.map((p) => p.pagina));
+  const motivos = [
+    ...queNoSabeHacer(destinoAntes?.notas ?? [], pdfPaginasAntes, slugDestino),
+    ultimaDelJson !== origen.pdfPaginas &&
+      `tiene un PDF de ${origen.pdfPaginas} páginas y el paginas.json es de ${ultimaDelJson}: no son del mismo archivo`,
+  ].filter(Boolean);
+  if (motivos.length > 0) {
+    console.error(
+      `\n  "${destinoAntes?.mes ?? origen.mes}" ${motivos.join("; ")}.\n  ${AL_PANEL}\n`,
+    );
+    process.exit(1);
+  }
+}
+
 let destino = origen;
 
 if (vistaPrevia) {
@@ -195,8 +275,13 @@ await db.$transaction(async (tx) => {
   // `orden: 0` a la página 1 choca contra la fila que ya lo tiene.
   const viejas = await tx.nota.findMany({
     where: { edicionId: destino.id },
-    select: { id: true, orden: true },
+    select: { id: true, orden: true, slug: true, pdfPagina: true },
   });
+  // Otra vez, sobre lo que de verdad se va a pisar: ver `queNoSabeHacer`.
+  const motivos = queNoSabeHacer(viejas, pdfPaginasAntes, destino.slug);
+  if (motivos.length > 0) {
+    throw new Error(`"${destino.mes}" ${motivos.join("; ")}. ${AL_PANEL}`);
+  }
   for (const vieja of viejas) {
     await tx.nota.update({
       where: { id: vieja.id },

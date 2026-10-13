@@ -23,6 +23,7 @@ import {
   camposDePagina,
   type PaginaDigitalizada,
 } from "@/lib/pdf/estructura";
+import type { BloqueNota } from "@/lib/types";
 import { esLaUnicaServible } from "@/lib/repos/edicion-servibles";
 
 /** Lo que puede tener un PDF de diario. Un número de más acá casi seguro es un
@@ -215,6 +216,11 @@ export async function guardarDigitalizacion(
   borradas: number;
   /** Cuántas notas escritas se conservaron, corridas detrás del impreso. */
   escritasConservadas: number;
+  /** Las páginas que se escribieron dentro de la nota de la anterior, porque
+   *  la redacción las había unido. */
+  unidas: number[];
+  /** El slug de la nota que muestra cada página del PDF. */
+  notaDePagina: Record<number, string>;
 }> {
   if (paginas.length === 0) {
     throw new Error("La digitalización no produjo ninguna página.");
@@ -222,7 +228,7 @@ export async function guardarDigitalizacion(
 
   const edicion = await db().edicion.findUnique({
     where: { slug: edicionSlug },
-    select: { id: true, mes: true, tema: true, publicaEn: true },
+    select: { id: true, mes: true, tema: true, publicaEn: true, pdfPaginas: true },
   });
   if (!edicion) throw new Error(`No existe la edición "${edicionSlug}".`);
 
@@ -265,7 +271,7 @@ export async function guardarDigitalizacion(
      */
     const viejas = await tx.nota.findMany({
       where: { edicionId: edicion.id },
-      select: { id: true, orden: true },
+      select: { id: true, orden: true, pdfPagina: true },
     });
     for (const vieja of viejas) {
       await tx.nota.update({
@@ -289,8 +295,66 @@ export async function guardarDigitalizacion(
      * esto es una relación entre dos. Y no inventa nada: el título es el de al
      * lado.
      */
-    let tituloPrevio = "";
+    /*
+     * Las páginas que la redacción unió a la anterior siguen unidas.
+     *
+     * Cuando una nota del impreso ocupa dos páginas, la digitalización la parte
+     * en dos —mira una página por vez— y la redacción la une desde el panel:
+     * pasa el texto a la primera y borra la segunda (ver `nota-borrar.ts`).
+     * Antes, volver a digitalizar recreaba la segunda con su slug de siempre y
+     * la unión se deshacía sin que nadie lo notara.
+     *
+     * El dato es el hueco: un número ya digitalizado —tiene su tapa— al que le
+     * falta la fila de una página. Esa página se escribe AL FINAL de la nota
+     * que la cubre, que es lo que la redacción había hecho a mano. Lo que se
+     * pisa es lo mismo que pisa digitalizar de nuevo cualquier página: lo
+     * corregido a mano, no la decisión de que son una sola nota.
+     */
+    const yaEstaban = new Set(
+      viejas
+        .map((v) => v.pdfPagina)
+        .filter((p): p is number => p !== null),
+    );
+    const unidas = yaEstaban.has(1)
+      ? new Set(
+          paginas
+            .map((p) => p.pagina)
+            // Hasta el largo del PDF, como `hastaDelImpreso()`: una página que
+            // falta más allá no la cubre nadie, así que no es una unión.
+            .filter(
+              (n) =>
+                n > 1 &&
+                n <= (edicion.pdfPaginas ?? paginas.length) &&
+                !yaEstaban.has(n),
+            ),
+        )
+      : new Set<number>();
+    const notasDelImpreso: {
+      pagina: PaginaDigitalizada;
+      cuerpo: BloqueNota[];
+      /** Las páginas que muestra: la suya y las unidas detrás. */
+      cubre: number[];
+    }[] = [];
     for (const pagina of paginas) {
+      const anterior = notasDelImpreso.at(-1);
+      if (unidas.has(pagina.pagina) && anterior) {
+        anterior.cuerpo.push(...comoContinuacion(pagina));
+        anterior.cubre.push(pagina.pagina);
+      } else {
+        notasDelImpreso.push({
+          pagina,
+          cuerpo: [...pagina.cuerpo],
+          cubre: [pagina.pagina],
+        });
+      }
+    }
+
+    /** En qué nota quedó cada página, para que los avisos del panel lleven a
+     *  la nota que hay que revisar y no a una dirección armada a mano. */
+    const notaDePagina: Record<number, string> = {};
+
+    let tituloPrevio = "";
+    for (const { pagina, cuerpo, cubre } of notasDelImpreso) {
       // El título y la bajada los decide `camposDePagina`, que es puro y lo
       // comparte con el script de carga: son las dos únicas formas de escribir
       // una digitalización y tienen que dar exactamente lo mismo.
@@ -304,9 +368,9 @@ export async function guardarDigitalizacion(
         seccion: edicion.tema || "Edición impresa",
         titulo,
         bajada,
-        cuerpo: pagina.cuerpo,
-        minutosLectura: minutosDeLectura(pagina.cuerpo),
-        textoPlano: textoPlanoDe(pagina.cuerpo),
+        cuerpo,
+        minutosLectura: minutosDeLectura(cuerpo),
+        textoPlano: textoPlanoDe(cuerpo),
         imagenSrc: pagina.imagen?.src ?? null,
         imagenAlt: pagina.imagen?.alt ?? null,
         imagenEpigrafe: pagina.imagen?.epigrafe ?? null,
@@ -316,11 +380,44 @@ export async function guardarDigitalizacion(
         edicionId: edicion.id,
       };
 
-      await tx.nota.upsert({
-        where: { slug: slugDePagina(pagina.pagina) },
-        update: campos,
-        create: { slug: slugDePagina(pagina.pagina), ...campos },
-      });
+      /*
+       * La fila de esta página se busca por su NÚMERO, no por el slug.
+       *
+       * Por slug, una página a la que la redacción le cambió el slug —se puede,
+       * desde el editor— no se encontraba: se creaba otra con el slug de
+       * siempre y la renombrada quedaba en el rango alto, donde el borrado de
+       * abajo se la llevaba con todos sus comentarios. Incluidos los que le
+       * habían llegado de una página unida. Por número, la fila es la misma y
+       * conserva su slug, sus comentarios y sus enlaces.
+       */
+      const previa = viejas.find((v) => v.pdfPagina === pagina.pagina);
+      let guardada: { slug: string };
+      if (previa) {
+        guardada = await tx.nota.update({
+          where: { id: previa.id },
+          data: campos,
+          select: { slug: true },
+        });
+      } else {
+        // Una página nueva. El slug es único en toda la base: si lo tiene una
+        // nota de otra edición, se avisa en vez de pisarla.
+        const slug = slugDePagina(pagina.pagina);
+        const ocupado = await tx.nota.findUnique({
+          where: { slug },
+          select: { titulo: true },
+        });
+        if (ocupado) {
+          throw new Error(
+            `El slug "${slug}" ya lo usa la nota «${ocupado.titulo}». ` +
+              "Cambiale el slug a esa nota y volvé a digitalizar.",
+          );
+        }
+        guardada = await tx.nota.create({
+          data: { slug, ...campos },
+          select: { slug: true },
+        });
+      }
+      for (const n of cubre) notaDePagina[n] = guardada.slug;
     }
 
     /*
@@ -357,8 +454,44 @@ export async function guardarDigitalizacion(
       where: { edicionId: edicion.id, orden: { gte: 1000 } },
     });
 
-    return { paginas: paginas.length, borradas, escritasConservadas: escritas.length };
+    return {
+      paginas: paginas.length,
+      borradas,
+      escritasConservadas: escritas.length,
+      unidas: [...unidas].sort((a, b) => a - b),
+      notaDePagina,
+    };
   });
+}
+
+/**
+ * Lo que una página unida a la anterior le agrega a esa nota: todo lo que el
+ * conversor sacó de ella, sin perder nada.
+ *
+ * El título de la página va como subtítulo y no se tira. A veces es inventado
+ * —el conversor exige uno y lo saca de alguna línea de la página—, pero esa
+ * línea es texto del impreso y no está en el cuerpo: tirarla sería perder una
+ * frase. La foto de apertura de la página, lo mismo: pasa a ser una foto del
+ * cuerpo, porque la nota ya tiene la suya.
+ */
+function comoContinuacion(pagina: PaginaDigitalizada): BloqueNota[] {
+  const bloques: BloqueNota[] = [];
+  if (pagina.titulo.trim()) {
+    bloques.push({ tipo: "subtitulo", texto: pagina.titulo.trim() });
+  }
+  if (pagina.bajada.trim()) {
+    bloques.push({ tipo: "parrafo", texto: pagina.bajada.trim() });
+  }
+  if (pagina.imagen?.src) {
+    bloques.push({
+      tipo: "foto",
+      src: pagina.imagen.src,
+      alt: pagina.imagen.alt,
+      ...(pagina.imagen.epigrafe ? { epigrafe: pagina.imagen.epigrafe } : {}),
+      ...(pagina.imagen.credito ? { credito: pagina.imagen.credito } : {}),
+    });
+  }
+  return [...bloques, ...pagina.cuerpo];
 }
 
 /**

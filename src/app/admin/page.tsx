@@ -17,6 +17,7 @@ import {
 } from "@/components/admin/piezas";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { getIndice, getResumenEdicion, repoEscribe } from "@/lib/repos/edicion";
+import { foliosDeNota, rotuloDeFolios } from "@/lib/data/paginas";
 
 export const metadata = { title: "Notas" };
 
@@ -178,8 +179,15 @@ export default async function AdminNotas() {
                       Tapa
                     </span>
                   ) : (
+                    /* El mismo folio que ve el lector, de `paginas.ts`. Decía
+                       `Pág. {i + 2}`, que es la cuenta de una edición de notas
+                       escritas: en una digitalizada corría todo un lugar, y es
+                       justo el número con el que la redacción elige qué nota
+                       borrar después de unir dos páginas. */
                     <span className="w-14 shrink-0 text-panel-xs font-medium tabular-nums text-panel-tinta-3">
-                      Pág. {i + 2}
+                      {rotuloDeFolios(foliosDeNota(indice, nota.slug), {
+                        corto: true,
+                      })}
                     </span>
                   )}
                   <span className="min-w-0 flex-1 basis-56">

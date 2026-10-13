@@ -29,7 +29,7 @@ import {
   ES_PEDIDO_DE_CONTINUACION,
   paginaPedida,
 } from "@/lib/migue/interpretacion";
-import { notaEnPagina } from "@/lib/data/paginas";
+import { notaEnPagina, totalDePaginas } from "@/lib/data/paginas";
 import {
   textoDeResumenDeNota,
   textoDeResumenDeTapa,
@@ -493,11 +493,45 @@ export async function POST(request: NextRequest) {
      * Es la diferencia entre "no tengo eso" y leerle treinta segundos de una
      * nota equivocada, y en una publicación oficial no son lo mismo.
      */
+    /*
+     * La página 1 cuando no es una nota.
+     *
+     * En una edición digitalizada la 1 es la tapa y `notaEnPagina` la
+     * encuentra. En las otras dos no, y antes caía en el "no encuentro" de
+     * abajo, que le decía al vecino que la edición tiene N páginas y no
+     * encuentra la 1:
+     * - de notas escritas, la 1 es la portada, que muestra la primera nota:
+     *   ésa es la tapa que se le lee;
+     * - un facsímil sin digitalizar dibuja la página 1 del PDF, que no tiene
+     *   texto. Leerle la primera fila sería leerle la página 2 diciendo que
+     *   es la tapa.
+     */
+    if (numeroPedido === 1 && !notaPedida) {
+      if (!edicion.pdf && indice[0]) {
+        return responder("leer", `Te leo la tapa de ${edicion.mes}.`, {
+          pregunta,
+          contextoSlug: body.notaSlug,
+          leer: textoDeResumenDeTapa(edicion, indice[0]),
+        });
+      }
+      return responder(
+        "sin_respuesta",
+        edicion.pdf
+          ? `La página 1 de ${edicion.mes} es la tapa del impreso, y todavía ` +
+              "no está pasada a texto: no tengo qué leerte. Decime otro número."
+          : "Todavía no hay nada cargado en esta edición para leerte.",
+        { pregunta, contextoSlug: body.notaSlug },
+      );
+    }
+
     if (numeroPedido !== null && !notaPedida) {
       return responder(
         "sin_respuesta",
-        `Esta edición de ${edicion.mes} tiene ${indice.length} ` +
-          `${indice.length === 1 ? "página" : "páginas"}, así que no encuentro ` +
+        // Las páginas del número, no las notas: con una nota que ocupa dos
+        // páginas del impreso son una menos, y en una edición de notas
+        // escritas la portada es la 1 y no es una nota.
+        `Esta edición de ${edicion.mes} tiene ${totalDePaginas(indice)} ` +
+          `${totalDePaginas(indice) === 1 ? "página" : "páginas"}, así que no encuentro ` +
           `la ${numeroPedido}. Decime otro número y te la leo.`,
         { pregunta, contextoSlug: body.notaSlug },
       );

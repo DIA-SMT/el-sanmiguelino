@@ -61,6 +61,7 @@ export const ACCIONES = {
   },
   "usuario.desbloqueo": { objeto: "usuario", nombre: "Desbloqueó una cuenta" },
   "nota.guardada": { objeto: "nota", nombre: "Guardó una nota" },
+  "nota.borrada": { objeto: "nota", nombre: "Borró una nota", grave: true },
   "edicion.creada": { objeto: "edicion", nombre: "Creó una edición" },
   "edicion.editada": { objeto: "edicion", nombre: "Editó una edición" },
   "edicion.publicada": { objeto: "edicion", nombre: "Puso en la calle" },

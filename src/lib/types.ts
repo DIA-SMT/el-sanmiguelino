@@ -170,6 +170,18 @@ export interface NotaResumen {
    *  y se dibuja con el visor en lugar del cuerpo. Empieza en 2: la página 1
    *  es la tapa y se sirve en /diario. */
   pdfPagina?: number;
+  /**
+   * La última página del impreso que muestra esta nota, cuando son varias.
+   *
+   * Pasa cuando la digitalización partió en dos una nota que en el papel
+   * ocupa dos páginas, y la redacción las unió: la nota de la página 4 quedó
+   * con todo el texto y la de la 5 se borró. La 4 pasa a cubrir 4 y 5, y así
+   * el foliado sigue siendo el del papel.
+   *
+   * No es una columna: se deduce del índice al leerlo (ver `hastaDelImpreso`
+   * en `paginas.ts`). Ausente = cubre sólo su `pdfPagina`.
+   */
+  pdfHasta?: number;
 }
 
 /** La nota entera, para la pantalla que efectivamente la muestra. */

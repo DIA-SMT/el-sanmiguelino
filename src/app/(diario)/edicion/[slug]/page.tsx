@@ -5,7 +5,7 @@ import { HojaDiario } from "@/components/hoja-diario";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { getIndiceDe, getPublicadas, getResumenEdicion } from "@/lib/repos/edicion";
-import { numeroDeNota } from "@/lib/data/paginas";
+import { foliosDeNota, rotuloDeFolios } from "@/lib/data/paginas";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
 import { usuarioActual } from "@/lib/auth/dal";
 
@@ -80,9 +80,10 @@ export default async function EdicionPage({
    * `paginas.ts` dice que el foliado del impreso y el del sitio tienen que
    * coincidir; este era el cuarto lugar que contestaba distinto.
    *
-   * Se usa `numeroDeNota()` y no el índice del array: `paginasDeEdicion()` de
+   * Se usa `foliosDeNota()` y no el índice del array: `paginasDeEdicion()` de
    * una edición de notas escritas antepone la portada, así que sus posiciones
-   * no son las de `notas`.
+   * no son las de `notas`. Y una nota que ocupa dos páginas del impreso dice
+   * "Págs. 4 y 5".
    */
   const secciones = seccionesDeEdicion(notas);
   const hayVariasSecciones = secciones.length > 1;
@@ -139,7 +140,9 @@ export default async function EdicionPage({
           {notas.map((nota) => (
             <li key={nota.slug} className="flex gap-5 py-5">
               <span className="w-12 shrink-0 pt-1 font-sans text-[0.72rem] uppercase tracking-[0.12em] tabular-nums text-ink-3">
-                Pág. {numeroDeNota(notas, nota.slug)}
+                {rotuloDeFolios(foliosDeNota(notas, nota.slug), {
+                  corto: true,
+                })}
               </span>
               <div className="min-w-0 flex-1">
                 {/* La volanta de sección sólo cuando distingue algo. En un

@@ -28,14 +28,26 @@ import { db } from "@/lib/db";
 import { TIENE_CONTENIDO } from "@/lib/repos/edicion-postgres";
 
 /**
+ * Con qué se consulta: la base, o la transacción de quien llama.
+ *
+ * Adentro de una transacción `Serializable` estas lecturas tienen que ir por la
+ * transacción. Si no, Postgres no las ve, y dos escrituras cruzadas —borrar la
+ * última nota de agosto y la de septiembre a la vez— pasan las dos y dejan al
+ * diario sin número. Ver `borrarNota()`.
+ */
+type Cliente = Pick<ReturnType<typeof db>, "edicion">;
+
+/**
  * El slug de la edición que el lector ve al abrir el diario, o `null` si no hay
  * ninguna.
  *
  * Ignora la edición "en foco" del administrador a propósito: la vista previa es
  * de él, y lo que estas guardas protegen es el diario del lector.
  */
-export async function slugEnLaCalle(): Promise<string | null> {
-  const fila = await db().edicion.findFirst({
+export async function slugEnLaCalle(
+  cliente: Cliente = db(),
+): Promise<string | null> {
+  const fila = await cliente.edicion.findFirst({
     where: { publicaEn: { not: null, lte: new Date() }, ...TIENE_CONTENIDO },
     orderBy: { publicaEn: "desc" },
     select: { slug: true },
@@ -45,8 +57,11 @@ export async function slugEnLaCalle(): Promise<string | null> {
 
 /** Cuántas OTRAS ediciones podría servir el diario si esta desapareciera. Cero
  *  significa que lo que se está por hacer deja el sitio sin número. */
-export async function otrasServibles(exceptoSlug: string): Promise<number> {
-  return db().edicion.count({
+export async function otrasServibles(
+  exceptoSlug: string,
+  cliente: Cliente = db(),
+): Promise<number> {
+  return cliente.edicion.count({
     where: {
       slug: { not: exceptoSlug },
       publicaEn: { not: null, lte: new Date() },
@@ -64,7 +79,17 @@ export async function otrasServibles(exceptoSlug: string): Promise<number> {
  * más vieja para caerse, y preguntar sólo "¿hay otras?" trabaría el borrado de
  * una edición programada que no está sirviendo nada.
  */
-export async function esLaUnicaServible(edicionSlug: string): Promise<boolean> {
+export async function esLaUnicaServible(
+  edicionSlug: string,
+  /** La transacción de quien llama, si hay una. Ver `Cliente`. */
+  tx?: Cliente,
+): Promise<boolean> {
+  // Por una transacción, de a una: es una sola conexión.
+  if (tx) {
+    const enLaCalle = await slugEnLaCalle(tx);
+    if (enLaCalle !== edicionSlug) return false;
+    return (await otrasServibles(edicionSlug, tx)) === 0;
+  }
   const [enLaCalle, otras] = await Promise.all([
     slugEnLaCalle(),
     otrasServibles(edicionSlug),

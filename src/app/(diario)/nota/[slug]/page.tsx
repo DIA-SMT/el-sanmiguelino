@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock } from "lucide-react";
 import { InteractivoIncrustado } from "@/components/interactivo-incrustado";
@@ -28,7 +28,7 @@ import {
   getResumenEdicion,
 } from "@/lib/repos/edicion";
 import { seccionesDeEdicion, slugificarSeccion } from "@/lib/data/secciones";
-import { numeroDeNota, paginasDeEdicion } from "@/lib/data/paginas";
+import { foliosDeNota, paginasDeEdicion } from "@/lib/data/paginas";
 import { FoliadoDeLaPagina } from "@/components/foliado-visible";
 import { usuarioActual } from "@/lib/auth/dal";
 import { firmaPublica } from "@/lib/auth/cidituc/nombre";
@@ -275,6 +275,34 @@ function Bloque({
   }
 }
 
+/**
+ * La nota que muestra hoy una página del impreso que ya no tiene la suya.
+ *
+ * Cuando la redacción une una nota que el papel tenía en dos páginas, la de la
+ * segunda se borra y la primera pasa a cubrir las dos. Pero la dirección de la
+ * que se borró ya pudo haber circulado —en un grupo, en un buscador—, y un
+ * vecino que la abre no tiene por qué encontrarse con un "no existe": la nota
+ * está, en la página de al lado. `null` si la dirección no es de una página del
+ * impreso, o si ninguna nota la cubre.
+ *
+ * Se resuelve con el índice que el lector puede leer (`getIndiceDe` aplica la
+ * misma regla de publicación que `getNota`): una edición que todavía no salió
+ * no se deja adivinar por acá.
+ */
+async function notaQueCubre(slug: string): Promise<string | null> {
+  const partes = /^(.+)-p(\d{1,3})$/.exec(slug);
+  if (!partes) return null;
+  const pagina = Number(partes[2]);
+  const notas = await getIndiceDe(partes[1]);
+  const cubre = notas.find(
+    (n) =>
+      n.pdfPagina !== undefined &&
+      n.pdfPagina < pagina &&
+      pagina <= (n.pdfHasta ?? n.pdfPagina),
+  );
+  return cubre?.slug ?? null;
+}
+
 export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
   // Leer es libre: sin sesión, `usuario` es null y la página se arma igual.
   const usuario = await usuarioActual();
@@ -283,7 +311,11 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
 
   const { slug } = await params;
   const nota = await getNota(slug);
-  if (!nota) notFound();
+  if (!nota) {
+    const cubre = await notaQueCubre(slug);
+    if (cubre) redirect(`/nota/${cubre}`);
+    notFound();
+  }
 
   const [edicion, indice] = await Promise.all([
     getResumenEdicion(),
@@ -310,7 +342,23 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
   // La regla vive en `paginas.ts`: en un número digitalizado la tapa es la
   // página 1 y no hay portada aparte, así que el foliado del diario coincide
   // con el que trae impreso el papel.
-  const numeroPagina = numeroDeNota(indiceDeSuEdicion, nota.slug);
+  const folios = foliosDeNota(indiceDeSuEdicion, nota.slug);
+  const numeroPagina = folios.desde;
+  const paginaHasta = folios.hasta > folios.desde ? folios.hasta : undefined;
+
+  /*
+   * Qué páginas del impreso muestra esta nota. Casi siempre una; dos cuando la
+   * redacción unió una nota que el papel tenía partida (ver
+   * `NotaResumen.pdfHasta`). El dato viene del índice: `getNota()` trae una
+   * sola fila y desde una sola fila no se sabe dónde empieza la siguiente.
+   */
+  const paginasDelImpreso: number[] = [];
+  if (nota.pdfPagina) {
+    const hasta =
+      indiceDeSuEdicion.find((n) => n.slug === nota.slug)?.pdfHasta ??
+      nota.pdfPagina;
+    for (let p = nota.pdfPagina; p <= hasta; p++) paginasDelImpreso.push(p);
+  }
 
   /*
    * La edición DE LA NOTA, que es de donde sale su PDF.
@@ -410,6 +458,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
     // siempre —que muestra una nota vacía— en vez de romper. Es el hueco que
     // queda mientras se reemplaza el archivo de un número.
     if (suEdicion?.pdf) {
+      const pdf = suEdicion.pdf;
       return (
         <ViewTransition {...transicionPagina}>
           <HojaDiario
@@ -446,11 +495,17 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                 </Link>
               </nav>
 
-              <PaginaPdf
-                url={suEdicion.pdf.url}
-                pagina={nota.pdfPagina}
-                etiqueta={`Página ${nota.pdfPagina} de El Sanmiguelino, ${suEdicion.mes}`}
-              />
+              {/* Una hoja por página del impreso: dos si la nota se unió. */}
+              <div className="grid gap-8">
+                {paginasDelImpreso.map((pagina) => (
+                  <PaginaPdf
+                    key={pagina}
+                    url={pdf.url}
+                    pagina={pagina}
+                    etiqueta={`Página ${pagina} de El Sanmiguelino, ${suEdicion.mes}`}
+                  />
+                ))}
+              </div>
 
               <DescargarPdf
                 url={suEdicion.pdf.url}
@@ -485,6 +540,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
             usuario={usuario}
             seccionActiva={slugificarSeccion(nota.seccion)}
             pagina={numeroPagina}
+            paginaHasta={paginaHasta}
           />
 
           <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
@@ -550,7 +606,7 @@ export default async function NotaPage({ params }: PageProps<"/nota/[slug]">) {
                   <div className="mt-3">
                     <VerFacsimil
                       url={suEdicion.pdf.url}
-                      pagina={nota.pdfPagina}
+                      paginas={paginasDelImpreso}
                       mes={suEdicion.mes}
                     />
                   </div>

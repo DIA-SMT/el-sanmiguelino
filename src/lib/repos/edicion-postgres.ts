@@ -3,6 +3,7 @@ import type { EdicionRepo } from "@/lib/repos/edicion";
 import { db } from "@/lib/db";
 import { edicionEnFoco } from "@/lib/auth/vista-previa";
 import { minutosDeLectura, textoPlanoDe } from "@/lib/derivar";
+import { hastaDelImpreso } from "@/lib/data/paginas";
 import type {
   BloqueNota,
   NotaBorrador,
@@ -219,7 +220,8 @@ export const edicionPostgresRepo: EdicionRepo = {
       orderBy: { orden: "asc" },
       select: CAMPOS_RESUMEN,
     });
-    return filas.map(aResumen);
+    // Qué páginas del impreso cubre cada nota: ver `NotaResumen.pdfHasta`.
+    return hastaDelImpreso(filas.map(aResumen), edicion.pdfPaginas);
   },
 
   /**
@@ -371,9 +373,30 @@ export const edicionPostgresRepo: EdicionRepo = {
     const existente = slugOriginal
       ? await db().nota.findUnique({
           where: { slug: clave },
-          select: { id: true, edicionId: true },
+          select: { id: true, edicionId: true, pdfPagina: true },
         })
       : null;
+
+    /*
+     * Una página del impreso no se muda de número.
+     *
+     * Es una hoja del PDF de SU edición: en otra no hay PDF que la respalde, o
+     * hay otro con otra página en ese lugar. Mudarla dejaba un hueco en el
+     * foliado de origen —que se lee como una página unida a la anterior (ver
+     * `NotaResumen.pdfHasta`)— y un folio ajeno en el de destino.
+     */
+    if (
+      existente &&
+      existente.pdfPagina !== null &&
+      destino &&
+      destino.id !== existente.edicionId
+    ) {
+      throw new Error(
+        `Es la página ${existente.pdfPagina} del impreso de su edición y no ` +
+          "se puede mover a otro número. Si hace falta en otra edición, creá " +
+          "una nota nueva allá.",
+      );
+    }
 
     if (existente) {
       // Renombrar hacia un slug ocupado por OTRA nota tampoco puede pisarla.
@@ -471,9 +494,14 @@ export const edicionPostgresRepo: EdicionRepo = {
         },
       },
       orderBy: { orden: "asc" },
-      select: CAMPOS_RESUMEN,
+      // Las páginas del PDF viajan en cada fila y no en una consulta aparte:
+      // son las mismas para todas, y así esto sigue siendo un solo viaje.
+      select: { ...CAMPOS_RESUMEN, edicion: { select: { pdfPaginas: true } } },
     });
-    return filas.map(aResumen);
+    return hastaDelImpreso(
+      filas.map(aResumen),
+      filas[0]?.edicion.pdfPaginas ?? null,
+    );
   },
 
   async publicadas(): Promise<EdicionResumen[]> {

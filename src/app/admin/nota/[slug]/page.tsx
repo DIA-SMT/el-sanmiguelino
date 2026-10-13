@@ -11,6 +11,7 @@ import {
   repoEscribe,
 } from "@/lib/repos/edicion";
 import { db } from "@/lib/db";
+import { estadoParaBorrarNota } from "@/lib/repos/nota-borrar";
 
 /**
  * Editar una nota existente, o crear una nueva con el slug reservado `nueva`.
@@ -85,6 +86,10 @@ export default async function AdminEditarNota({
   const actual = await getResumenEdicion();
   const edicionInicial = nota?.edicionSlug ?? actual.slug;
 
+  // Qué pasa si se la borra: si es una página del impreso, cuál la cubre; si
+  // no se puede, por qué. La acción lo vuelve a preguntar antes de borrar.
+  const borrado = nota ? await estadoParaBorrarNota(nota.slug) : null;
+
   return (
     <>
       {/* El <h1> de la pantalla lo pone el banner; adentro del editor no hay
@@ -114,6 +119,7 @@ export default async function AdminEditarNota({
         secciones={secciones}
         ediciones={ediciones}
         edicionInicial={edicionInicial}
+        borrado={borrado}
       />
     </>
   );

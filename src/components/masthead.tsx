@@ -8,6 +8,7 @@ import { SeccionesNav } from "@/components/secciones-nav";
 import { esAdmin } from "@/lib/auth/dal";
 import { edicionEnFoco } from "@/lib/auth/vista-previa";
 import { getPublicadas, getResumenEdicion } from "@/lib/repos/edicion";
+import { rotuloDeFolios } from "@/lib/data/paginas";
 import type { SeccionInfo } from "@/lib/data/secciones";
 import type { EdicionResumen, Usuario } from "@/lib/types";
 
@@ -52,6 +53,7 @@ export async function Masthead({
   usuario,
   seccionActiva,
   pagina,
+  paginaHasta,
   facsimil = false,
 }: {
   /** El número que esta cabecera representa. En las pantallas del diario es
@@ -64,6 +66,9 @@ export async function Masthead({
   seccionActiva?: string;
   /** Folio de la página. Presente = cabecera interior chica; ausente = tapa. */
   pagina?: number;
+  /** El último folio, si la nota ocupa más de una página del impreso: el
+   *  folio dice entonces "Págs. 4 y 5". */
+  paginaHasta?: number;
   /**
    * Lo que se muestra debajo es una página del PDF del impreso.
    *
@@ -172,7 +177,12 @@ export async function Masthead({
                 folioALaIzquierda ? "flex-row" : "flex-row-reverse"
               }`}
             >
-              <p className="tabular-nums">Pág. {pagina}</p>
+              <p className="tabular-nums">
+                {rotuloDeFolios(
+                  { desde: pagina, hasta: paginaHasta ?? pagina },
+                  { corto: true },
+                )}
+              </p>
               <p className="ml-auto truncate">
                 San Miguel de Tucumán, {edicion.mes}.
               </p>

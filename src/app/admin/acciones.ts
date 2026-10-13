@@ -18,6 +18,7 @@ import {
 } from "@/lib/repos/edicion-pdf";
 import { digitalizarPdf } from "@/lib/pdf/digitalizar-servidor";
 import { borrarEdicion } from "@/lib/repos/edicion-borrar";
+import { borrarNota } from "@/lib/repos/nota-borrar";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
 import { comentariosRepo } from "@/lib/repos/comentarios";
@@ -331,6 +332,84 @@ export async function guardarNotaAction(
     return {
       ok: false,
       error: e instanceof Error ? e.message : "No se pudo guardar la nota.",
+    };
+  }
+}
+
+/**
+ * Borra una nota.
+ *
+ * Si es una página del impreso, la página no se va del número: pasa a
+ * mostrarse con la nota de la página anterior, y sus comentarios se mudan ahí.
+ * Las comprobaciones —la tapa no se borra, un facsímil sin digitalizar
+ * tampoco, el diario no se queda sin número, el slug tipeado si se pierden
+ * comentarios— viven en `borrarNota()`, del lado del servidor.
+ */
+export async function borrarNotaAction(datos: unknown): Promise<{
+  ok: boolean;
+  error?: string;
+  /** A dónde mandar al editor después: la nota que cubre la página, o la
+   *  lista. */
+  despues?: string;
+}> {
+  const { usuario } = await requerirAdmin();
+
+  try {
+    if (!esObjeto(datos)) throw new Error("Faltan los datos de la nota.");
+    const { slug, confirmacion } = datos;
+    if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
+      throw new Error("Falta la nota.");
+    }
+
+    const borrada = await borrarNota(
+      slug,
+      textoNoVacio(confirmacion) ? confirmacion.trim() : undefined,
+    );
+    const pasaA = borrada.pagina?.pasaA;
+
+    await anotar(usuario, {
+      accion: "nota.borrada",
+      objetoId: slug,
+      resumen:
+        `Borró la nota «${borrada.titulo}»` +
+        (pasaA
+          ? ` (la página ${borrada.pagina?.numero} pasa a la ${pasaA.pagina})`
+          : "") +
+        (borrada.comentariosMudados > 0
+          ? ` y mudó ${borrada.comentariosMudados} ${borrada.comentariosMudados === 1 ? "comentario" : "comentarios"}`
+          : !pasaA && borrada.comentarios > 0
+            ? ` (se llevó ${borrada.comentarios} ${borrada.comentarios === 1 ? "comentario" : "comentarios"})`
+            : ""),
+      detalle: {
+        edicion: borrada.edicionSlug,
+        publicada: borrada.publicada,
+        ...(pasaA
+          ? {
+              pagina: borrada.pagina?.numero,
+              pasaA: pasaA.slug,
+              comentariosMudados: borrada.comentariosMudados,
+            }
+          : { comentarios: borrada.comentarios }),
+      },
+    });
+
+    revalidatePath("/diario");
+    revalidatePath(`/nota/${slug}`);
+    if (pasaA) revalidatePath(`/nota/${pasaA.slug}`);
+    revalidatePath(`/edicion/${borrada.edicionSlug}`);
+    revalidatePath("/archivo");
+    revalidatePath("/buscar");
+    revalidatePath("/admin");
+    revalidatePath("/", "layout");
+
+    return {
+      ok: true,
+      despues: pasaA ? `/admin/nota/${pasaA.slug}` : "/admin",
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo borrar la nota.",
     };
   }
 }
@@ -1030,7 +1109,9 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
   segundos?: number;
   maquetadas?: number;
   modeloMaquetado?: string | null;
-  avisos?: { pagina: number; texto: string }[];
+  /** `nota` es el slug de la nota que muestra esa página: el de siempre, o
+   *  el de la anterior si la página está unida a ella. */
+  avisos?: { pagina: number; nota?: string; texto: string }[];
 }> {
   const { usuario } = await requerirAdmin();
 
@@ -1057,7 +1138,7 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
       slug,
     );
 
-    await guardarDigitalizacion(slug, paginas, {
+    const { unidas, notaDePagina } = await guardarDigitalizacion(slug, paginas, {
       // `=== true` y no un truthy: esta bandera reescribe un número que puede
       // estar publicado, así que un `"false"` o un `1` que llegue por la
       // petición de la acción no puede valer por un sí.
@@ -1070,6 +1151,8 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
       resumen: `Digitalizó el PDF de ${slug} (${paginas.length} páginas)`,
       detalle: {
         paginas: paginas.length,
+        // Las que siguieron unidas a la anterior: ver guardarDigitalizacion().
+        ...(unidas.length > 0 ? { unidas } : {}),
         figuras,
         segundos,
         maquetadas,
@@ -1094,16 +1177,27 @@ export async function digitalizarEdicionAction(datos: unknown): Promise<{
       modeloMaquetado,
       // Los avisos son lo que hay que mirar primero en la revisión: páginas sin
       // título propio, citas que se quedaron sin autor, recuadros raros.
+      //
+      // Cada uno lleva el slug de la nota que muestra su página. Una página
+      // unida a la anterior no tiene nota propia: el aviso lleva a la que la
+      // contiene, y los que piden ponerle título no van, porque su título ya
+      // es un subtítulo adentro de otra nota.
       avisos: paginas.flatMap((p) =>
         [
-          ...p.avisos,
+          ...(unidas.includes(p.pagina)
+            ? p.avisos.filter((a) => !/t[ií]tul/i.test(a))
+            : p.avisos),
           ...(p.diagnostico && p.diagnostico.confianza !== "alta"
             ? [
                 `Formato ${p.diagnostico.formato} (${p.diagnostico.ancho}×${p.diagnostico.alto} pt), ` +
                   `confianza ${p.diagnostico.confianza}: ${p.diagnostico.motivos.join("; ")}.`,
               ]
             : []),
-        ].map((texto) => ({ pagina: p.pagina, texto })),
+        ].map((texto) => ({
+          pagina: p.pagina,
+          ...(notaDePagina[p.pagina] ? { nota: notaDePagina[p.pagina] } : {}),
+          texto,
+        })),
       ),
     };
   } catch (e) {

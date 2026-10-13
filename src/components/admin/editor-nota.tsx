@@ -23,6 +23,8 @@ import {
   SeccionPanel,
   TarjetaPanel,
 } from "@/components/admin/piezas";
+import { BorrarNota } from "@/components/admin/borrar-nota";
+import type { EstadoParaBorrarNota } from "@/lib/repos/nota-borrar";
 import type { BloqueNota, NotaCompleta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { SITIOS_INCRUSTABLES, urlIncrustable } from "@/lib/interactivos";
@@ -292,9 +294,13 @@ export function EditorNota({
   secciones,
   ediciones,
   edicionInicial,
+  borrado,
 }: {
   /** La nota a editar, o null para una nota nueva. */
   nota: NotaCompleta | null;
+  /** Qué pasa si se la borra, para la tarjeta del pie. Ausente en una nota
+   *  nueva: lo que no se guardó no hay que borrarlo. */
+  borrado?: EstadoParaBorrarNota | null;
   /** Todas las ediciones, de la más nueva a la más vieja. */
   ediciones: {
     slug: string;
@@ -681,6 +687,9 @@ export function EditorNota({
               id="nota-edicion"
               value={edicionSlug}
               onChange={(e) => alEditar(setEdicionSlug)(e.target.value)}
+              // Una página del impreso es de SU número: el servidor no la deja
+              // mudar, así que el selector tampoco lo ofrece.
+              disabled={Boolean(nota?.pdfPagina)}
               className={cn(campo, "mt-1.5")}
               aria-describedby="nota-edicion-ayuda"
             >
@@ -696,9 +705,11 @@ export function EditorNota({
               ))}
             </select>
             <span id="nota-edicion-ayuda" className={ayudaCampo}>
-              {nota
-                ? "Cambiarla mueve la nota a esa edición, al final del foliado."
-                : "En qué número va a salir la nota."}
+              {nota?.pdfPagina
+                ? `Es la página ${nota.pdfPagina} del impreso: no se puede mover a otro número.`
+                : nota
+                  ? "Cambiarla mueve la nota a esa edición, al final del foliado."
+                  : "En qué número va a salir la nota."}
             </span>
           </div>
 
@@ -1005,6 +1016,8 @@ export function EditorNota({
           Agregar bloque
         </button>
       </section>
+
+      {borrado && <BorrarNota estado={borrado} />}
 
       {/* La barra de guardar queda fija: el cuerpo de una nota es largo y no
           se debería tener que volver arriba para grabar.

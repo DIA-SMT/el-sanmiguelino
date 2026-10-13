@@ -106,7 +106,7 @@ export function PdfEdicion({
     segundos: number;
     maquetadas: number;
     modeloMaquetado: string | null;
-    avisos: { pagina: number; texto: string }[];
+    avisos: { pagina: number; nota?: string; texto: string }[];
   } | null>(null);
 
   const ocupado =
@@ -578,8 +578,11 @@ export function PdfEdicion({
               <ul className="grid gap-1">
                 {resultado.avisos.map((a, i) => (
                   <li key={i} className="text-panel-xs text-panel-tinta-2">
+                    {/* A la nota que muestra la página, que manda el servidor:
+                        si la página está unida a la anterior o la nota cambió
+                        de slug, `${slug}-p${a.pagina}` ya no existe. */}
                     <Link
-                      href={`/admin/nota/${slug}-p${a.pagina}`}
+                      href={`/admin/nota/${a.nota ?? `${slug}-p${a.pagina}`}`}
                       className="font-medium underline underline-offset-2 hover:text-accent"
                     >
                       Página {a.pagina}
