@@ -5,7 +5,6 @@ import { HojaDiario } from "@/components/hoja-diario";
 import { Masthead } from "@/components/masthead";
 import { SiteFooter } from "@/components/site-footer";
 import { getIndiceDe, getPublicadas, getResumenEdicion } from "@/lib/repos/edicion";
-import { foliosDeNota, rotuloDeFolios } from "@/lib/data/paginas";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
 import { usuarioActual } from "@/lib/auth/dal";
 
@@ -70,20 +69,10 @@ export default async function EdicionPage({
   const notas = await getIndiceDe(slug);
 
   /*
-   * El foliado sale de `paginasDeEdicion()` y no de contar filas.
-   *
-   * Acá decía `Pág. {i + 2}`, que es la regla de una edición de notas
-   * escritas: la portada es la 1 y la primera nota la 2. En un número
-   * digitalizado la tapa del papel ES la página 1, así que esa cuenta corría
-   * todo un lugar — y las tres ediciones que hay publicadas son digitalizadas,
-   * o sea que el sumario del archivo venía numerando mal los tres números.
-   * `paginas.ts` dice que el foliado del impreso y el del sitio tienen que
-   * coincidir; este era el cuarto lugar que contestaba distinto.
-   *
-   * Se usa `foliosDeNota()` y no el índice del array: `paginasDeEdicion()` de
-   * una edición de notas escritas antepone la portada, así que sus posiciones
-   * no son las de `notas`. Y una nota que ocupa dos páginas del impreso dice
-   * "Págs. 4 y 5".
+   * Sin número de página a la izquierda. Estuvo ("Pág. 4") y la redacción pidió
+   * sacarlo (2026-10-21): en el diario digital el sumario es una lista de
+   * notas para elegir, no un índice de papel. El número de cada hoja sigue al
+   * pie, en el pasador.
    */
   const secciones = seccionesDeEdicion(notas);
   const hayVariasSecciones = secciones.length > 1;
@@ -138,13 +127,8 @@ export default async function EdicionPage({
 
         <ol className="mt-2 divide-y divide-hairline">
           {notas.map((nota) => (
-            <li key={nota.slug} className="flex gap-5 py-5">
-              <span className="w-12 shrink-0 pt-1 font-sans text-[0.72rem] uppercase tracking-[0.12em] tabular-nums text-ink-3">
-                {rotuloDeFolios(foliosDeNota(notas, nota.slug), {
-                  corto: true,
-                })}
-              </span>
-              <div className="min-w-0 flex-1">
+            <li key={nota.slug} className="py-5">
+              <div className="min-w-0">
                 {/* La volanta de sección sólo cuando distingue algo. En un
                     número digitalizado las ocho notas comparten el mismo valor
                     —sale del mismo campo para todas— y repetirlo ocho veces no

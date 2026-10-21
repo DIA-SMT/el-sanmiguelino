@@ -49,7 +49,12 @@ export function textoDeBloque(bloque: BloqueNota): string {
       return [
         bloque.titulo,
         ...bloque.entradas.flatMap((e) => [e.lead, e.texto]),
-      ].join(" ");
+        // La foto del recuadro, igual que una foto suelta: epígrafe y crédito.
+        bloque.foto?.epigrafe,
+        bloque.foto?.credito,
+      ]
+        .filter(Boolean)
+        .join(" ");
     case "foto":
       // El epígrafe y el crédito, no el `alt`. El `alt` describe la imagen para
       // quien no la ve y suele repetir lo que ya dice el epígrafe; meterlo

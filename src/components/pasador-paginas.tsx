@@ -13,14 +13,11 @@ export function PasadorPaginas({
   anterior,
   siguiente,
   numero,
-  hasta,
   total,
 }: {
   anterior: PaginaEdicion | null;
   siguiente: PaginaEdicion | null;
   numero: number;
-  /** El último folio, si la hoja ocupa más de una página del impreso. */
-  hasta?: number;
   total: number;
 }) {
   const claseBoton =
@@ -51,19 +48,7 @@ export function PasadorPaginas({
         )}
 
         <p className="meta shrink-0">
-          {hasta && hasta > numero ? (
-            <>
-              Páginas{" "}
-              <span className="text-ink">
-                {numero} {hasta === numero + 1 ? "y" : "a"} {hasta}
-              </span>{" "}
-              de {total}
-            </>
-          ) : (
-            <>
-              Página <span className="text-ink">{numero}</span> de {total}
-            </>
-          )}
+          Página <span className="text-ink">{numero}</span> de {total}
         </p>
 
         {siguiente ? (

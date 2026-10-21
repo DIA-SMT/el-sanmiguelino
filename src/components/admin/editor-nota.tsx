@@ -26,6 +26,9 @@ import {
 import { BorrarNota } from "@/components/admin/borrar-nota";
 import type { EstadoParaBorrarNota } from "@/lib/repos/nota-borrar";
 import type { BloqueNota, NotaCompleta } from "@/lib/types";
+
+/** La foto opcional de un recuadro (ficha). */
+type FotoDeFicha = NonNullable<Extract<BloqueNota, { tipo: "ficha" }>["foto"]>;
 import { cn } from "@/lib/utils";
 import { SITIOS_INCRUSTABLES, urlIncrustable } from "@/lib/interactivos";
 
@@ -294,8 +297,12 @@ export function EditorNota({
   secciones,
   ediciones,
   edicionInicial,
+  ordenDeEdicion,
   borrado,
+  avisoInicial,
 }: {
+  /** Un aviso para mostrar al abrir: lo que dejó el guardado anterior. */
+  avisoInicial?: string;
   /** La nota a editar, o null para una nota nueva. */
   nota: NotaCompleta | null;
   /** Qué pasa si se la borra, para la tarjeta del pie. Ausente en una nota
@@ -309,13 +316,15 @@ export function EditorNota({
   }[];
   /** A qué edición va por defecto: la de la nota, o la que está en foco. */
   edicionInicial: string;
+  /** Las notas de `edicionInicial` en su orden, para elegir dónde va ésta. */
+  ordenDeEdicion: { slug: string; titulo: string; pdfPagina: number | null }[];
   /** Las secciones que ya existen en la edición, para no inventar nombres
    *  nuevos por un error de tipeo. Igual se puede escribir una. */
   secciones: string[];
 }) {
   const router = useRouter();
   const [guardando, iniciarGuardado] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(avisoInicial ?? null);
   /**
    * "Guardado" se apaga en cuanto se toca cualquier cosa.
    *
@@ -338,6 +347,41 @@ export function EditorNota({
 
   const slugOriginal = nota?.slug;
   const [edicionSlug, setEdicionSlug] = useState(edicionInicial);
+
+  /*
+   * La ubicación: detrás de qué nota va (su slug), "__primera", o "" = al
+   * final, que es sólo para una nota nueva. Se manda únicamente si cambió:
+   * guardar el texto de una nota no tiene por qué tocar el orden.
+   */
+  const ubicacionDeHoy = (() => {
+    if (!nota) return "";
+    const i = ordenDeEdicion.findIndex((f) => f.slug === nota.slug);
+    if (i === 0) return "__primera";
+    return i > 0 ? ordenDeEdicion[i - 1].slug : "";
+  })();
+  const [ubicacion, setUbicacion] = useState(ubicacionDeHoy);
+  const [ubicacionGuardada, setUbicacionGuardada] = useState(ubicacionDeHoy);
+  /*
+   * Si la nota se mudó de edición y se guardó, la página vuelve a dibujarse
+   * con la lista de la edición NUEVA, pero el estado de arriba se quedaba con
+   * la de la vieja: el próximo guardado podía mandarla primera en el número
+   * nuevo sin que nadie lo eligiera. Cuando cambia la edición, la ubicación se
+   * vuelve a leer de la lista que llegó.
+   */
+  const [edicionDeLaLista, setEdicionDeLaLista] = useState(edicionInicial);
+  if (edicionDeLaLista !== edicionInicial) {
+    setEdicionDeLaLista(edicionInicial);
+    setUbicacion(ubicacionDeHoy);
+    setUbicacionGuardada(ubicacionDeHoy);
+  }
+  // En un facsímil sin digitalizar la tapa es la página 1 del PDF, que no es
+  // una nota: la primera nota no va a la tapa, va después de ella.
+  const facsimilSinDigitalizar =
+    ordenDeEdicion.some((f) => f.pdfPagina !== null) &&
+    !ordenDeEdicion.some((f) => f.pdfPagina === 1);
+  // Sólo una nota escrita, y sólo en su edición: si se cambia de edición, la
+  // lista de acá ya no es la de destino.
+  const ubicable = !nota?.pdfPagina && edicionSlug === edicionInicial;
   const [slug, setSlug] = useState(nota?.slug ?? "");
   const [seccion, setSeccion] = useState(nota?.seccion ?? "");
   const [titulo, setTitulo] = useState(nota?.titulo ?? "");
@@ -374,6 +418,64 @@ export function EditorNota({
     setCuerpo((prev) =>
       prev.map((b, k) => (k === i ? ({ ...b, ...cambios } as BloqueNota) : b)),
     );
+  }
+
+  /**
+   * Cambia la foto de un recuadro, o la saca con `null`.
+   *
+   * Aparte de `editarBloque` porque la foto es un objeto adentro del bloque:
+   * mezclar sobre el estado VIGENTE —y no sobre el bloque de cuando se eligió
+   * el archivo— es lo que evita que una subida que termina pise el epígrafe
+   * que se escribió mientras tanto.
+   */
+  function editarFotoDeFicha(i: number, cambios: Partial<FotoDeFicha> | null) {
+    setGuardado(false);
+    setSucio(true);
+    setCuerpo((prev) =>
+      prev.map((b, k) => {
+        if (k !== i || b.tipo !== "ficha") return b;
+        if (cambios === null) {
+          return { tipo: "ficha", titulo: b.titulo, entradas: b.entradas };
+        }
+        return { ...b, foto: { src: "", alt: "", ...b.foto, ...cambios } };
+      }),
+    );
+  }
+
+  /**
+   * Mete en un recuadro una foto que ya está en el cuerpo, y la saca de ahí.
+   *
+   * Es el caso que lo pidió: la digitalización deja la imagen que en el papel
+   * va al lado del recuadro como un bloque suelto debajo. Así se pasa de un
+   * click, sin copiar la dirección a mano.
+   */
+  function traerFotoAlRecuadro(iFicha: number, iFoto: number) {
+    setGuardado(false);
+    setSucio(true);
+    // Sacar un bloque corre los de abajo un lugar: un aviso de subida que
+    // quedó pegado a una posición caería al lado de otro bloque.
+    setDestinoSubida(null);
+    setErrorFoto(null);
+    setCuerpo((prev) => {
+      const ficha = prev[iFicha];
+      const foto = prev[iFoto];
+      if (ficha?.tipo !== "ficha" || foto?.tipo !== "foto") return prev;
+      return prev
+        .map((b, k) =>
+          k === iFicha
+            ? {
+                ...ficha,
+                foto: {
+                  src: foto.src,
+                  alt: foto.alt,
+                  ...(foto.epigrafe ? { epigrafe: foto.epigrafe } : {}),
+                  ...(foto.credito ? { credito: foto.credito } : {}),
+                },
+              }
+            : b,
+        )
+        .filter((_, k) => k !== iFoto);
+    });
   }
 
   /**
@@ -567,10 +669,13 @@ export function EditorNota({
       // atrapar, el estado de "guardando" no se limpiaba nunca y el boton
       // giraba para siempre sin decir nada.
       try {
+        const mandarUbicacion =
+          ubicable && ubicacion !== "" && ubicacion !== ubicacionGuardada;
         const res = await guardarNotaAction({
           slug,
           slugOriginal,
           edicionSlug,
+          ...(mandarUbicacion ? { ubicacion } : {}),
           seccion,
           titulo,
           bajada,
@@ -591,8 +696,18 @@ export function EditorNota({
         });
         if (!res.ok) {
           setError(res.error ?? "No se pudo guardar.");
+          // Se guardó pero no se pudo ubicar: la nota ya existe con ese slug.
+          // Quedarse en "nota nueva" haría que el próximo intento choque. El
+          // aviso viaja en la dirección porque la pantalla nueva arranca de
+          // cero y lo perdería.
+          if (res.slug && res.slug !== slugOriginal) {
+            router.replace(
+              `/admin/nota/${res.slug}${res.sinUbicar ? "?sinUbicar=1" : ""}`,
+            );
+          }
           return;
         }
+        if (mandarUbicacion) setUbicacionGuardada(ubicacion);
         setGuardado(true);
         setSucio(false);
         // Si el slug cambió, la URL del editor apunta a una nota que ya no
@@ -734,6 +849,54 @@ export function EditorNota({
             </datalist>
             <span id="nota-seccion-ayuda" className={ayudaCampo}>
               Se puede elegir una de las que ya existen o escribir una nueva.
+            </span>
+          </div>
+
+          {/*
+            * Dónde va dentro de la edición.
+            *
+            * Lo pidió la redacción: cuando una página del PDF trae varias
+            * notas, la que se separa se crea nueva, y caía siempre al final.
+            * Acá se la pone al lado de la página de la que salió. Las páginas
+            * del impreso no se mueven —van en el orden del papel—, y una nota
+            * que cambia de edición va al final de la nueva: la lista de acá es
+            * la de su edición actual.
+            */}
+          <div className="sm:col-span-2">
+            <label htmlFor="nota-ubicacion" className={etiqueta}>
+              Ubicación en la edición
+            </label>
+            <select
+              id="nota-ubicacion"
+              value={ubicable ? ubicacion : ""}
+              onChange={(e) => alEditar(setUbicacion)(e.target.value)}
+              disabled={!ubicable}
+              className={cn(campo, "mt-1.5")}
+              aria-describedby="nota-ubicacion-ayuda"
+            >
+              {!nota && <option value="">Al final</option>}
+              {!ubicable && nota && <option value="">—</option>}
+              {!ordenDeEdicion.some((f) => f.pdfPagina === 1) && (
+                <option value="__primera">
+                  {facsimilSinDigitalizar
+                    ? "Primera (después de la tapa del impreso)"
+                    : "Primera (va a la tapa)"}
+                </option>
+              )}
+              {ordenDeEdicion
+                .filter((f) => f.slug !== nota?.slug)
+                .map((f) => (
+                  <option key={f.slug} value={f.slug}>
+                    Después de «{f.titulo.slice(0, 80)}»
+                  </option>
+                ))}
+            </select>
+            <span id="nota-ubicacion-ayuda" className={ayudaCampo}>
+              {nota?.pdfPagina
+                ? "Es una página del impreso: va en el orden del papel."
+                : edicionSlug !== edicionInicial
+                  ? "Al cambiar de edición va al final de la nueva. Después la podés ubicar."
+                  : "Por ejemplo, después de la página de la que salió. También se ordena con las flechas de la lista de notas."}
             </span>
           </div>
 
@@ -993,6 +1156,13 @@ export function EditorNota({
                   bloque={bloque}
                   indice={i}
                   onCambio={(c) => editarBloque(i, c)}
+                  onFotoFicha={(c) => editarFotoDeFicha(i, c)}
+                  fotosDeLaNota={cuerpo.flatMap((b, k) =>
+                    b.tipo === "foto" && b.src
+                      ? [{ indice: k, nombre: b.epigrafe || b.alt || "sin epígrafe" }]
+                      : [],
+                  )}
+                  onTraerFoto={(k) => traerFotoAlRecuadro(i, k)}
                   onSubir={subirArchivo}
                   subiendo={subiendo}
                   destinoSubida={destinoSubida}
@@ -1152,6 +1322,9 @@ function CamposBloque({
   bloque,
   indice,
   onCambio,
+  onFotoFicha,
+  fotosDeLaNota,
+  onTraerFoto,
   onSubir,
   subiendo,
   destinoSubida,
@@ -1160,6 +1333,11 @@ function CamposBloque({
   bloque: BloqueNota;
   indice: number;
   onCambio: (cambios: Partial<BloqueNota>) => void;
+  /** Sólo del recuadro: cambia su foto, o la saca con `null`. */
+  onFotoFicha: (cambios: Partial<FotoDeFicha> | null) => void;
+  /** Las fotos sueltas del cuerpo, para traer una al recuadro. */
+  fotosDeLaNota: { indice: number; nombre: string }[];
+  onTraerFoto: (indiceFoto: number) => void;
   /** Sube un archivo y devuelve su dirección. Lo usan el bloque de foto y el
    *  retrato de la cita; `destino` dice cuál, para mostrar ahí el resultado. */
   onSubir: (archivo: File, destino: string) => Promise<string | null>;
@@ -1173,6 +1351,9 @@ function CamposBloque({
   // Este bloque es el dueño de la subida en curso (o de la que falló).
   const destino = `bloque-${indice}`;
   const esMia = destinoSubida === destino;
+  // La foto de un recuadro sube por su propio destino: el bloque tiene otros
+  // controles y el aviso tiene que salir al lado del que se usó.
+  const destinoFicha = `bloque-${indice}-foto`;
   if (bloque.tipo === "ficha") {
     return (
       <div className="mt-3 space-y-3">
@@ -1262,6 +1443,128 @@ function CamposBloque({
           <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           Agregar entrada
         </button>
+
+        {/* La foto del recuadro: va al costado del texto, que la rodea. */}
+        <div className="space-y-3 border-t border-panel-borde pt-3">
+          <p className={etiqueta}>
+            Foto del recuadro{" "}
+            <span className="font-normal text-panel-tinta-3">(opcional)</span>
+          </p>
+          <p className="text-panel-sm text-panel-tinta-3">
+            Va al costado del texto, que la rodea. Sirve para que el recuadro no
+            quede con medio espacio en blanco.
+          </p>
+          {bloque.foto ? (
+            <>
+              <input
+                value={bloque.foto.src}
+                onChange={(e) => onFotoFicha({ src: e.target.value })}
+                {...sinEnviarConEnter}
+                aria-label={`Dirección de la foto del recuadro del bloque ${indice + 1}`}
+                className={campo}
+                placeholder="Dirección de la foto"
+              />
+              <div className="flex flex-wrap items-center gap-panel-controles">
+                <label
+                  className={cn(
+                    "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-borde-campo px-3 py-1.5 text-[0.78rem] font-medium",
+                    subiendo && "opacity-60",
+                  )}
+                >
+                  {(destinoSubida === destinoFicha && subiendo) ||
+                    "Reemplazar la foto"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={subiendo !== null}
+                    className="sr-only"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (f) {
+                        void onSubir(f, destinoFicha).then(
+                          (url) => url && onFotoFicha({ src: url }),
+                        );
+                      }
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => onFotoFicha(null)}
+                  disabled={subiendo !== null}
+                  className={botonFantasmaChico}
+                >
+                  Quitar la foto
+                </button>
+              </div>
+              <input
+                value={bloque.foto.epigrafe ?? ""}
+                onChange={(e) => onFotoFicha({ epigrafe: e.target.value })}
+                {...sinEnviarConEnter}
+                aria-label={`Epígrafe de la foto del recuadro del bloque ${indice + 1}`}
+                className={campo}
+                placeholder="Epígrafe: qué se ve en la foto"
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <input
+                  value={bloque.foto.alt}
+                  onChange={(e) => onFotoFicha({ alt: e.target.value })}
+                  {...sinEnviarConEnter}
+                  aria-label={`Texto alternativo de la foto del recuadro del bloque ${indice + 1}`}
+                  className={campo}
+                  placeholder="Texto alternativo"
+                />
+                <input
+                  value={bloque.foto.credito ?? ""}
+                  onChange={(e) => onFotoFicha({ credito: e.target.value })}
+                  {...sinEnviarConEnter}
+                  aria-label={`Crédito de la foto del recuadro del bloque ${indice + 1}`}
+                  className={campo}
+                  placeholder="Quién la sacó (opcional)"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center gap-panel-controles">
+              <label
+                className={cn(
+                  "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-borde-campo px-3 py-1.5 text-[0.78rem] font-medium",
+                  subiendo && "opacity-60",
+                )}
+              >
+                {(destinoSubida === destinoFicha && subiendo) ||
+                  "Subir una foto"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={subiendo !== null}
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) {
+                      void onSubir(f, destinoFicha).then(
+                        (url) => url && onFotoFicha({ src: url }),
+                      );
+                    }
+                  }}
+                />
+              </label>
+              {fotosDeLaNota.length > 0 && (
+                <TraerFoto
+                  indice={indice}
+                  fotos={fotosDeLaNota}
+                  deshabilitado={subiendo !== null}
+                  onTraer={onTraerFoto}
+                />
+              )}
+            </div>
+          )}
+          {destinoSubida === destinoFicha && errorFoto && (
+            <AvisoDeSubida texto={errorFoto} />
+          )}
+        </div>
       </div>
     );
   }
@@ -1613,5 +1916,56 @@ function CamposBloque({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Elegir una foto del cuerpo y traerla al recuadro.
+ *
+ * Elegir y traer son dos pasos: un select que actuara al cambiar se dispararía
+ * con la primera flecha del teclado y metería en el recuadro una foto que
+ * nadie eligió —y sacaría ese bloque del cuerpo—.
+ */
+function TraerFoto({
+  indice,
+  fotos,
+  deshabilitado,
+  onTraer,
+}: {
+  indice: number;
+  fotos: { indice: number; nombre: string }[];
+  deshabilitado: boolean;
+  onTraer: (indiceFoto: number) => void;
+}) {
+  const [elegida, setElegida] = useState("");
+  return (
+    <span className="inline-flex flex-wrap items-center gap-panel-controles">
+      <select
+        value={elegida}
+        onChange={(e) => setElegida(e.target.value)}
+        disabled={deshabilitado}
+        aria-label={`Foto de la nota para el recuadro del bloque ${indice + 1}`}
+        className={cn(campo, "w-auto min-w-0 max-w-full")}
+      >
+        <option value="">Traer una foto de esta nota…</option>
+        {fotos.map((f) => (
+          <option key={f.indice} value={f.indice}>
+            Bloque {f.indice + 1}: {f.nombre.slice(0, 60)}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={() => {
+          if (elegida === "") return;
+          onTraer(Number(elegida));
+          setElegida("");
+        }}
+        disabled={deshabilitado || elegida === ""}
+        className={botonFantasmaChico}
+      >
+        Traer
+      </button>
+    </span>
   );
 }

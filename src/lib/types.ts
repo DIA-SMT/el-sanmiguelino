@@ -89,6 +89,15 @@ export type BloqueNota =
       tipo: "ficha";
       titulo: string;
       entradas: { lead: string; texto: string }[];
+      /**
+       * Una foto adentro del recuadro, al costado del texto, que la rodea.
+       *
+       * Lo pidió la redacción: un recuadro con poco texto dejaba medio marco
+       * en blanco, y la imagen que en el papel va al lado —el mapa del exilio
+       * de Alberdi, la plaza de la Memoria descriptiva— quedaba suelta debajo.
+       * Opcional: los recuadros que ya existen no la tienen.
+       */
+      foto?: { src: string; alt: string; epigrafe?: string; credito?: string };
     }
   /**
    * Una enumeración: ítems cortos, uno por renglón.

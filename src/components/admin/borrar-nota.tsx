@@ -127,13 +127,8 @@ export function BorrarNota({ estado }: { estado: EstadoParaBorrarNota }) {
                 <strong className="font-semibold text-panel-tinta">
                   «{pagina.pasaA.titulo}»
                 </strong>
-                , que queda como “
-                {rotuloDeFolios(
-                  { desde: pagina.pasaA.pagina, hasta: pagina.pasaA.hasta },
-                  { corto: true },
-                )}
-                ” con sus {pagina.pasaA.hasta - pagina.pasaA.pagina + 1} hojas
-                en el facsímil.{" "}
+                , que en «Verla como salió impresa» va a mostrar las{" "}
+                {pagina.pasaA.hasta - pagina.pasaA.pagina + 1} hojas.{" "}
                 <strong className="font-semibold text-panel-tinta">
                   El texto de esta nota no se pasa solo
                 </strong>

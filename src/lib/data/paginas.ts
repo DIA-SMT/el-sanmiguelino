@@ -3,9 +3,6 @@ import type { NotaResumen } from "@/lib/types";
 /** Una página del diario. El orden del array `notas` define la numeración. */
 export interface PaginaEdicion {
   numero: number;
-  /** El último folio que ocupa, si son varios: una nota que en el papel va en
-   *  dos páginas y se unió en una (ver `NotaResumen.pdfHasta`). */
-  hasta?: number;
   href: string;
   titulo: string;
   /**
@@ -36,38 +33,30 @@ function esDigitalizada(notas: NotaResumen[]): boolean {
   return notas[0]?.pdfPagina === 1;
 }
 
-/** Desde qué folio y hasta cuál ocupa una nota. Casi siempre son el mismo. */
+/** Un rango de páginas del IMPRESO: las hojas del facsímil que muestra una
+ *  nota. Casi siempre es una sola. */
 export interface Folios {
   desde: number;
   hasta: number;
 }
 
 /**
- * Los folios de cada nota del índice, en el mismo orden.
+ * El número de cada nota: su posición en el número, como la lee el lector.
  *
- * **Una página del impreso lleva SU número, no el de su posición.** Antes el
- * folio era la posición en la lista, y eso andaba mientras hubiera una nota por
- * página. Cuando la redacción unió una nota que el impreso tenía en las
- * páginas 4 y 5 y borró la de la 5, todo lo que venía detrás se corría un
- * lugar: la página 6 del papel pasaba a decir "Página 5", su facsímil seguía
- * diciendo 6, y a Migue "la página 6" le devolvía la 7. Ahora la nota unida
- * ocupa la 4 y la 5, y la 6 sigue siendo la 6.
+ * **Por posición en la web, no por página del papel.** Lo decidió la redacción
+ * el 2026-10-21. Una página del impreso puede traer varias notas, que se
+ * separan a mano y se ubican al lado de la suya; y dos páginas pueden ser una
+ * sola nota, que se une. Con el número del papel, eso dejaba dos notas con el
+ * mismo número o una nota con dos ("Págs. 4 y 5"). En la web cada nota es una
+ * página y se cuenta como tal; el número del papel queda donde es el papel: en
+ * el facsímil ("Verla como salió impresa").
  *
- * Lo que no es del impreso —las notas escritas, o un dato que no cierra—
- * sigue a continuación del último folio usado, que es lo que pasaba antes.
+ * En un número digitalizado la tapa es la 1. En uno de notas escritas, o en un
+ * facsímil sin digitalizar, la 1 es la portada y la primera nota es la 2.
  */
-function foliosDe(notas: NotaResumen[]): Folios[] {
-  let siguiente = esDigitalizada(notas) ? 1 : 2;
-  return notas.map((nota) => {
-    // Un `pdfPagina` que no avanza sería un folio repetido, y el pasador ubica
-    // la hoja buscando su número: con dos iguales se pierde. Mejor un número
-    // corrido que una hoja sin pie.
-    const desde =
-      nota.pdfPagina && nota.pdfPagina >= siguiente ? nota.pdfPagina : siguiente;
-    const hasta = Math.max(desde, nota.pdfHasta ?? desde);
-    siguiente = hasta + 1;
-    return { desde, hasta };
-  });
+function numerosDe(notas: NotaResumen[]): number[] {
+  const base = esDigitalizada(notas) ? 1 : 2;
+  return notas.map((_, i) => base + i);
 }
 
 /**
@@ -98,11 +87,10 @@ export function hastaDelImpreso<
 }
 
 /**
- * Cómo se nombra un rango de folios.
+ * Cómo se nombran unas páginas del impreso: "Página 4", "Páginas 4 y 5".
  *
- * `corto` es el de la bandera y el sumario ("Pág. 4", "Págs. 4 y 5"); el largo
- * es el del pie ("Página 4", "Páginas 4 y 5"). Dos páginas van con "y" —es lo
- * que dice cualquiera que hojea un diario— y más de dos, con "a".
+ * Es el rótulo del facsímil. Dos páginas van con "y" —es lo que dice
+ * cualquiera que hojea un diario— y más de dos, con "a".
  */
 export function rotuloDeFolios(
   { desde, hasta }: Folios,
@@ -150,13 +138,10 @@ export function paginasDeEdicion(
    */
   { enLaCalle = true }: { enLaCalle?: boolean } = {},
 ): PaginaEdicion[] {
-  // El número de cada nota lo decide `foliosDe()`, que ya sabe la regla de
-  // cada clase de edición y las notas que ocupan más de una página.
-  const folios = foliosDe(notas);
-  const deLaNota = (i: number) => ({
-    numero: folios[i].desde,
-    ...(folios[i].hasta > folios[i].desde ? { hasta: folios[i].hasta } : {}),
-  });
+  // El número de cada nota lo decide `numerosDe()`, que ya sabe la regla de
+  // cada clase de edición.
+  const numeros = numerosDe(notas);
+  const deLaNota = (i: number) => ({ numero: numeros[i] });
 
   if (!enLaCalle) {
     // Todas las páginas por su nota.
@@ -211,41 +196,29 @@ export function posicionEnFoliado(
  * y lo que Migue entiende cuando alguien le nombra un número.
  */
 export function numeroDeNota(notas: NotaResumen[], slug: string): number {
-  return foliosDeNota(notas, slug).desde;
-}
-
-/** Los folios de una nota: el primero y el último. Para la bandera y el
- *  sumario, que dicen "Págs. 4 y 5" cuando la nota ocupa dos. */
-export function foliosDeNota(notas: NotaResumen[], slug: string): Folios {
   const i = notas.findIndex((n) => n.slug === slug);
-  if (i === -1) return { desde: 1, hasta: 1 };
-  return foliosDe(notas)[i];
+  return i === -1 ? 1 : numerosDe(notas)[i];
 }
 
 /**
- * Cuántas páginas tiene el número: el folio más alto.
+ * Cuántas páginas tiene el número.
  *
- * No es cuántas notas hay. Con una nota que ocupa dos páginas, son una menos
- * que las páginas del papel; y en una edición de notas escritas la portada es
- * la página 1 y no es una nota.
+ * No siempre es cuántas notas hay: en una edición de notas escritas la portada
+ * es la página 1 y no es una nota.
  */
 export function totalDePaginas(notas: NotaResumen[]): number {
-  const folios = foliosDe(notas);
-  return folios.at(-1)?.hasta ?? (esDigitalizada(notas) ? 0 : 1);
+  return notas.length + (esDigitalizada(notas) ? 0 : 1);
 }
 
 /**
  * La nota que está en una página, por su número. `null` si ese número es la
  * portada de una edición sin digitalizar, que no es una nota, o si no existe.
- *
- * Busca por rango: en una nota que ocupa la 4 y la 5, "la página 5" es ella.
  */
 export function notaEnPagina(
   notas: NotaResumen[],
   numero: number,
 ): NotaResumen | null {
-  const folios = foliosDe(notas);
-  const i = folios.findIndex((f) => f.desde <= numero && numero <= f.hasta);
+  const i = numerosDe(notas).indexOf(numero);
   return i === -1 ? null : notas[i];
 }
 

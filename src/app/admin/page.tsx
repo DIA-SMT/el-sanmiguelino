@@ -17,7 +17,7 @@ import {
 } from "@/components/admin/piezas";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { getIndice, getResumenEdicion, repoEscribe } from "@/lib/repos/edicion";
-import { foliosDeNota, rotuloDeFolios } from "@/lib/data/paginas";
+import { MoverNota } from "@/components/admin/mover-nota";
 
 export const metadata = { title: "Notas" };
 
@@ -85,7 +85,7 @@ export default async function AdminNotas() {
             color="azul"
             titulo="Notas en la edición"
             valor={String(indice.length)}
-            nota="La primera va en la tapa; el resto sale numerado desde la página 2."
+            nota="La primera va en la tapa."
           />
           <TarjetaDato
             icono={Clock}
@@ -126,7 +126,11 @@ export default async function AdminNotas() {
         <SeccionPanel
           id="paginas-de-la-edicion"
           titulo="Páginas de la edición"
-          bajada="En el orden en que las encuentra el lector."
+          bajada={
+            puedeEditar
+              ? "En el orden en que las encuentra el lector. Las notas escritas se mueven con las flechas; las páginas del PDF van en el orden del papel."
+              : "En el orden en que las encuentra el lector."
+          }
         >
           {/* Una edición recién creada no tiene notas todavía, y es un estado
               normal —se crea el número y se le van cargando—. Con la lista
@@ -145,7 +149,29 @@ export default async function AdminNotas() {
               lista que representan. Para eso está `--panel-tarjeta-2`. */}
           <ul className="grid gap-2">
             {indice.map((nota, i) => {
-              const enTapa = i === 0;
+              const digitalizada = indice[0]?.pdfPagina === 1;
+              // En un facsímil sin digitalizar la tapa es la página 1 del PDF,
+              // que se dibuja en /diario y no es una fila: la primera nota no
+              // va en la tapa.
+              const enTapa = i === 0 && !(edicion.pdf && !digitalizada);
+              /*
+               * A dónde va cada flecha: detrás de qué nota. Sólo las notas
+               * escritas se mueven, y en un número digitalizado nada sube por
+               * encima de la tapa del impreso. La regla que manda es la del
+               * servidor (`nuevoOrden()`); esto sólo apaga lo que ya se sabe
+               * que no se puede.
+               */
+              const movible = puedeEditar && nota.pdfPagina === undefined;
+              const subirA =
+                i === 0
+                  ? null
+                  : i === 1
+                    ? digitalizada
+                      ? null
+                      : "__primera"
+                    : indice[i - 2].slug;
+              const bajarA =
+                i === indice.length - 1 ? null : indice[i + 1].slug;
               return (
                 <li
                   key={nota.slug}
@@ -164,8 +190,8 @@ export default async function AdminNotas() {
                     }}
                   />
                   {/* La marca de tapa NO es una `Pildora`: no lleva caja ni
-                      fondo porque es la primera columna de una lista, y tiene
-                      que alinear con el "Pág. 3" de las filas de abajo. Una
+                      fondo porque es la primera columna de una lista, y las
+                      demás filas dejan el mismo lugar vacío para alinear. Una
                       píldora acá desalinearía las once filas para decir lo
                       mismo. La píldora está tres líneas más abajo, donde sí
                       hay un estado. */}
@@ -179,16 +205,10 @@ export default async function AdminNotas() {
                       Tapa
                     </span>
                   ) : (
-                    /* El mismo folio que ve el lector, de `paginas.ts`. Decía
-                       `Pág. {i + 2}`, que es la cuenta de una edición de notas
-                       escritas: en una digitalizada corría todo un lugar, y es
-                       justo el número con el que la redacción elige qué nota
-                       borrar después de unir dos páginas. */
-                    <span className="w-14 shrink-0 text-panel-xs font-medium tabular-nums text-panel-tinta-3">
-                      {rotuloDeFolios(foliosDeNota(indice, nota.slug), {
-                        corto: true,
-                      })}
-                    </span>
+                    /* Sin número de página: lo pidió la redacción
+                       (2026-10-21). En el diario digital el número es la
+                       posición, y la posición ya es la fila. */
+                    <span className="w-14 shrink-0" aria-hidden="true" />
                   )}
                   <span className="min-w-0 flex-1 basis-56">
                     <Link
@@ -210,6 +230,14 @@ export default async function AdminNotas() {
                       <code className="font-mono">{nota.slug}</code>
                     </span>
                   </span>
+                  {movible && (
+                    <MoverNota
+                      slug={nota.slug}
+                      titulo={nota.titulo}
+                      subirA={subirA}
+                      bajarA={bajarA}
+                    />
+                  )}
                   {puedeEditar ? (
                     /* La fila es `--panel-tarjeta-2`, así que el botón apoya
                        sobre superficie hundida y `sobre="hundida"` le pone el

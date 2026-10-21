@@ -24,6 +24,7 @@ import {
   type PaginaDigitalizada,
 } from "@/lib/pdf/estructura";
 import type { BloqueNota } from "@/lib/types";
+import { ordenTrasDigitalizar } from "@/lib/data/orden-notas";
 import { esLaUnicaServible } from "@/lib/repos/edicion-servibles";
 
 /** Lo que puede tener un PDF de diario. Un número de más acá casi seguro es un
@@ -116,6 +117,15 @@ export async function guardarPdfDeEdicion(
   }
 
   return db().$transaction(async (tx) => {
+    // El orden de antes, para devolver cada nota escrita detrás de su página
+    // (ver `ordenTrasDigitalizar`). Sólo si el número no está digitalizado:
+    // con la tapa digitalizada, reemplazar el PDF sigue el camino de siempre.
+    const viejas = await tx.nota.findMany({
+      where: { edicionId: edicion.id },
+      select: { id: true, orden: true, pdfPagina: true },
+    });
+    const digitalizada = viejas.some((v) => v.pdfPagina === 1);
+
     /*
      * Las notas escritas se APARTAN, no se borran.
      *
@@ -137,6 +147,7 @@ export async function guardarPdfDeEdicion(
       where: { edicionId: edicion.id, pdfPagina: { gt: paginas } },
     });
 
+    const cabezas: { id: string; pagina: number }[] = [];
     for (let pagina = 2; pagina <= paginas; pagina++) {
       const campos = {
         seccion: "Edición impresa",
@@ -154,11 +165,13 @@ export async function guardarPdfDeEdicion(
         orden: pagina - 2,
         edicionId: edicion.id,
       };
-      await tx.nota.upsert({
+      const fila = await tx.nota.upsert({
         where: { slug: slugDePagina(edicionSlug, pagina) },
         update: campos,
         create: { slug: slugDePagina(edicionSlug, pagina), ...campos },
+        select: { id: true },
       });
+      cabezas.push({ id: fila.id, pagina });
     }
 
     /*
@@ -173,6 +186,23 @@ export async function guardarPdfDeEdicion(
         where: { id: escrita.id },
         data: { orden: paginas - 1 + i },
       });
+    }
+
+    /*
+     * Pero si la redacción había ubicado notas escritas entre las páginas, van
+     * de vuelta detrás de la suya y no al final: subir otra vez el PDF no
+     * tiene por qué deshacer ese orden. Dos pasadas por el índice único.
+     */
+    if (!digitalizada && cabezas.length > 0 && escritas.length > 0) {
+      const final = ordenTrasDigitalizar(viejas, cabezas, {
+        antesDeLaPrimera: true,
+      });
+      for (const [i, id] of final.entries()) {
+        await tx.nota.update({ where: { id }, data: { orden: 100_000 + i } });
+      }
+      for (const [i, id] of final.entries()) {
+        await tx.nota.update({ where: { id }, data: { orden: i } });
+      }
     }
 
     await tx.edicion.update({
@@ -353,6 +383,9 @@ export async function guardarDigitalizacion(
      *  la nota que hay que revisar y no a una dirección armada a mano. */
     const notaDePagina: Record<number, string> = {};
 
+    /** Las notas del impreso en el orden del papel, para ubicar al final. */
+    const cabezas: { id: string; pagina: number }[] = [];
+
     let tituloPrevio = "";
     for (const { pagina, cuerpo, cubre } of notasDelImpreso) {
       // El título y la bajada los decide `camposDePagina`, que es puro y lo
@@ -376,7 +409,9 @@ export async function guardarDigitalizacion(
         imagenEpigrafe: pagina.imagen?.epigrafe ?? null,
         imagenCredito: pagina.imagen?.credito ?? null,
         pdfPagina: pagina.pagina,
-        orden: pagina.pagina - 1,
+        // Provisorio y fuera del rango final: el orden de verdad se pone al
+        // terminar, cuando se sabe dónde va cada nota escrita.
+        orden: 5000 + pagina.pagina,
         edicionId: edicion.id,
       };
 
@@ -391,12 +426,12 @@ export async function guardarDigitalizacion(
        * conserva su slug, sus comentarios y sus enlaces.
        */
       const previa = viejas.find((v) => v.pdfPagina === pagina.pagina);
-      let guardada: { slug: string };
+      let guardada: { id: string; slug: string };
       if (previa) {
         guardada = await tx.nota.update({
           where: { id: previa.id },
           data: campos,
-          select: { slug: true },
+          select: { id: true, slug: true },
         });
       } else {
         // Una página nueva. El slug es único en toda la base: si lo tiene una
@@ -414,39 +449,30 @@ export async function guardarDigitalizacion(
         }
         guardada = await tx.nota.create({
           data: { slug, ...campos },
-          select: { slug: true },
+          select: { id: true, slug: true },
         });
       }
       for (const n of cubre) notaDePagina[n] = guardada.slug;
+      cabezas.push({ id: guardada.id, pagina: pagina.pagina });
     }
 
     /*
-     * Las notas ESCRITAS de la edición vuelven, detrás de las páginas.
+     * El orden final: cada página del impreso, y detrás de ella las notas
+     * escritas que estaban detrás de ella.
      *
-     * Se las había corrido al rango alto junto con todo lo demás, y antes se
-     * borraban con el resto: redigitalizar se llevaba puesto cualquier texto
-     * que alguien hubiera escrito para ese número, sin avisar. Un número puede
-     * tener las dos cosas —el impreso digitalizado y notas que sólo salen en la
-     * web— y eso ya pasa: septiembre publicó "La Batalla de Tucumán" después de
-     * sus ocho páginas.
-     *
-     * **Van DETRÁS del impreso, y eso es lo que mantiene honesto el foliado.**
-     * Las páginas ocupan `orden` 0…N-1, o sea las páginas 1…N del papel; una
-     * nota escrita intercalada correría todo y el número saldría con la página
-     * 4 del impreso numerada 5. Atrás, la 4 sigue siendo la 4 y la nota es la
-     * N+1. Es la misma regla que ya cumplía la de septiembre por casualidad,
-     * ahora garantizada.
+     * Antes las escritas se borraban al redigitalizar; después volvían, pero
+     * todas al final. Desde que la redacción puede ubicarlas al lado de la
+     * página de la que salieron, volver al final sería deshacer ese trabajo
+     * sin avisar. Si su página ya no tiene nota propia —se unió a la anterior,
+     * o el PDF nuevo es más corto—, van detrás de la que la cubre. Nunca antes
+     * de la tapa: la tapa es la página 1.
      */
-    const escritas = await tx.nota.findMany({
-      where: { edicionId: edicion.id, orden: { gte: 1000 }, pdfPagina: null },
-      orderBy: { orden: "asc" },
-      select: { id: true },
-    });
-    for (const [i, escrita] of escritas.entries()) {
-      await tx.nota.update({
-        where: { id: escrita.id },
-        data: { orden: paginas.length + i },
-      });
+    const final = ordenTrasDigitalizar(viejas, cabezas);
+    const escritas = viejas.filter((v) => v.pdfPagina === null);
+    // Todo lo que se va a ordenar está ahora en el rango alto (las escritas
+    // en +1000, las páginas en 5000+), así que numerar de 0 no choca.
+    for (const [i, id] of final.entries()) {
+      await tx.nota.update({ where: { id }, data: { orden: i } });
     }
 
     // Lo que sigue en el rango alto es una página que el PDF nuevo ya no tiene.

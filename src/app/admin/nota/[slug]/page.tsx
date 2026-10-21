@@ -12,6 +12,7 @@ import {
 } from "@/lib/repos/edicion";
 import { db } from "@/lib/db";
 import { estadoParaBorrarNota } from "@/lib/repos/nota-borrar";
+import { filasDeEdicion } from "@/lib/repos/nota-orden";
 
 /**
  * Editar una nota existente, o crear una nueva con el slug reservado `nueva`.
@@ -37,9 +38,13 @@ const enlaceSecundario = clasesDeBoton();
 
 export default async function AdminEditarNota({
   params,
+  searchParams,
 }: PageProps<"/admin/nota/[slug]">) {
   await requerirAdmin();
   const { slug } = await params;
+  // Lo deja el guardado de una nota nueva que no se pudo ubicar: la pantalla
+  // nueva arranca de cero y el aviso no puede perderse en el cambio.
+  const { sinUbicar } = await searchParams;
 
   // Sin motor de escritura el editor sería un formulario que promete guardar y
   // pierde todo al recargar. Mejor que no exista.
@@ -90,6 +95,9 @@ export default async function AdminEditarNota({
   // no se puede, por qué. La acción lo vuelve a preguntar antes de borrar.
   const borrado = nota ? await estadoParaBorrarNota(nota.slug) : null;
 
+  // Las notas de su edición en orden, para el campo "Ubicación".
+  const ordenDeEdicion = await filasDeEdicion(edicionInicial);
+
   return (
     <>
       {/* El <h1> de la pantalla lo pone el banner; adentro del editor no hay
@@ -119,7 +127,13 @@ export default async function AdminEditarNota({
         secciones={secciones}
         ediciones={ediciones}
         edicionInicial={edicionInicial}
+        ordenDeEdicion={ordenDeEdicion}
         borrado={borrado}
+        avisoInicial={
+          sinUbicar
+            ? "La nota se guardó, pero no se pudo ubicar donde elegiste. Elegí de nuevo dónde va y guardá."
+            : undefined
+        }
       />
     </>
   );

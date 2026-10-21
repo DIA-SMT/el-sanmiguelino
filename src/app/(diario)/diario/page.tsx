@@ -19,15 +19,21 @@ import { transicionPagina } from "@/lib/transiciones";
 import { seccionesDeEdicion } from "@/lib/data/secciones";
 import { numeroDeNota } from "@/lib/data/paginas";
 import { medirImagen } from "@/lib/medir-imagen";
-import type { NotaCompleta } from "@/lib/types";
+import type { BloqueNota, NotaCompleta } from "@/lib/types";
 
-function parrafosDe(nota: NotaCompleta): string[] {
-  return nota.cuerpo.filter((b) => b.tipo === "parrafo").map((b) => b.texto);
-}
-
-function citaDe(nota: NotaCompleta) {
-  const bloque = nota.cuerpo.find((b) => b.tipo === "cita");
-  return bloque?.tipo === "cita" ? bloque : null;
+/**
+ * Lo que la tapa dibuja del cuerpo: los párrafos y las citas, **en el orden
+ * en que están en el editor**.
+ *
+ * Antes se juntaban los párrafos por un lado y la primera cita por otro, y la
+ * cita iba siempre después del segundo párrafo. Octubre la tiene al final, y
+ * salía en el medio, cortando el texto.
+ */
+function cuerpoDeTapa(nota: NotaCompleta) {
+  return nota.cuerpo.filter(
+    (b): b is Extract<BloqueNota, { tipo: "parrafo" | "cita" }> =>
+      b.tipo === "parrafo" || b.tipo === "cita",
+  );
 }
 
 export default async function Portada() {
@@ -126,8 +132,7 @@ export default async function Portada() {
     : null;
   const fotoVertical = medidas ? medidas.alto / medidas.ancho > 1.1 : false;
 
-  const parrafos = principal ? parrafosDe(principal) : [];
-  const cita = principal ? citaDe(principal) : null;
+  const cuerpo = principal ? cuerpoDeTapa(principal) : [];
   // En qué página sigue la nota de tapa. La regla vive en `paginas.ts` porque
   // no es la misma en los dos tipos de edición: en una de notas escritas la
   // tapa es una vidriera y la nota empieza en la página 2, y en una
@@ -225,11 +230,15 @@ export default async function Portada() {
                 />
               )}
 
-              {/* El cuerpo en columnas. La cita va adentro del flujo y cruza todas
-              las columnas: en el papel ocupa el ancho de dos, pero multicol no
-              sabe abarcar 2 de 3 — sólo todas o una. Cruzarlas enteras es la
-              versión honesta del mismo recurso, y aguanta los tres
-              breakpoints sin maquetar cada uno a mano. */}
+              {/* El cuerpo en columnas, en el orden del editor. La cita va
+              adentro de una columna, como los destacados de la nota.
+
+              Antes cruzaba las tres: en el papel ocupa el ancho de dos, y
+              multicol no sabe abarcar 2 de 3, así que se la estiraba a todas.
+              Pero un elemento que cruza parte el texto en dos tandas que se
+              reparten por separado: lo de arriba quedaba en una columna y
+              media con la tercera vacía, y lo de abajo arrancaba de nuevo. La
+              redacción lo veía cortado aunque en el editor fuera continuo. */}
               <div className="entra entra-3 note-columns mt-8">
                 {/* Primera de la columna uno: el texto la rodea por las otras. */}
                 {principal.imagen && fotoVertical && (
@@ -243,33 +252,25 @@ export default async function Portada() {
                   />
                 )}
 
-                {parrafos.slice(0, 2).map((texto, i) => (
-                  <p
-                    key={`a${i}`}
-                    className="texto-diario font-serif text-[0.95rem] leading-[1.7] text-ink"
-                  >
-                    {texto}
-                  </p>
-                ))}
-
-                {cita && (
-                  <CitaPersona
-                    texto={cita.texto}
-                    autor={cita.autor}
-                    cargo={cita.cargo}
-                    retrato={cita.retrato}
-                    className="my-6 [column-span:all]"
-                  />
+                {cuerpo.map((bloque, i) =>
+                  bloque.tipo === "cita" ? (
+                    <CitaPersona
+                      key={i}
+                      texto={bloque.texto}
+                      autor={bloque.autor}
+                      cargo={bloque.cargo}
+                      retrato={bloque.retrato}
+                      className="my-6"
+                    />
+                  ) : (
+                    <p
+                      key={i}
+                      className="texto-diario font-serif text-[0.95rem] leading-[1.7] text-ink"
+                    >
+                      {bloque.texto}
+                    </p>
+                  ),
                 )}
-
-                {parrafos.slice(2).map((texto, i) => (
-                  <p
-                    key={`b${i}`}
-                    className="texto-diario font-serif text-[0.95rem] leading-[1.7] text-ink"
-                  >
-                    {texto}
-                  </p>
-                ))}
               </div>
 
               {/*

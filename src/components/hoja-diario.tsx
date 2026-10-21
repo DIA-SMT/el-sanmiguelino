@@ -84,14 +84,10 @@ export async function HojaDiario({
             anterior={paginas[indice - 1] ?? null}
             siguiente={paginas[indice + 1] ?? null}
             numero={paginas[indice].numero}
-            hasta={paginas[indice].hasta}
             /* El total es el folio más ALTO, no cuántas filas hay: en una
                edición de notas escritas la portada es la página 1 y no está en
-               esta lista cuando se lee del archivo, y una nota puede ocupar
-               dos páginas del impreso. */
-            total={
-              paginas.at(-1)?.hasta ?? paginas.at(-1)?.numero ?? paginas.length
-            }
+               esta lista cuando se lee del archivo. */
+            total={paginas[paginas.length - 1]?.numero ?? paginas.length}
           />
         )}
       </div>

@@ -19,6 +19,7 @@ import {
 import { digitalizarPdf } from "@/lib/pdf/digitalizar-servidor";
 import { borrarEdicion } from "@/lib/repos/edicion-borrar";
 import { borrarNota } from "@/lib/repos/nota-borrar";
+import { filasDeEdicion, nuevoOrden, ubicarNota } from "@/lib/repos/nota-orden";
 import { requerirAdmin } from "@/lib/auth/dal";
 import { guardarNota } from "@/lib/repos/edicion";
 import { comentariosRepo } from "@/lib/repos/comentarios";
@@ -54,6 +55,8 @@ export interface ResultadoGuardar {
   ok: boolean;
   error?: string;
   slug?: string;
+  /** Se guardó, pero no quedó donde se pidió. */
+  sinUbicar?: boolean;
 }
 
 const TIPOS_CON_TEXTO = ["parrafo", "subtitulo", "destacado"] as const;
@@ -133,7 +136,45 @@ function validarBloque(v: unknown, i: number): BloqueNota {
       }
       return { lead: e.lead, texto: e.texto };
     });
-    return { tipo: "ficha", titulo: v.titulo, entradas };
+    /* La foto del recuadro es opcional, pero si se empezó a cargar tiene que
+       estar entera: con la misma regla que el bloque de foto (archivo, y algo
+       que diga qué se ve). Si todos sus campos están vacíos, no hay foto. */
+    let foto: Extract<BloqueNota, { tipo: "ficha" }>["foto"];
+    if (esObjeto(v.foto)) {
+      const f = v.foto;
+      const algo = [f.src, f.alt, f.epigrafe, f.credito].some(textoNoVacio);
+      if (algo) {
+        if (!textoNoVacio(f.src)) {
+          throw new Error(
+            `La foto del recuadro del bloque ${i + 1} no tiene archivo. Subí ` +
+              "una imagen o quitala.",
+          );
+        }
+        const alt = textoNoVacio(f.alt)
+          ? f.alt
+          : textoNoVacio(f.epigrafe)
+            ? f.epigrafe
+            : null;
+        if (!alt) {
+          throw new Error(
+            `La foto del recuadro del bloque ${i + 1} no dice qué se ve en ` +
+              "ella. Hace falta el epígrafe o el texto alternativo.",
+          );
+        }
+        foto = {
+          src: f.src,
+          alt,
+          ...(textoNoVacio(f.epigrafe) ? { epigrafe: f.epigrafe } : {}),
+          ...(textoNoVacio(f.credito) ? { credito: f.credito } : {}),
+        };
+      }
+    }
+    return {
+      tipo: "ficha",
+      titulo: v.titulo,
+      entradas,
+      ...(foto ? { foto } : {}),
+    };
   }
 
   if (tipo === "lista") {
@@ -252,6 +293,7 @@ export async function guardarNotaAction(
       cuerpo,
       imagen,
       edicionSlug,
+      ubicacion,
     } = borrador;
 
     if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
@@ -297,7 +339,52 @@ export async function guardarNotaAction(
         : {}),
     };
 
+    /*
+     * Dónde va en su edición, si se eligió. Se revisa ANTES de guardar, con
+     * la misma regla que después la aplica: así un lugar que no se puede (antes
+     * de la tapa, después de una nota que ya no está) se dice sin haber
+     * guardado nada a medias.
+     */
+    const despuesDe = leerUbicacion(ubicacion);
+    if (despuesDe !== undefined) {
+      if (!textoNoVacio(edicionSlug)) {
+        throw new Error("Para ubicar la nota hace falta saber de qué edición es.");
+      }
+      const filas = (await filasDeEdicion(edicionSlug)).filter(
+        (f) => f.slug !== slugOriginal,
+      );
+      // Si el slug ya lo usa otra nota, que lo diga `guardarNota` con su
+      // mensaje: la simulación de abajo lo taparía con uno de ubicación.
+      if (!filas.some((f) => f.slug === slug)) {
+        // La nota se simula al final, sin página del impreso: es donde la
+        // deja el guardado (nueva, o mudada de edición), y una página del
+        // impreso no llega acá porque el editor no la deja ubicar.
+        nuevoOrden(
+          [...filas, { slug, titulo, pdfPagina: null }],
+          slug,
+          despuesDe,
+        );
+      }
+    }
+
     const guardada = await guardarNota(limpio);
+
+    /*
+     * Si ubicarla falla —otra persona ordenaba la misma edición, o la nota de
+     * referencia se borró en el medio—, lo guardado igual queda guardado: se
+     * anota y se revalida como cualquier guardado, y recién al final se avisa
+     * que falta ubicarla. Cortar acá dejaba una nota creada sin rastro en el
+     * registro.
+     */
+    let movida = false;
+    let sinUbicar: string | null = null;
+    if (despuesDe !== undefined) {
+      try {
+        movida = (await ubicarNota(guardada.slug, despuesDe)).cambio;
+      } catch (e) {
+        sinUbicar = e instanceof Error ? e.message : "error desconocido.";
+      }
+    }
 
     const esNueva = !textoNoVacio(slugOriginal);
     await anotar(usuario, {
@@ -310,6 +397,8 @@ export async function guardarNotaAction(
           ? {}
           : { slugAnterior: slugOriginal }),
         ...(textoNoVacio(edicionSlug) ? { edicion: edicionSlug } : {}),
+        ...(movida ? { despuesDe: despuesDe ?? "(primera)" } : {}),
+        ...(sinUbicar ? { sinUbicar: true } : {}),
       },
     });
 
@@ -325,6 +414,15 @@ export async function guardarNotaAction(
     revalidatePath("/admin");
     revalidatePath("/", "layout");
 
+    if (sinUbicar) {
+      // Con el slug: el editor tiene que irse a la nota que ya existe.
+      return {
+        ok: false,
+        slug: guardada.slug,
+        sinUbicar: true,
+        error: `La nota se guardó, pero no se pudo ubicar: ${sinUbicar}`,
+      };
+    }
     return { ok: true, slug: guardada.slug };
   } catch (e) {
     // El mensaje va al editor, así que tiene que decir qué arreglar. Un
@@ -332,6 +430,56 @@ export async function guardarNotaAction(
     return {
       ok: false,
       error: e instanceof Error ? e.message : "No se pudo guardar la nota.",
+    };
+  }
+}
+
+/** Lo que llega del editor como ubicación: `undefined` = no se toca,
+ *  `null` = primera, un slug = después de esa nota. */
+function leerUbicacion(v: unknown): string | null | undefined {
+  if (v === "__primera") return null;
+  if (textoNoVacio(v) && SLUG_VALIDO.test(v)) return v;
+  if (v === undefined || v === null || v === "") return undefined;
+  throw new Error("La ubicación elegida no es válida.");
+}
+
+/**
+ * Mueve una nota dentro de su edición: las flechas de la lista del panel.
+ *
+ * Sólo notas escritas, y nunca antes de la tapa del impreso: la regla vive en
+ * `nuevoOrden()`, del lado del servidor.
+ */
+export async function moverNotaAction(
+  datos: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  const { usuario } = await requerirAdmin();
+  try {
+    if (!esObjeto(datos)) throw new Error("Faltan los datos de la nota.");
+    const { slug, despuesDe } = datos;
+    if (!textoNoVacio(slug) || !SLUG_VALIDO.test(slug)) {
+      throw new Error("Falta la nota.");
+    }
+    const destino = leerUbicacion(despuesDe);
+    if (destino === undefined) throw new Error("Falta a dónde moverla.");
+
+    const r = await ubicarNota(slug, destino);
+    if (r.cambio) {
+      await anotar(usuario, {
+        accion: "nota.movida",
+        objetoId: slug,
+        resumen: `Movió la nota «${r.titulo}»`,
+        detalle: { edicion: r.edicionSlug, despuesDe: destino ?? "(primera)" },
+      });
+      revalidatePath("/diario");
+      revalidatePath(`/edicion/${r.edicionSlug}`);
+      revalidatePath("/admin");
+      revalidatePath("/", "layout");
+    }
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "No se pudo mover la nota.",
     };
   }
 }
