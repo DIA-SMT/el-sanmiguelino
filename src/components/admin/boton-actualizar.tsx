@@ -110,7 +110,7 @@ export function BotonActualizar() {
    * `tono="primario"` porque es la única acción de la pantalla: va sólida y no
    * en contorno, que en un banner con un solo botón se lee como
    * "deshabilitado". El par `bg-accent` + `text-accent-contrast` ya está medido
-   * (5.66:1 en claro, 8.31:1 en oscuro) y vive en la pieza, junto con el hover
+   * (5.51:1 en claro, 8.31:1 en oscuro) y vive en la pieza, junto con el hover
    * a `accent-strong`, que en cada tema se mueve para el lado que conserva ese
    * contraste contra el mismo texto.
    *

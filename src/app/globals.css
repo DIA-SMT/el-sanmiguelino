@@ -23,7 +23,7 @@
   color-scheme: light;
 
   /* --- marca (fija, no cambia con el tema: es el logo) ------------------- */
-  --azul: #0a5ce8;
+  --azul: #075cf1;
   --azul-fuerte: #0847c4;
   --celeste: #22a7f5;
   --amarillo: #f5ce00;
@@ -54,11 +54,11 @@
   --hairline: #e6e0d2;
 
   /* --- acento activo: azul en claro, celeste en oscuro ------------------- */
-  --accent: #0a5ce8;
+  --accent: #075cf1;
   --accent-strong: #0847c4;
   --accent-contrast: #ffffff;
   /* lavado de acento para fondos y estados */
-  --accent-wash: rgb(10 92 232 / 0.08);
+  --accent-wash: rgb(7 92 241 / 0.08);
 
   /* --- gráficos del tablero: un color por resultado de Migue ------------
      Son cuatro y siempre los mismos: si el naranja quiere decir "sin
@@ -84,7 +84,7 @@
      eso es aceptable únicamente porque la leyenda lleva etiqueta y número
      escritos al lado del color, así que la identidad nunca depende del color
      solo. Si alguna vez se saca esa leyenda, hay que oscurecer el celeste. */
-  --grafico-nota: #0a5ce8;
+  --grafico-nota: #075cf1;
   --grafico-indice: #22a7f5;
   --grafico-diario: #b8860b;
   --grafico-alerta: #c2410c;
@@ -107,7 +107,7 @@
      municipal y ya cambia con el tema.
 
      **Los dos azules del panel, y cuál manda.** En claro `--accent` y
-     `--grafico-nota` son los dos #0a5ce8, y en oscuro se separan: el acento se
+     `--grafico-nota` son los dos #075cf1, y en oscuro se separan: el acento se
      va a #38b6ff y el gráfico se queda en #2570cc. Eso hizo que el filete del
      banner y el filete de la KPI azul se leyeran como la misma cosa hasta que
      alguien tocaba el toggle. No son la misma cosa:
@@ -136,7 +136,7 @@
      (4.59:1), que es la superficie más exigente donde aparece. Sobre la
      tarjeta blanca da 4.97:1. */
   --panel-tinta-3: #667085;
-  --panel-wash: rgb(10 92 232 / 0.08);
+  --panel-wash: rgb(7 92 241 / 0.08);
   /* El filete de un CAMPO no es el filete de una tarjeta, aunque los dos sean
      una línea de 1px.
 
@@ -154,6 +154,21 @@
      Es de la misma familia fría que el resto de los grises del panel: es
      `--panel-tinta-3` un escalón más claro, no un gris nuevo. */
   --panel-borde-campo: #828c9e;
+  /* --- el toque editorial (kit visual, 2026-10-23) ----------------------
+     Los dos colores que el kit suma al panel, y los dos son DECORACIÓN: no hay
+     texto encima de ninguno que dependa de ellos para leerse.
+
+     `--panel-papel` es el marfil del kit (#F6F2E9). Entra sólo como el
+     arranque del degradé del banner y el fondo de las ilustraciones de estado
+     vacío —nunca detrás de una tabla ni de un formulario—: es lo que emparenta
+     la cabecera del panel con el papel del diario sin que el panel pase a
+     parecer publicado.
+
+     `--panel-oro` es el amarillo de acento (#F5C542), y el kit pide usarlo con
+     discreción: es el sol de las ilustraciones y nada más. Como relleno de algo
+     que lleva texto no sirve —el blanco encima no llega a 2:1—. */
+  --panel-papel: #f6f2e9;
+  --panel-oro: #f5c542;
   /* --- las esquinas -----------------------------------------------------
      Tres escalones y un solo paso entre ellos. Los radios NO se repiten en los
      bloques oscuros: una esquina no cambia con la luz.
@@ -329,6 +344,12 @@
      sobre el fondo de la página (#0d1117). Mismo criterio y misma familia fría
      que en claro; lo único que se invierte es de qué lado del gris está. */
   --panel-borde-campo: #657082;
+  /* El marfil no tiene sentido en nocturno —un rectángulo crema sobre el
+     panel oscuro es justo el destello que el tema evita—, así que pasa a un
+     gris apenas más tibio que la tarjeta. El oro baja un punto para no
+     encandilar desde el rincón del banner. */
+  --panel-papel: #1d2029;
+  --panel-oro: #d9ad37;
   --panel-sombra:
     0 1px 2px rgb(0 0 0 / 0.4), 0 6px 16px -6px rgb(0 0 0 / 0.55);
 
@@ -380,6 +401,8 @@
     --panel-tinta-3: #8590a3;
     --panel-wash: rgb(56 182 255 / 0.14);
     --panel-borde-campo: #657082;
+    --panel-papel: #1d2029;
+    --panel-oro: #d9ad37;
     --panel-sombra:
       0 1px 2px rgb(0 0 0 / 0.4), 0 6px 16px -6px rgb(0 0 0 / 0.55);
 

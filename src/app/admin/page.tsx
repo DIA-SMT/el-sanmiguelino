@@ -7,15 +7,18 @@ import {
   Pencil,
   Plus,
 } from "lucide-react";
+import { ActividadReciente } from "@/components/admin/actividad-reciente";
 import {
   Aviso,
   BannerPanel,
+  EstadoVacio,
   Pildora,
   SeccionPanel,
   TarjetaDato,
   clasesDeBoton,
 } from "@/components/admin/piezas";
 import { requerirAdmin } from "@/lib/auth/dal";
+import { listarRegistro } from "@/lib/repos/auditoria";
 import { getIndice, getResumenEdicion, repoEscribe } from "@/lib/repos/edicion";
 import { MoverNota } from "@/components/admin/mover-nota";
 
@@ -41,9 +44,13 @@ export const metadata = { title: "Notas" };
 export default async function AdminNotas() {
   await requerirAdmin();
   const puedeEditar = repoEscribe();
-  const [edicion, indice] = await Promise.all([
+  const [edicion, indice, registro] = await Promise.all([
     getResumenEdicion(),
     getIndice(),
+    // Cinco renglones: es un vistazo, no el registro. Si la base no contesta
+    // la pantalla de notas no se cae por esto —se trabaja igual sin saber qué
+    // hicieron los demás—, y la tarjeta queda vacía.
+    listarRegistro(5).catch(() => []),
   ]);
 
   const minutos = indice.reduce((total, n) => total + n.minutosLectura, 0);
@@ -123,152 +130,160 @@ export default async function AdminNotas() {
           </Aviso>
         )}
 
-        <SeccionPanel
-          id="paginas-de-la-edicion"
-          titulo="Páginas de la edición"
-          bajada={
-            puedeEditar
-              ? "En el orden en que las encuentra el lector. Las notas escritas se mueven con las flechas; las páginas del PDF van en el orden del papel."
-              : "En el orden en que las encuentra el lector."
-          }
-        >
-          {/* Una edición recién creada no tiene notas todavía, y es un estado
-              normal —se crea el número y se le van cargando—. Con la lista
-              vacía la tarjeta quedaba con título y nada abajo, que se lee como
-              que algo falló. */}
-          {indice.length === 0 && (
-            <p className="rounded-panel-2 bg-panel-tarjeta-2 px-4 py-6 text-center text-panel-base text-panel-tinta-2">
-              Esta edición todavía no tiene notas.
-              {puedeEditar ? " La primera que cargues va a la tapa." : null}
-            </p>
-          )}
+        {/* La lista manda y la actividad acompaña: desde `xl` van lado a lado
+            con la columna angosta a la derecha, y abajo de eso la actividad
+            pasa DESPUÉS de la lista, para que el trabajo no quede empujado
+            hacia abajo por un vistazo. */}
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
+          <SeccionPanel
+            id="paginas-de-la-edicion"
+            titulo="Páginas de la edición"
+            bajada={
+              puedeEditar
+                ? "En el orden en que las encuentra el lector. Las notas escritas se mueven con las flechas; las páginas del PDF van en el orden del papel."
+                : "En el orden en que las encuentra el lector."
+            }
+          >
+            {/* Una edición recién creada no tiene notas todavía, y es un estado
+                normal —se crea el número y se le van cargando—. Con la lista
+                vacía la tarjeta quedaba con título y nada abajo, que se lee como
+                que algo falló. */}
+            {indice.length === 0 && (
+              <EstadoVacio ilustracion="periodico">
+                Esta edición todavía no tiene notas.
+                {puedeEditar ? " La primera que cargues va a la tapa." : null}
+              </EstadoVacio>
+            )}
 
-          {/* Las notas van como filas hundidas dentro de la tarjeta, no como
-              tarjetas sueltas: son una lista ordenada de once títulos, y once
-              tarjetas blancas flotando una debajo de la otra pesan más que la
-              lista que representan. Para eso está `--panel-tarjeta-2`. */}
-          <ul className="grid gap-2">
-            {indice.map((nota, i) => {
-              const digitalizada = indice[0]?.pdfPagina === 1;
-              // En un facsímil sin digitalizar la tapa es la página 1 del PDF,
-              // que se dibuja en /diario y no es una fila: la primera nota no
-              // va en la tapa.
-              const enTapa = i === 0 && !(edicion.pdf && !digitalizada);
-              /*
-               * A dónde va cada flecha: detrás de qué nota. Sólo las notas
-               * escritas se mueven, y en un número digitalizado nada sube por
-               * encima de la tapa del impreso. La regla que manda es la del
-               * servidor (`nuevoOrden()`); esto sólo apaga lo que ya se sabe
-               * que no se puede.
-               */
-              const movible = puedeEditar && nota.pdfPagina === undefined;
-              const subirA =
-                i === 0
-                  ? null
-                  : i === 1
-                    ? digitalizada
-                      ? null
-                      : "__primera"
-                    : indice[i - 2].slug;
-              const bajarA =
-                i === indice.length - 1 ? null : indice[i + 1].slug;
-              return (
-                <li
-                  key={nota.slug}
-                  className="relative flex flex-wrap items-center gap-x-4 gap-y-2 overflow-hidden rounded-panel-2 bg-panel-tarjeta-2 py-3 pr-3.5 pl-6"
-                >
-                  {/* El filete sólo se pinta en la de tapa; en las demás queda
-                      del color del borde, para que todas alineen igual y la
-                      única que salta sea la que efectivamente es distinta. */}
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-y-0 left-0 w-1"
-                    style={{
-                      background: enTapa
-                        ? "var(--grafico-nota)"
-                        : "var(--panel-borde)",
-                    }}
-                  />
-                  {/* La marca de tapa NO es una `Pildora`: no lleva caja ni
-                      fondo porque es la primera columna de una lista, y las
-                      demás filas dejan el mismo lugar vacío para alinear. Una
-                      píldora acá desalinearía las once filas para decir lo
-                      mismo. La píldora está tres líneas más abajo, donde sí
-                      hay un estado. */}
-                  {enTapa ? (
-                    <span className="inline-flex w-14 shrink-0 items-center gap-1.5 text-panel-xs font-semibold text-panel-tinta">
-                      <span
-                        aria-hidden="true"
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ background: "var(--grafico-nota)" }}
-                      />
-                      Tapa
-                    </span>
-                  ) : (
-                    /* Sin número de página: lo pidió la redacción
-                       (2026-10-21). En el diario digital el número es la
-                       posición, y la posición ya es la fila. */
-                    <span className="w-14 shrink-0" aria-hidden="true" />
-                  )}
-                  <span className="min-w-0 flex-1 basis-56">
-                    <Link
-                      href={
-                        puedeEditar
-                          ? `/admin/nota/${nota.slug}`
-                          : `/nota/${nota.slug}`
-                      }
-                      className="text-panel-lg font-semibold text-panel-tinta transition-colors hover:text-accent"
-                    >
-                      {nota.titulo}
-                    </Link>
-                    <span className="mt-1 block text-panel-xs text-panel-tinta-3">
-                      {nota.seccion} · {nota.minutosLectura} min ·{" "}
-                      {/* El slug va en mono pero en el MISMO paso que el resto
-                          de la línea: bajarlo medio punto —estaba en 0.68rem—
-                          no lo distingue, la tipografía ya lo hace, y le suma
-                          un tamaño más a la escala. */}
-                      <code className="font-mono">{nota.slug}</code>
-                    </span>
-                  </span>
-                  {movible && (
-                    <MoverNota
-                      slug={nota.slug}
-                      titulo={nota.titulo}
-                      subirA={subirA}
-                      bajarA={bajarA}
+            {/* Las notas van como filas hundidas dentro de la tarjeta, no como
+                tarjetas sueltas: son una lista ordenada de once títulos, y once
+                tarjetas blancas flotando una debajo de la otra pesan más que la
+                lista que representan. Para eso está `--panel-tarjeta-2`. */}
+            <ul className="grid gap-2">
+              {indice.map((nota, i) => {
+                const digitalizada = indice[0]?.pdfPagina === 1;
+                // En un facsímil sin digitalizar la tapa es la página 1 del PDF,
+                // que se dibuja en /diario y no es una fila: la primera nota no
+                // va en la tapa.
+                const enTapa = i === 0 && !(edicion.pdf && !digitalizada);
+                /*
+                 * A dónde va cada flecha: detrás de qué nota. Sólo las notas
+                 * escritas se mueven, y en un número digitalizado nada sube por
+                 * encima de la tapa del impreso. La regla que manda es la del
+                 * servidor (`nuevoOrden()`); esto sólo apaga lo que ya se sabe
+                 * que no se puede.
+                 */
+                const movible = puedeEditar && nota.pdfPagina === undefined;
+                const subirA =
+                  i === 0
+                    ? null
+                    : i === 1
+                      ? digitalizada
+                        ? null
+                        : "__primera"
+                      : indice[i - 2].slug;
+                const bajarA =
+                  i === indice.length - 1 ? null : indice[i + 1].slug;
+                return (
+                  <li
+                    key={nota.slug}
+                    className="relative flex flex-wrap items-center gap-x-4 gap-y-2 overflow-hidden rounded-panel-2 bg-panel-tarjeta-2 py-3 pr-3.5 pl-6"
+                  >
+                    {/* El filete sólo se pinta en la de tapa; en las demás queda
+                        del color del borde, para que todas alineen igual y la
+                        única que salta sea la que efectivamente es distinta. */}
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 w-1"
+                      style={{
+                        background: enTapa
+                          ? "var(--grafico-nota)"
+                          : "var(--panel-borde)",
+                      }}
                     />
-                  )}
-                  {puedeEditar ? (
-                    /* La fila es `--panel-tarjeta-2`, así que el botón apoya
-                       sobre superficie hundida y `sobre="hundida"` le pone el
-                       relleno contrario. `shrink-0` se concatena y no se pasa
-                       por `cn()`: `cn()` es tailwind-merge sin configurar y se
-                       lleva puesto el `text-panel-sm` de la pieza (ver la nota
-                       de los botones en `piezas.tsx`). */
-                    <Link
-                      href={`/admin/nota/${nota.slug}`}
-                      className={`${clasesDeBoton({
-                        tamano: "chico",
-                        sobre: "hundida",
-                      })} shrink-0`}
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                      Editar
-                    </Link>
-                  ) : (
-                    /* La fila es `--panel-tarjeta-2`, así que la píldora apoya
-                       sobre superficie hundida y `sobre="hundida"` le pone el
-                       fondo contrario. Antes esto era la tercera copia de la
-                       píldora escrita a mano en el panel. */
-                    <Pildora tono="var(--grafico-nota)" sobre="hundida">
-                      Publicada
-                    </Pildora>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </SeccionPanel>
+                    {/* La marca de tapa NO es una `Pildora`: no lleva caja ni
+                        fondo porque es la primera columna de una lista, y las
+                        demás filas dejan el mismo lugar vacío para alinear. Una
+                        píldora acá desalinearía las once filas para decir lo
+                        mismo. La píldora está tres líneas más abajo, donde sí
+                        hay un estado. */}
+                    {enTapa ? (
+                      <span className="inline-flex w-14 shrink-0 items-center gap-1.5 text-panel-xs font-semibold text-panel-tinta">
+                        <span
+                          aria-hidden="true"
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: "var(--grafico-nota)" }}
+                        />
+                        Tapa
+                      </span>
+                    ) : (
+                      /* Sin número de página: lo pidió la redacción
+                         (2026-10-21). En el diario digital el número es la
+                         posición, y la posición ya es la fila. */
+                      <span className="w-14 shrink-0" aria-hidden="true" />
+                    )}
+                    <span className="min-w-0 flex-1 basis-56">
+                      <Link
+                        href={
+                          puedeEditar
+                            ? `/admin/nota/${nota.slug}`
+                            : `/nota/${nota.slug}`
+                        }
+                        className="text-panel-lg font-semibold text-panel-tinta transition-colors hover:text-accent"
+                      >
+                        {nota.titulo}
+                      </Link>
+                      <span className="mt-1 block text-panel-xs text-panel-tinta-3">
+                        {nota.seccion} · {nota.minutosLectura} min ·{" "}
+                        {/* El slug va en mono pero en el MISMO paso que el resto
+                            de la línea: bajarlo medio punto —estaba en 0.68rem—
+                            no lo distingue, la tipografía ya lo hace, y le suma
+                            un tamaño más a la escala. */}
+                        <code className="font-mono">{nota.slug}</code>
+                      </span>
+                    </span>
+                    {movible && (
+                      <MoverNota
+                        slug={nota.slug}
+                        titulo={nota.titulo}
+                        subirA={subirA}
+                        bajarA={bajarA}
+                      />
+                    )}
+                    {puedeEditar ? (
+                      /* La fila es `--panel-tarjeta-2`, así que el botón apoya
+                         sobre superficie hundida y `sobre="hundida"` le pone el
+                         relleno contrario. `shrink-0` se concatena y no se pasa
+                         por `cn()`: `cn()` es tailwind-merge sin configurar y se
+                         lleva puesto el `text-panel-sm` de la pieza (ver la nota
+                         de los botones en `piezas.tsx`). */
+                      <Link
+                        href={`/admin/nota/${nota.slug}`}
+                        className={`${clasesDeBoton({
+                          tamano: "chico",
+                          sobre: "hundida",
+                        })} shrink-0`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        Editar
+                      </Link>
+                    ) : (
+                      /* La fila es `--panel-tarjeta-2`, así que la píldora apoya
+                         sobre superficie hundida y `sobre="hundida"` le pone el
+                         fondo contrario. Antes esto era la tercera copia de la
+                         píldora escrita a mano en el panel. */
+                      <Pildora tono="var(--grafico-nota)" sobre="hundida">
+                        Publicada
+                      </Pildora>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </SeccionPanel>
+
+          <ActividadReciente registro={registro} />
+        </div>
       </div>
     </>
   );

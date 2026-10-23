@@ -8,7 +8,7 @@ import {
   cambiarRolAction,
 } from "@/app/admin/acciones";
 import { Aviso, Pildora, clasesDeBoton } from "@/components/admin/piezas";
-import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
+import { iniciales, nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import type { UsuarioDelPanel } from "@/lib/repos/usuarios";
 import { cn, tiempoRelativo } from "@/lib/utils";
 
@@ -82,14 +82,29 @@ export function FilaUsuario({
       )}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {/* El monograma, con la misma regla que el chip de sesión. Es
+            decoración: el nombre está al lado, así que va `aria-hidden`. El
+            fondo es la tinta y no un color por persona: un color inventado
+            por nombre no dice nada, y en una lista de cien se vuelve ruido. */}
+        <span
+          aria-hidden="true"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-panel-tinta text-panel-xs font-bold tracking-wider text-panel-tarjeta"
+        >
+          {iniciales(nombreDeDiario(usuario.nombre))}
+        </span>
         <span className="text-panel-base font-semibold text-panel-tinta">
           {nombreDeDiario(usuario.nombre)}
         </span>
 
-        {esAdmin && (
+        {/* El rol se dice siempre, también el de lectura: con la píldora sólo
+            en quien administra, la ausencia era la única forma de decir
+            "lectora", y una ausencia no se lee de un vistazo. */}
+        {esAdmin ? (
           <Pildora tono="var(--grafico-acento)" sobre={superficie} enfasis>
             Administra
           </Pildora>
+        ) : (
+          <Pildora sobre={superficie}>Lectora</Pildora>
         )}
         {usuario.bloqueado && (
           <Pildora tono="var(--grafico-alerta)" sobre={superficie} enfasis>

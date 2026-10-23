@@ -3,6 +3,7 @@ import { FilaComentario } from "@/components/admin/fila-comentario";
 import {
   BannerPanel,
   ChipFiltro,
+  EstadoVacio,
   TarjetaDato,
   TarjetaPanel,
 } from "@/components/admin/piezas";
@@ -161,21 +162,15 @@ export default async function AdminComentarios({
         </nav>
 
         {comentarios.length === 0 ? (
-          <TarjetaPanel className="flex flex-col items-center gap-3 py-12 text-center">
-            <MessageSquare
-              className="h-6 w-6 text-panel-tinta-3"
-              aria-hidden="true"
-            />
-            <p className="text-panel-base text-panel-tinta-2">
-              {filtro === "oculto"
-                ? "No hay comentarios dados de baja."
-                : filtro === "en_revision"
-                  ? "No hay nada en revisión."
-                  : filtro === "publicado"
-                    ? "No hay comentarios publicados."
-                    : "Todavía no hay comentarios en esta edición."}
-            </p>
-          </TarjetaPanel>
+          <EstadoVacio ilustracion="comentarios" sobre="pagina">
+            {filtro === "oculto"
+              ? "No hay comentarios dados de baja."
+              : filtro === "en_revision"
+                ? "No hay nada en revisión."
+                : filtro === "publicado"
+                  ? "No hay comentarios publicados."
+                  : "Todavía no hay comentarios en esta edición."}
+          </EstadoVacio>
         ) : (
           /* `p-0` y `overflow-hidden`: las filas llegan al borde de la tarjeta
              —una fila moderada se pinta entera— y el redondeo las recorta en vez

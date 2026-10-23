@@ -50,7 +50,7 @@
  * papel crema (#fcfaf4) y ahora la tarjeta es blanca (#ffffff); en oscuro se
  * validó sobre #141922 y ahora la tarjeta es #161b24.
  *
- *   claro  (#0a5ce8 #22a7f5 #b8860b #c2410c) sobre #ffffff → todo PASA.
+ *   claro  (#075cf1 #22a7f5 #b8860b #c2410c) sobre #ffffff → todo PASA.
  *          Banda de luminosidad, piso de croma, separación daltónica (el peor
  *          par adyacente, naranja↔oro, ΔE 9,4 en deuteranopía) y piso de visión
  *          normal (ΔE 15,5). Único aviso: el celeste del "índice" da 2,65:1

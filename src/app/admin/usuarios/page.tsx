@@ -6,6 +6,7 @@ import { ListaUsuarios } from "@/components/admin/lista-usuarios";
 import {
   Aviso,
   BannerPanel,
+  EstadoVacio,
   SeccionPanel,
   TarjetaDato,
 } from "@/components/admin/piezas";
@@ -126,10 +127,10 @@ export default async function AdminUsuarios() {
           bajada="Ordenada por fecha de registro, de la última en sumarse a la primera. Bloquear corta la participación y el panel en el pedido siguiente, y no deja abrir una sesión nueva; quien ya tenga una abierta puede seguir leyendo el diario hasta que se le venza."
         >
           {usuarios.length === 0 ? (
-            <p className="text-panel-base text-panel-tinta-2">
+            <EstadoVacio ilustracion="usuarios">
               Todavía no ingresó nadie. La lista se llena sola: cada ingreso por
               Cidituc deja su fila.
-            </p>
+            </EstadoVacio>
           ) : (
             <ListaUsuarios usuarios={usuarios} yo={sesion.usuario.id} />
           )}

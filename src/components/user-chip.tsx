@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOut } from "lucide-react";
-import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
+import { iniciales as inicialesDe, nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import { olvidarBorradores } from "@/lib/borradores";
 import { olvidarPaginasGuardadas } from "@/lib/pwa";
 import { salida } from "@/lib/salida";
@@ -12,6 +12,7 @@ export function UserChip({
   nombre: nombreCrudo,
   soloMonograma = false,
   salirA,
+  rol,
 }: {
   /** Sólo el nombre, no el usuario entero: este componente es de cliente y lo
    *  que recibe viaja dentro del HTML. */
@@ -31,6 +32,9 @@ export function UserChip({
    *  monta: la cabecera lo pasa durante la vista previa de una edición, que sin
    *  sesión es un 404. */
   salirA?: string;
+  /** Una segunda línea chica bajo el nombre —"Administración" en la barra del
+   *  panel—. Sólo la pasa quien sabe que es verdad: el chip no averigua roles. */
+  rol?: string;
 }) {
   const router = useRouter();
   const ruta = usePathname();
@@ -68,14 +72,7 @@ export function UserChip({
     }
   }
 
-  // Primera palabra y ÚLTIMA, no las dos primeras: con "Alfredo Agustin Brito"
-  // las dos primeras dan "AA" —dos veces el nombre de pila y nunca el apellido—.
-  const palabras = nombre.split(" ").filter(Boolean);
-  const iniciales = (
-    palabras.length > 1
-      ? palabras[0][0] + palabras[palabras.length - 1][0]
-      : (palabras[0]?.[0] ?? "")
-  ).toLocaleUpperCase("es");
+  const iniciales = inicialesDe(nombre);
 
   return (
     /* `flex-wrap` con `max-w-full` y no una fila fija: los dos controles suman
@@ -101,10 +98,18 @@ export function UserChip({
           className={
             soloMonograma
               ? "sr-only"
-              : "sr-only font-sans text-[0.7rem] font-medium text-ink sm:not-sr-only sm:max-w-[9rem] sm:truncate"
+              : "sr-only font-sans text-[0.7rem] font-medium text-ink sm:not-sr-only sm:max-w-[9rem] sm:truncate sm:leading-tight"
           }
         >
           {nombre}
+          {rol ? (
+            <span className="block text-[0.62rem] font-normal text-ink-2">
+              {/* La coma es para el lector de pantalla, que si no lee
+                  "Alfredo BritoAdministración" de corrido. */}
+              <span className="sr-only">, </span>
+              {rol}
+            </span>
+          ) : null}
         </span>
       </span>
       <button

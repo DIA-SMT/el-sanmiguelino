@@ -15,7 +15,8 @@ import {
   PanelLeftOpen,
   Users,
 } from "lucide-react";
-import { HojaSanmiguelino } from "@/components/brand/logos";
+import { HojaSanmiguelino, LogoSanmiguelino } from "@/components/brand/logos";
+import { SiluetaCiudad } from "@/components/admin/ilustraciones-panel";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserChip } from "@/components/user-chip";
 import type { Usuario } from "@/lib/types";
@@ -204,13 +205,23 @@ function ListaSecciones({
                  globito para el mouse. */
               title={plegada ? texto : undefined}
               className={cn(
-                "inline-flex min-h-9 w-full items-center gap-2.5 rounded-panel-2 px-3 py-2 whitespace-nowrap transition-colors",
+                "relative inline-flex min-h-9 w-full items-center gap-2.5 rounded-panel-2 px-3 py-2 whitespace-nowrap transition-colors",
                 plegada && "lg:w-auto lg:justify-center lg:px-2.5",
                 esActiva
                   ? "bg-panel-wash font-semibold text-accent"
                   : "font-medium text-panel-tinta-2 hover:bg-panel-tarjeta-2 hover:text-panel-tinta",
               )}
             >
+              {/* El indicador del kit: una barra de acento al costado del
+                  activo en la columna, y abajo en la tira del teléfono, que es
+                  donde se lee una pestaña. Es refuerzo del fondo y la negrita,
+                  no la única marca: por eso va `aria-hidden`. */}
+              {esActiva ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-accent lg:inset-x-auto lg:top-1.5 lg:bottom-1.5 lg:left-0 lg:h-auto lg:w-[3px]"
+                />
+              ) : null}
               <Icono className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span className={plegada ? "lg:sr-only" : undefined}>{texto}</span>
             </Link>
@@ -278,31 +289,34 @@ export function BarraLateralPanel({ usuario }: { usuario: Usuario }) {
           plegada ? "lg:flex-col lg:gap-2 lg:px-2" : "lg:px-5",
         )}
       >
-        {/* La marca lleva al diario.
-            El logo NO va como decorativo aunque ahora esté adentro de un
-            enlace: el texto de al lado dice "Administración" y "El
-            Sanmiguelino", pero no nombra a la Municipalidad, y plegada la
-            marca es sólo el logo. Su etiqueta se suma al nombre del enlace, y
-            el `sr-only` del final es el que dice a dónde lleva — sin eso, el
-            enlace se anunciaría como el nombre del municipio y no como una
-            puerta. */}
+        {/* La marca lleva al diario. El `sr-only` del final es el que dice a
+            dónde lleva — sin eso, el enlace se anunciaría como el nombre del
+            diario y no como una puerta. */}
         <Link
           href="/diario"
           title="Ir al diario"
           className="pressable flex min-w-0 items-center gap-2.5 rounded-panel-2 text-left hover:text-accent focus-visible:outline-offset-4"
         >
-          {/* La hoja sola y no el logotipo entero: esta barra se pliega hasta
-              el ancho de un ícono, y una pieza de 10:1 ahí no entra. */}
-          <HojaSanmiguelino decorativo className="h-8 shrink-0" />
+          {/* Desplegada va el logotipo entero, que es lo que pide el kit
+              visual: la marca real del diario, la del archivo de imprenta, y
+              no la versión redibujada del boceto. Plegada vuelve la hoja sola,
+              porque en 80px una pieza de 10:1 no entra.
+
+              Los dos son decorativos y el nombre lo pone el `sr-only` del
+              final, que no depende de cuál de los dos se esté viendo: antes,
+              plegada, el texto visible quedaba en `display: none` y el enlace
+              se anunciaba sólo como "Ir al diario". */}
+          <HojaSanmiguelino
+            decorativo
+            className={cn("h-8 shrink-0", plegada ? "hidden lg:block" : "hidden")}
+          />
           <span className={cn("min-w-0", plegada && "lg:hidden")}>
-            <span className="block text-panel-base font-semibold text-panel-tinta">
+            <LogoSanmiguelino decorativo className="block w-[9.5rem]" />
+            <span className="mt-1.5 block text-panel-xs font-bold tracking-[0.15em] text-accent uppercase">
               Administración
             </span>
-            <span className="block truncate text-panel-sm text-panel-tinta-3">
-              El Sanmiguelino
-            </span>
           </span>
-          <span className="sr-only">Ir al diario</span>
+          <span className="sr-only">El Sanmiguelino. Ir al diario</span>
         </Link>
 
         {/* Plegar y desplegar. Sólo en pantalla ancha, que es donde la barra es
@@ -345,13 +359,27 @@ export function BarraLateralPanel({ usuario }: { usuario: Usuario }) {
         </Suspense>
       </nav>
 
+      {/* La silueta de ciudad del pie de la barra: sólo en la columna
+          desplegada, que es donde sobra alto. Plegada no entra en 80px y en la
+          tira del teléfono no hay hueco que llenar.
+
+          El `mt-auto` que empuja el pie hacia abajo lo lleva ella cuando se ve,
+          y el pie cuando no: con los dos a la vez el espacio libre se reparte
+          entre ambos y la silueta quedaba flotando a mitad de la barra. */}
+      <SiluetaCiudad
+        className={cn(
+          "hidden h-16 w-full shrink-0 px-4 lg:order-3 lg:mt-auto",
+          !plegada && "lg:block",
+        )}
+      />
+
       {/* El estilo del pie sale de PIEL_DEL_PIE, arriba: ahí está por qué se
           redeclaran los tokens del diario acá adentro y cuándo se borra. */}
       <div
         style={PIEL_DEL_PIE}
         className={cn(
-          "flex shrink-0 flex-wrap items-center gap-panel-controles px-4 py-3 lg:order-4 lg:mt-auto lg:border-t lg:border-panel-borde lg:py-4",
-          plegada ? "lg:flex-col lg:px-2" : "lg:px-4",
+          "flex shrink-0 flex-wrap items-center gap-panel-controles px-4 py-3 lg:order-4 lg:border-t lg:border-panel-borde lg:py-4",
+          plegada ? "lg:mt-auto lg:flex-col lg:px-2" : "lg:px-4",
         )}
       >
         <Link
@@ -371,7 +399,13 @@ export function BarraLateralPanel({ usuario }: { usuario: Usuario }) {
         {/* Plegada, el chip se queda con el monograma: el nombre completo no
             entra en 80px y `sm:not-sr-only` no lo puede saber, porque mira el
             ancho de la ventana y no el del hueco. */}
-        <UserChip nombre={usuario.nombre} soloMonograma={plegada} />
+        <UserChip
+          nombre={usuario.nombre}
+          soloMonograma={plegada}
+          // Es verdad siempre: esta barra sólo se dibuja después de
+          // `requerirAdmin()`.
+          rol="Administración"
+        />
       </div>
     </aside>
   );

@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
+import {
+  FotoCabecera,
+  IlustracionPanel,
+  type TemaIlustracion,
+} from "@/components/admin/ilustraciones-panel";
 import { cn } from "@/lib/utils";
 
 /**
@@ -63,7 +68,7 @@ const RELLENO = "p-4 sm:p-5";
  * filete se lea como el borde del degradé y no como un adorno pegado.
  *
  * **El filete es `--accent` y no `--grafico-nota`, y eso ahora es una regla
- * escrita.** En claro los dos son el mismo #0a5ce8, así que durante un tiempo
+ * escrita.** En claro los dos son el mismo #075cf1, así que durante un tiempo
  * el filete del banner y el de la tarjeta de dato azul parecieron la misma
  * cosa; en oscuro se separan y la identidad se partía al tocar el toggle. La
  * decisión está en `globals.css`, en el bloque de los tokens del panel: el
@@ -75,33 +80,57 @@ const RELLENO = "p-4 sm:p-5";
  * teléfono y manda en un escritorio. Una escala de cinco pasos que se rompe en
  * el componente más visible del panel deja de ser una escala.
  *
- * El degradé va en `style` y no como clase arbitraria de Tailwind porque el
- * valor arranca en un token con alfa (`--panel-wash`) y termina en
- * `transparent`: escrito así se lee de una y no hay que adivinar si Tailwind
- * lo tomó como color o como imagen de fondo.
+ * El degradé va en `style` y no como clase arbitraria de Tailwind: escrito así
+ * se lee de una y no hay que adivinar si Tailwind lo tomó como color o como
+ * imagen de fondo.
+ *
+ * **Lo que sumó el kit visual (2026-10-23)**, y por qué ninguna de las tres
+ * cosas toca la regla de que el panel no se confunda con el diario:
+ *
+ * - El degradé arranca en `--panel-papel`, el marfil, en vez del lavado azul.
+ *   Es la única superficie del panel con ese tono y es la cabecera: emparenta
+ *   sin que ninguna tabla ni formulario parezca impreso.
+ * - Un antetítulo en versalitas azules arriba del `<h1>` —el "kicker" del kit—.
+ *   Por defecto dice "El Sanmiguelino", que es la firma; una pantalla puede
+ *   pasar el suyo ("Editar nota").
+ * - La panorámica de la ciudad a la derecha (`FotoCabecera`), desvanecida
+ *   hacia el título. Sólo desde `sm`: en un teléfono el banner es una columna
+ *   y la foto quedaría detrás de los botones. Por ella el banner pide 128px de
+ *   alto mínimo: con menos, la tira de foto no alcanzaba a mostrar la sierra.
+ *
+ * El contenido va en `relative` para pintarse encima de la foto, que es
+ * `absolute`: sin eso el orden de pintado lo decide el DOM y la foto taparía
+ * el título.
  */
 export function BannerPanel({
   titulo,
   bajada,
+  antetitulo = "El Sanmiguelino",
   children,
 }: {
   titulo: string;
   bajada?: React.ReactNode;
+  /** Las versalitas de arriba del título. */
+  antetitulo?: string;
   /** Las acciones de la derecha. */
   children?: React.ReactNode;
 }): React.ReactElement {
   return (
     <header
       className={cn(
-        "mb-6 flex flex-col gap-4 overflow-hidden rounded-panel border border-panel-borde border-l-4 border-l-accent bg-panel-tarjeta font-sans shadow-panel sm:flex-row sm:items-center sm:justify-between sm:gap-6",
+        "relative mb-6 flex flex-col gap-4 overflow-hidden rounded-panel border border-panel-borde border-l-4 border-l-accent bg-panel-tarjeta font-sans shadow-panel sm:min-h-32 sm:flex-row sm:items-center sm:justify-between sm:gap-6",
         RELLENO,
       )}
       style={{
         backgroundImage:
-          "linear-gradient(100deg, var(--panel-wash) 0%, transparent 62%)",
+          "linear-gradient(100deg, var(--panel-papel) 0%, var(--panel-tarjeta) 70%)",
       }}
     >
-      <div className="min-w-0">
+      <FotoCabecera className="absolute inset-y-0 right-0 hidden w-[min(68%,44rem)] sm:block" />
+      <div className="relative min-w-0">
+        <p className="mb-1 text-panel-xs font-bold tracking-[0.15em] text-accent uppercase">
+          {antetitulo}
+        </p>
         <h1 className="text-panel-xl font-bold tracking-[-0.01em] text-panel-tinta">
           {titulo}
         </h1>
@@ -112,7 +141,7 @@ export function BannerPanel({
         ) : null}
       </div>
       {children ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-panel-controles">
+        <div className="relative flex shrink-0 flex-wrap items-center gap-panel-controles">
           {children}
         </div>
       ) : null}
@@ -204,6 +233,50 @@ export function SeccionPanel({
       </div>
       {children}
     </section>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Estado vacío
+--------------------------------------------------------------------------- */
+
+/**
+ * Lo que se ve cuando una lista no tiene nada: un dibujo chico del kit y la
+ * frase que dice por qué.
+ *
+ * Venía escrito cuatro veces con tres formas —un ícono de lucide en una
+ * tarjeta, un párrafo hundido centrado, un párrafo pelado—. Ahora es una pieza
+ * con dos ejes, y los dos vienen de dónde se apoya:
+ *
+ * - `sobre="pagina"` es la tarjeta entera (la lista vacía ES la pantalla, como
+ *   en comentarios o suscripciones); `sobre="tarjeta"` es un bloque hundido
+ *   adentro de una `SeccionPanel` que ya tiene su título.
+ *
+ * **El texto es el estado; el dibujo, no.** El dibujo va `aria-hidden` y la
+ * frase tiene que poder leerse sola: "No hay nada en revisión", no "Nada por
+ * acá" con un dibujo que explique el resto.
+ */
+export function EstadoVacio({
+  ilustracion,
+  sobre = "tarjeta",
+  children,
+}: {
+  ilustracion: TemaIlustracion;
+  sobre?: "pagina" | "tarjeta";
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center gap-3 text-center font-sans",
+        sobre === "pagina"
+          ? "rounded-panel border border-panel-borde bg-panel-tarjeta px-4 py-10 shadow-panel"
+          : "rounded-panel-2 bg-panel-tarjeta-2 px-4 py-6",
+      )}
+    >
+      <IlustracionPanel tema={ilustracion} className="h-20 sm:h-24" />
+      <p className="max-w-prose text-panel-base text-panel-tinta-2">{children}</p>
+    </div>
   );
 }
 
@@ -752,7 +825,7 @@ function tonoDeBoton(
 ): string {
   switch (tono) {
     case "primario":
-      // El par ya medido: 5,66:1 en claro y 8,31:1 en oscuro. El hover se va a
+      // El par ya medido: 5,51:1 en claro y 8,31:1 en oscuro. El hover se va a
       // `accent-strong`, que en cada tema se mueve para el lado que conserva
       // ese contraste contra el MISMO texto.
       return "bg-accent text-accent-contrast hover:bg-accent-strong";

@@ -145,3 +145,21 @@ export function firmaPublica(bruto: string): string {
   const inicial = Array.from(palabras[palabras.length - 1])[0] ?? "";
   return `${palabras[0]} ${inicial.toLocaleUpperCase("es")}.`;
 }
+
+/**
+ * Las iniciales de un monograma: primera palabra y ÚLTIMA, no las dos primeras.
+ * Con "Alfredo Agustin Brito" las dos primeras dan "AA" —dos veces el nombre de
+ * pila y nunca el apellido—.
+ *
+ * Recibe el nombre ya pasado por `nombreDeDiario()`. Estaba escrito adentro de
+ * `UserChip` y salió acá cuando la lista de usuarios del panel necesitó el
+ * mismo monograma: dos copias de esta regla eran dos reglas.
+ */
+export function iniciales(nombre: string): string {
+  const palabras = nombre.split(" ").filter(Boolean);
+  return (
+    palabras.length > 1
+      ? palabras[0][0] + palabras[palabras.length - 1][0]
+      : (palabras[0]?.[0] ?? "")
+  ).toLocaleUpperCase("es");
+}

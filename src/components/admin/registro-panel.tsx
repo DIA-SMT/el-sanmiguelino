@@ -1,7 +1,16 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import {
+  CircleDot,
+  FilePlus2,
+  Gavel,
+  KeyRound,
+  PencilLine,
+  Search,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 import {
   ChipFiltro,
   PaginadoNumerado,
@@ -45,6 +54,53 @@ const OBJETOS: Record<string, { nombre: string; color: string }> = {
   nota: { nombre: "Notas", color: "var(--grafico-acento)" },
   suscripciones: { nombre: "Suscripciones", color: "var(--grafico-alerta)" },
 };
+
+/**
+ * La clase de cambio de cada acción, para el ícono de la línea de tiempo.
+ *
+ * Es otro eje que `OBJETOS`: aquél dice SOBRE QUÉ se actuó (un comentario, una
+ * edición) y éste QUÉ CLASE de cosa se hizo (dar de alta, cambiar, borrar,
+ * moderar, tocar permisos). Igual que `OBJETOS`, es sólo un rótulo para
+ * mostrar: no decide nada, y una acción que este mapa no conozca cae en "Otro"
+ * con un punto neutro, en vez de esconderse.
+ *
+ * Los borrados no se pintan con un color propio: el rojo ya lo pone `grave`,
+ * que viene resuelto del servidor, y dos fuentes para "esto es grave" se
+ * terminarían contradiciendo.
+ */
+const CLASES = {
+  alta: { nombre: "Alta", icono: FilePlus2, color: "var(--grafico-nota)" },
+  cambio: { nombre: "Cambio", icono: PencilLine, color: "var(--grafico-indice)" },
+  baja: { nombre: "Borrado", icono: Trash2, color: "var(--grafico-alerta)" },
+  moderacion: { nombre: "Administrativa", icono: Gavel, color: "var(--grafico-diario)" },
+  permisos: { nombre: "Permisos", icono: KeyRound, color: "var(--grafico-acento)" },
+  otro: { nombre: "Otro", icono: CircleDot, color: "var(--panel-tinta-3)" },
+} satisfies Record<string, { nombre: string; icono: LucideIcon; color: string }>;
+
+const CLASE_DE_ACCION: Record<string, keyof typeof CLASES> = {
+  "edicion.creada": "alta",
+  "edicion.pdf": "alta",
+  "edicion.digitalizada": "alta",
+  "nota.guardada": "cambio",
+  "nota.movida": "cambio",
+  "edicion.editada": "cambio",
+  "edicion.publicada": "cambio",
+  "comentario.borrado": "baja",
+  "nota.borrada": "baja",
+  "edicion.borrada": "baja",
+  "edicion.pdf.quitado": "baja",
+  "comentario.baja": "moderacion",
+  "comentario.revision": "moderacion",
+  "comentario.restitucion": "moderacion",
+  "suscripciones.descarga": "moderacion",
+  "usuario.rol": "permisos",
+  "usuario.bloqueo": "permisos",
+  "usuario.desbloqueo": "permisos",
+};
+
+function claseDe(accion: string) {
+  return CLASES[CLASE_DE_ACCION[accion] ?? "otro"];
+}
 
 /** Fecha completa: acá el "hace 3 h" no alcanza. Un registro de auditoría se
  *  lee para reconstruir qué pasó y cuándo, y para eso hace falta el instante,
@@ -263,66 +319,96 @@ export function RegistroPanelLista({
           )}
         </div>
       ) : (
+        /* Una línea de tiempo: un riel vertical a la izquierda y, sobre él, el
+           ícono de la clase de cambio de cada renglón. El riel es un tramo por
+           fila y no una línea única detrás de la lista, para que el paginado
+           no lo deje colgando más allá del último renglón. */
         <ul
           id={idLista}
-          className="-mx-4 divide-y divide-panel-borde border-y border-panel-borde sm:-mx-5"
+          className="-mx-4 border-y border-panel-borde sm:-mx-5"
         >
-          {enPantalla.map((r) => (
-            <li
-              key={r.id}
-              className={cn(
-                "border-l-2 px-4 py-3 sm:px-5",
-                r.grave
-                  ? "border-l-[var(--grafico-alerta)] bg-panel-tarjeta-2"
-                  : "border-l-transparent",
-              )}
-            >
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-panel-base text-panel-tinta">
-                  {r.resumen}
+          {enPantalla.map((r) => {
+            const clase = claseDe(r.accion);
+            const Icono = clase.icono;
+            return (
+              <li
+                key={r.id}
+                className={cn(
+                  "relative grid grid-cols-[2rem_minmax(0,1fr)] gap-x-3 px-4 py-3 sm:px-5",
+                  r.grave && "bg-panel-tarjeta-2",
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-y-0 left-[calc(1rem+1rem-0.5px)] w-px bg-panel-borde sm:left-[calc(1.25rem+1rem-0.5px)]"
+                />
+                {/* La clase de cambio, dicha también en palabras para el
+                    lector de pantalla: el ícono solo no alcanza. El círculo de un
+                    renglón grave lleva el filete rojo, que es lo que antes hacía
+                    el borde izquierdo de la fila. */}
+                <span
+                  className={cn(
+                    "relative mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full border",
+                    r.grave
+                      ? "border-[var(--grafico-alerta)] bg-panel-tarjeta"
+                      : "border-panel-borde bg-panel-tarjeta-2",
+                  )}
+                  style={{
+                    color: `color-mix(in srgb, ${clase.color} 72%, var(--panel-tinta))`,
+                  }}
+                >
+                  <Icono className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="sr-only">{clase.nombre}:</span>
                 </span>
-                {OBJETOS[r.objeto] && (
-                  <Pildora
-                    tono={OBJETOS[r.objeto].color}
-                    sobre={r.grave ? "hundida" : "tarjeta"}
-                  >
-                    {OBJETOS[r.objeto].nombre}
-                  </Pildora>
-                )}
-              </div>
-              <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-panel-xs text-panel-tinta-3">
-                <span className="tabular-nums">{fechaCorta(r.fecha)}</span>
-                <span aria-hidden="true">·</span>
-                <span>{tiempoRelativo(r.fecha)}</span>
-                <span aria-hidden="true">·</span>
-                {/* El nombre y el id: el nombre para leer, el id porque es lo
-                    que aparece en el rastro de un rol cambiado y en los
-                    comentarios, así que es lo que permite cruzar. */}
-                <span className="text-panel-tinta-2">{r.autorNombre}</span>
-                <span className="font-mono">{r.autorId}</span>
-                {r.objetoId && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span className="font-mono">{r.objetoId}</span>
-                  </>
-                )}
-              </p>
-              {r.detalle && Object.keys(r.detalle).length > 0 && (
-                <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-panel-xs text-panel-tinta-3">
-                  {Object.entries(r.detalle).map(([clave, valor]) => (
-                    <span key={clave}>
-                      {clave}:{" "}
-                      <span className="text-panel-tinta-2">
-                        {valor === null || valor === undefined
-                          ? "—"
-                          : String(valor)}
-                      </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="text-panel-base text-panel-tinta">
+                      {r.resumen}
                     </span>
-                  ))}
-                </p>
-              )}
-            </li>
-          ))}
+                    {OBJETOS[r.objeto] && (
+                      <Pildora
+                        tono={OBJETOS[r.objeto].color}
+                        sobre={r.grave ? "hundida" : "tarjeta"}
+                      >
+                        {OBJETOS[r.objeto].nombre}
+                      </Pildora>
+                    )}
+                  </div>
+                  <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-panel-xs text-panel-tinta-3">
+                    <span className="tabular-nums">{fechaCorta(r.fecha)}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{tiempoRelativo(r.fecha)}</span>
+                    <span aria-hidden="true">·</span>
+                    {/* El nombre y el id: el nombre para leer, el id porque es lo
+                        que aparece en el rastro de un rol cambiado y en los
+                        comentarios, así que es lo que permite cruzar. */}
+                    <span className="text-panel-tinta-2">{r.autorNombre}</span>
+                    <span className="font-mono">{r.autorId}</span>
+                    {r.objetoId && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-mono">{r.objetoId}</span>
+                      </>
+                    )}
+                  </p>
+                  {r.detalle && Object.keys(r.detalle).length > 0 && (
+                    <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-panel-xs text-panel-tinta-3">
+                      {Object.entries(r.detalle).map(([clave, valor]) => (
+                        <span key={clave}>
+                          {clave}:{" "}
+                          <span className="text-panel-tinta-2">
+                            {valor === null || valor === undefined
+                              ? "—"
+                              : String(valor)}
+                          </span>
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 

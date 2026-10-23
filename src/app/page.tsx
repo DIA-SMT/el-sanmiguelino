@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, MessageCircle, Newspaper, ThumbsUp } from "lucide-react";
 import { LogoHoja, LogoSanmiguelino } from "@/components/brand/logos";
-import { DiarioEnPerspectiva } from "@/components/landing/diario-en-perspectiva";
+import { FichaEdicion } from "@/components/landing/ficha-edicion";
+import { TapaEdicion } from "@/components/landing/tapa-edicion";
 import { VistaPrevia } from "@/components/landing/vista-previa";
 import { VitrinaSecciones } from "@/components/landing/vitrina-secciones";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -39,28 +40,60 @@ export default async function Landing() {
     getResumenEdicion(),
     getIndice(),
   ]);
-  const secciones = [...new Set(indice.map((n) => n.seccion))];
-
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <span className="flex items-center gap-3">
-            <LogoHoja className="h-9 w-9" />
+      {/* La cabecera institucional. Sólida y no translúcida con desenfoque:
+          el vidrio esmerilado es vocabulario de aplicación, y un diario tiene
+          una cabecera de papel con su filete.
+
+          Firma el municipio a la izquierda —su hoja tricolor y su nombre— y el
+          diario a la derecha de un filete vertical, con su logotipo. Son dos
+          marcas y van separadas, no fundidas (ver `brand/logos.tsx`). La
+          navegación son las tres puertas reales del sitio, nada más: la
+          edición, sus secciones (que están en esta misma página) y el
+          archivo. */}
+      <header className="sticky top-0 z-30 border-b border-line bg-paper shadow-[0_1px_0_var(--hairline)]">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
+          <span className="flex min-w-0 items-center gap-3">
+            <LogoHoja className="h-9 w-9 shrink-0" />
             <span className="font-sans text-[0.62rem] font-semibold uppercase leading-tight tracking-[0.16em] text-ink-2">
               Municipalidad de
               <br className="sm:hidden" /> San Miguel de Tucumán
             </span>
+            <span
+              aria-hidden="true"
+              className="hidden h-7 w-px bg-line md:block"
+            />
+            <LogoSanmiguelino className="hidden w-[8.5rem] shrink-0 text-ink md:block" />
           </span>
-          <span className="flex items-center gap-2.5">
+          <nav
+            aria-label="El diario"
+            className="flex items-center gap-x-5 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em]"
+          >
+            <Link
+              href="#secciones-edicion"
+              className="hidden text-ink-2 transition-colors hover:text-accent-strong lg:inline"
+            >
+              Secciones
+            </Link>
+            <Link
+              href="/archivo"
+              className="hidden text-ink-2 transition-colors hover:text-accent-strong lg:inline"
+            >
+              Números anteriores
+            </Link>
             <ThemeToggle />
             <Link
               href="/diario"
-              className="font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-accent-strong transition-colors hover:text-ink"
+              className="pressable inline-flex min-h-9 items-center whitespace-nowrap bg-accent px-3.5 text-accent-contrast hover:bg-accent-strong"
             >
-              Leer la edición
+              {/* En el teléfono dice sólo "Leer": completo se partía en dos
+                  renglones y apretaba el nombre del municipio a tres. El resto
+                  queda para el lector de pantalla, así el nombre del enlace es
+                  el mismo a cualquier ancho. */}
+              Leer<span className="sr-only sm:not-sr-only">&nbsp;la edición</span>
             </Link>
-          </span>
+          </nav>
         </div>
       </header>
 
@@ -77,7 +110,7 @@ export default async function Landing() {
           <div className="mx-auto grid w-full max-w-6xl items-center gap-8 px-4 py-10 sm:gap-14 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:py-24">
             <div className="fade-up">
               <p className="volanta text-accent-strong">
-                Diario digital · Una edición por mes
+                Diario digital · Municipalidad de San Miguel de Tucumán
               </p>
               <h1 className="mt-5">
                 <LogoSanmiguelino className="w-full max-w-[32rem] text-ink" />
@@ -105,37 +138,32 @@ export default async function Landing() {
                     aria-hidden="true"
                   />
                 </Link>
-                <p className="max-w-xs font-serif text-sm italic text-ink-2">
-                  Se lee libre. Para opinar y preguntarle a Migue,{" "}
-                  <Link href="/login" className="enlace not-italic">
-                    ingresá con Ciudadano Digital
-                  </Link>
-                  .
-                </p>
+                <Link
+                  href="/archivo"
+                  className="enlace font-sans text-[0.8rem] font-semibold"
+                >
+                  Números anteriores
+                </Link>
               </div>
-
-              {/* Las secciones de la edición en curso. En celular no van: la
-                  tira de secciones de más abajo dice exactamente lo mismo, y
-                  acá cuesta media pantalla. */}
-              <div className="mt-11 hidden border-t border-line pt-5 lg:block">
-                <p className="meta text-ink">En la edición de {edicion.mes}</p>
-                <ul className="mt-3 flex flex-wrap gap-x-2.5 gap-y-2">
-                  {secciones.map((s) => (
-                    <li
-                      key={s}
-                      className="border border-line bg-paper px-3 py-1.5 font-sans text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-2"
-                    >
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <p className="mt-6 max-w-sm font-serif text-sm italic text-ink-2">
+                Se lee libre. Para opinar y preguntarle a Migue,{" "}
+                <Link href="/login" className="enlace not-italic">
+                  ingresá con Ciudadano Digital
+                </Link>
+                .
+              </p>
+              {/* Acá iban las secciones de la edición como chips. Ahora las
+                  dice la ficha de abajo, con el resto del dato duro del
+                  número: dos veces lo mismo a cuatro centímetros era ruido. */}
             </div>
 
-            {/* El diario impreso, en ángulo y con la pila de hojas */}
-            <DiarioEnPerspectiva />
+            {/* La tapa del número: la página 1 del PDF si salió impreso, la
+                miniatura armada con sus notas si no. */}
+            <TapaEdicion edicion={edicion} />
           </div>
         </section>
+
+        <FichaEdicion edicion={edicion} indice={indice} />
 
         {/* Las secciones de la edición */}
         <VitrinaSecciones />

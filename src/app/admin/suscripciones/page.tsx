@@ -1,10 +1,10 @@
-import { CalendarDays, Download, Mailbox, UserPlus, Users } from "lucide-react";
+import { CalendarDays, Download, UserPlus, Users } from "lucide-react";
 import {
   BannerPanel,
+  EstadoVacio,
   SeccionPanel,
   TABLA,
   TarjetaDato,
-  TarjetaPanel,
   ZonaDeTabla,
   clasesDeBoton,
 } from "@/components/admin/piezas";
@@ -134,15 +134,9 @@ export default async function AdminSuscripciones() {
         </div>
 
         {suscripciones.length === 0 ? (
-          <TarjetaPanel className="flex flex-col items-center gap-3 py-12 text-center">
-            <Mailbox
-              className="h-6 w-6 text-panel-tinta-3"
-              aria-hidden="true"
-            />
-            <p className="text-panel-base text-panel-tinta-2">
-              Todavía no se anotó nadie.
-            </p>
-          </TarjetaPanel>
+          <EstadoVacio ilustracion="estadisticas" sobre="pagina">
+            Todavía no se anotó nadie.
+          </EstadoVacio>
         ) : (
           /* La tabla va adentro de una `SeccionPanel`, con su título, igual que
              la de Migue. Antes era una tarjeta pelada sin encabezado: la única
