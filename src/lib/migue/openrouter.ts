@@ -191,6 +191,45 @@ export async function preguntarAlModelo({
    *  un "decime" no se le puede contestar nada sensato. */
   historial?: Turno[];
 }): Promise<RespuestaMigue | null> {
+  const crudo = await pedirAlModelo({
+    sistema: [
+      instrucciones(diario, nombreUsuario),
+      abierta
+        ? `DÓNDE ESTÁ PARADO EL LECTOR: leyendo la nota "${abierta.titulo}" (slug ${abierta.slug}).
+Si te habla de "esta nota", "esta página", "esto que estoy leyendo" o te pide un resumen sin decir de qué, es ESA.`
+        : `DÓNDE ESTÁ PARADO EL LECTOR: en la tapa del diario.
+Si te pide un resumen de "esta página" sin decir de qué, contale de qué trata la edición y qué notas trae.`,
+      `NOTAS DE LA EDICIÓN DE ${diario.mes.toUpperCase()}:\n\n${contexto(notas)}`,
+    ],
+    historial,
+    pregunta,
+  });
+  return crudo === null ? null : interpretar(crudo);
+}
+
+/**
+ * La llamada a OpenRouter, sin nada de lo que la conversación con el vecino
+ * agrega encima: recibe los mensajes de sistema ya escritos y devuelve el
+ * texto crudo del modelo, o `null` si no se pudo —sin clave, error de red,
+ * respuesta rara—.
+ *
+ * Existe aparte desde que hay dos Migues: el del diario (`preguntarAlModelo`,
+ * arriba) y el que ayuda a la redacción en el panel (`lib/migue/panel.ts`).
+ * Los dos hablan con el mismo modelo, con la misma clave, el mismo techo de
+ * tokens y el mismo tiempo límite, y eso se escribe una vez: dos copias del
+ * `fetch` eran dos lugares donde cambiar el modelo y olvidarse de uno.
+ *
+ * Nunca tira: un Migue que contesta peor es mejor que uno que no contesta.
+ */
+export async function pedirAlModelo({
+  sistema,
+  historial = [],
+  pregunta,
+}: {
+  sistema: string[];
+  historial?: Turno[];
+  pregunta: string;
+}): Promise<string | null> {
   const clave = process.env.OPENROUTER_API_KEY;
   if (!clave) return null;
 
@@ -214,22 +253,10 @@ export async function preguntarAlModelo({
         model: modeloDeMigue(),
         max_tokens: MAXIMO_TOKENS,
         // Bajo a propósito: no se le pide creatividad, se le pide que no se
-        // aparte de las notas.
+        // aparte de lo que se le pasa.
         temperature: 0.2,
         messages: [
-          { role: "system", content: instrucciones(diario, nombreUsuario) },
-        {
-          role: "system",
-          content: abierta
-            ? `DÓNDE ESTÁ PARADO EL LECTOR: leyendo la nota "${abierta.titulo}" (slug ${abierta.slug}).
-Si te habla de "esta nota", "esta página", "esto que estoy leyendo" o te pide un resumen sin decir de qué, es ESA.`
-            : `DÓNDE ESTÁ PARADO EL LECTOR: en la tapa del diario.
-Si te pide un resumen de "esta página" sin decir de qué, contale de qué trata la edición y qué notas trae.`,
-        },
-          {
-            role: "system",
-            content: `NOTAS DE LA EDICIÓN DE ${diario.mes.toUpperCase()}:\n\n${contexto(notas)}`,
-          },
+          ...sistema.map((content) => ({ role: "system" as const, content })),
           ...historial.slice(-TURNOS_DE_MEMORIA).map((t) => ({
             role:
               t.rol === "usuario" ? ("user" as const) : ("assistant" as const),
@@ -255,7 +282,7 @@ Si te pide un resumen de "esta página" sin decir de qué, contale de qué trata
     const crudo: unknown = datos?.choices?.[0]?.message?.content;
     if (typeof crudo !== "string" || !crudo.trim()) return null;
 
-    return interpretar(crudo);
+    return crudo;
   } catch (e) {
     // Se traga el error y el llamador usa el buscador naive: que Migue
     // conteste peor es mejor que Migue no conteste.

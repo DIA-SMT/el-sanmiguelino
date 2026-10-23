@@ -1,4 +1,6 @@
+import { MiguePanel } from "@/components/admin/migue-panel";
 import { BarraLateralPanel } from "@/components/admin/navegacion-panel";
+import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import { requerirAdmin } from "@/lib/auth/dal";
 
 /**
@@ -91,6 +93,12 @@ export default async function AdminLayout({
       >
         <div className="mx-auto w-full max-w-6xl">{children}</div>
       </main>
+
+      {/* Migue, con las dudas de la pantalla en la que estás. Va en el layout
+          para que la charla sobreviva al cambio de sección; las preguntas
+          cambian solas porque el chat lee la ruta del cliente. Sólo recibe el
+          nombre: lo que viaja a un componente de cliente queda en el HTML. */}
+      <MiguePanel nombre={nombreDeDiario(usuario.nombre)} />
     </div>
   );
 }
