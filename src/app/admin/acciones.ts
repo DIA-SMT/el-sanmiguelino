@@ -118,6 +118,10 @@ function validarBloque(v: unknown, i: number): BloqueNota {
       autor: v.autor,
       ...(textoNoVacio(v.cargo) ? { cargo: v.cargo } : {}),
       ...(textoNoVacio(v.retrato) ? { retrato: v.retrato } : {}),
+      // `=== true`: ausente es blanco y negro, que es como están todas.
+      ...(textoNoVacio(v.retrato) && v.retratoColor === true
+        ? { retratoColor: true }
+        : {}),
     };
   }
 

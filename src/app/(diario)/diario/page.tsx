@@ -260,6 +260,7 @@ export default async function Portada() {
                       autor={bloque.autor}
                       cargo={bloque.cargo}
                       retrato={bloque.retrato}
+                      aColor={bloque.retratoColor}
                       className="my-6"
                     />
                   ) : (

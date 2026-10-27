@@ -40,6 +40,7 @@ export function Bloque({
           autor={bloque.autor}
           cargo={bloque.cargo}
           retrato={bloque.retrato}
+          aColor={bloque.retratoColor}
           className="my-7"
         />
       );

@@ -1856,9 +1856,9 @@ function CamposBloque({
         sigue siendo una cita correcta. En una publicación oficial, la cara
         equivocada al lado de una declaración es peor que ninguna.
 
-        El diario la muestra en BLANCO Y NEGRO, como el impreso: se puede subir
-        a color, pero se va a ver en gris. Lo dice la ayuda de abajo para que no
-        parezca que la foto se arruinó.
+        Por defecto el diario la muestra en BLANCO Y NEGRO, como el impreso. Se
+        puede pedir a color con la casilla: lo pidió la redacción, que subía la
+        foto de la intendenta a color y la veía gris.
       */}
       {bloque.tipo === "cita" && (
         <div className="flex flex-wrap items-center gap-3">
@@ -1867,7 +1867,10 @@ function CamposBloque({
             <img
               src={bloque.retrato}
               alt=""
-              className="h-12 w-12 shrink-0 rounded-full object-cover grayscale"
+              className={cn(
+                "h-12 w-12 shrink-0 rounded-full object-cover",
+                !bloque.retratoColor && "grayscale",
+              )}
             />
           ) : null}
           <label
@@ -1904,9 +1907,20 @@ function CamposBloque({
               Quitar
             </button>
           ) : null}
+          {bloque.retrato ? (
+            <label className="inline-flex cursor-pointer items-center gap-1.5 text-[0.78rem] font-medium text-panel-tinta-2">
+              <input
+                type="checkbox"
+                checked={bloque.retratoColor === true}
+                onChange={(e) => onCambio({ retratoColor: e.target.checked })}
+                className="h-4 w-4 accent-[var(--accent)]"
+              />
+              A color
+            </label>
+          ) : null}
           <span className="w-full text-[0.72rem] text-panel-tinta-3">
-            Opcional. En el diario se ve redondo y en blanco y negro, como en el
-            impreso.
+            Opcional. En el diario se ve redondo y, salvo que marques «A color»,
+            en blanco y negro, como en el impreso.
           </span>
           {esMia && errorFoto && (
             <span className="w-full">

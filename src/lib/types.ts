@@ -22,6 +22,9 @@ export type BloqueNota =
        *  correcto, y poner la cara equivocada al lado de una declaración
        *  oficial es peor que no poner ninguna. */
       retrato?: string;
+      /** El retrato a color. Ausente = blanco y negro, como el impreso. Lo
+       *  pidió la redacción para la foto de la intendenta en la tapa. */
+      retratoColor?: boolean;
     }
   /** Frase del propio texto, promovida a destacado. No lleva comillas ni
    *  autor: no es una cita, es el redactor subrayando su propia idea. */

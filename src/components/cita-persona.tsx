@@ -24,6 +24,7 @@ export function CitaPersona({
   autor,
   cargo,
   retrato,
+  aColor = false,
   className,
 }: {
   texto: string;
@@ -33,6 +34,8 @@ export function CitaPersona({
    *  —las dos las acepta `imagenDisponible()`—. Si no hay, no se dibuja el
    *  círculo. */
   retrato?: string;
+  /** El retrato a color. Por defecto va en blanco y negro, como el impreso. */
+  aColor?: boolean;
   className?: string;
 }) {
   const hayRetrato = Boolean(retrato && imagenDisponible(retrato));
@@ -46,7 +49,10 @@ export function CitaPersona({
           width={168}
           height={168}
           sizes="(min-width: 640px) 88px, 68px"
-          className="h-[68px] w-[68px] shrink-0 rounded-full object-cover grayscale sm:h-[88px] sm:w-[88px]"
+          className={cn(
+            "h-[68px] w-[68px] shrink-0 rounded-full object-cover sm:h-[88px] sm:w-[88px]",
+            !aColor && "grayscale",
+          )}
         />
       )}
       <div className="min-w-0 flex-1 border-t border-ink pt-3.5">
