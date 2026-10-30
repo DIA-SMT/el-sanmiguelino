@@ -30,6 +30,7 @@ import {
   paginaPedida,
 } from "@/lib/migue/interpretacion";
 import { notaEnPagina, totalDePaginas } from "@/lib/data/paginas";
+import { sinFormato } from "@/lib/formato-en-linea";
 import {
   textoDeResumenDeNota,
   textoDeResumenDeTapa,
@@ -130,7 +131,8 @@ function mejorParrafo(nota: NotaCompleta, tokens: string[]): string {
       mejor = p.texto;
     }
   }
-  return mejor;
+  // Lo que se muestra en el chat va sin los asteriscos del formato.
+  return sinFormato(mejor);
 }
 
 /**

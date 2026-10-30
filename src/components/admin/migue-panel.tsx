@@ -9,6 +9,7 @@ import { clasesDeBoton, clasesDeBotonIcono, clasesDeCampo } from "@/components/a
 import { CuerpoMigue, RetratoMigue } from "@/components/migue/retrato-migue";
 import { AYUDA, pantallaDeRuta } from "@/lib/migue/ayuda-panel";
 import { cn } from "@/lib/utils";
+import { ESTILO_SOBRE_LA_BARRA, useBurbujaMovible } from "@/lib/burbuja-movible";
 
 interface Mensaje {
   rol: "usuario" | "migue";
@@ -44,6 +45,8 @@ export function MiguePanel({ nombre }: { nombre: string }) {
   const [cargando, setCargando] = useState(false);
   const [errorUltima, setErrorUltima] = useState<string | null>(null);
   const reducirMovimiento = useReducedMotion();
+  // Se arrastra a donde moleste menos, y nunca tapa la barra de Guardar.
+  const burbuja = useBurbujaMovible("sm-migue-panel-posicion");
   const listaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -106,7 +109,10 @@ export function MiguePanel({ nombre }: { nombre: string }) {
         <button
           type="button"
           aria-label="Abrir la ayuda de Migue"
-          className="pressable fixed right-5 bottom-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent font-sans text-accent-contrast shadow-panel hover:bg-accent-strong sm:h-auto sm:w-auto sm:gap-2.5 sm:py-1.5 sm:pr-4 sm:pl-1.5"
+          title="Tocá para preguntar; arrastrá para moverla"
+          style={burbuja.style}
+          {...burbuja.handlers}
+          className="pressable fixed right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent font-sans text-accent-contrast shadow-panel hover:bg-accent-strong sm:h-auto sm:w-auto sm:gap-2.5 sm:py-1.5 sm:pr-4 sm:pl-1.5"
         >
           <RetratoMigue
             prioridad
@@ -133,8 +139,8 @@ export function MiguePanel({ nombre }: { nombre: string }) {
                 animate={reducirMovimiento ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
                 exit={reducirMovimiento ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
                 transition={{ duration: 0.18, ease: "easeOut" }}
-                style={{ transformOrigin: "bottom right" }}
-                className="fixed right-5 bottom-5 z-50 flex h-[min(600px,calc(100dvh-2.5rem))] w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-panel border border-panel-borde bg-panel-tarjeta font-sans text-panel-tinta shadow-panel"
+                style={{ transformOrigin: "bottom right", ...ESTILO_SOBRE_LA_BARRA }}
+                className="fixed right-5 z-50 flex h-[min(600px,calc(100dvh-2.5rem))] w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-panel border border-panel-borde bg-panel-tarjeta font-sans text-panel-tinta shadow-panel"
               >
                 <header className="flex items-center gap-3 border-b border-panel-borde px-4 py-3">
                   <RetratoMigue sizes="40px" className="h-10 w-10 bg-panel-tarjeta-2" />

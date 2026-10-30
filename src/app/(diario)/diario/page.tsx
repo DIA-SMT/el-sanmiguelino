@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ViewTransition } from "react";
 import { Masthead } from "@/components/masthead";
 import { CitaPersona } from "@/components/cita-persona";
+import { TextoConFormato } from "@/components/texto-con-formato";
 import { SiteFooter } from "@/components/site-footer";
 import { FiguraNota } from "@/components/figura-nota";
 import { HojaDiario } from "@/components/hoja-diario";
@@ -268,7 +269,7 @@ export default async function Portada() {
                       key={i}
                       className="texto-diario font-serif text-[0.95rem] leading-[1.7] text-ink"
                     >
-                      {bloque.texto}
+                      <TextoConFormato texto={bloque.texto} />
                     </p>
                   ),
                 )}

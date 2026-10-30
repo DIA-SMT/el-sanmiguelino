@@ -11,6 +11,7 @@ import { rutaDeIngreso } from "@/lib/auth/destino";
 import { useRutaActual } from "@/lib/auth/usar-ruta-actual";
 import { useLecturaEnVoz } from "@/lib/voz/usar-voz";
 import { cn } from "@/lib/utils";
+import { useBurbujaMovible } from "@/lib/burbuja-movible";
 
 interface Mensaje {
   rol: "usuario" | "migue";
@@ -76,6 +77,8 @@ export function MigueChat({ conSesion }: { conSesion: boolean }) {
   const [rechazo, setRechazo] = useState<"sesion" | "bloqueado" | null>(null);
   const puedePreguntar = conSesion && rechazo === null;
   const reducirMovimiento = useReducedMotion();
+  // Se arrastra a donde moleste menos para leer, y se queda ahí.
+  const burbuja = useBurbujaMovible("sm-migue-posicion");
   const listaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   /**
@@ -230,7 +233,10 @@ export function MigueChat({ conSesion }: { conSesion: boolean }) {
         <button
           type="button"
           aria-label="Abrir chat con Migue, el asistente del diario"
-          className="pressable fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-flotante hover:bg-accent-strong sm:h-auto sm:w-auto sm:gap-2.5 sm:py-2 sm:pl-2 sm:pr-5"
+          title="Tocá para preguntar; arrastrá para moverla"
+          style={burbuja.style}
+          {...burbuja.handlers}
+          className="pressable fixed right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-flotante hover:bg-accent-strong sm:h-auto sm:w-auto sm:gap-2.5 sm:py-2 sm:pl-2 sm:pr-5"
         >
           {/* La cara va sobre un círculo claro y no directamente sobre el
               acento: el retrato tiene alfa, y el azul del botón se le metía

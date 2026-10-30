@@ -2,6 +2,7 @@ import { InteractivoIncrustado } from "@/components/interactivo-incrustado";
 import { urlIncrustable } from "@/lib/interactivos";
 import { FiguraNota } from "@/components/figura-nota";
 import { CitaPersona } from "@/components/cita-persona";
+import { TextoConFormato } from "@/components/texto-con-formato";
 import { cn } from "@/lib/utils";
 import type { BloqueNota } from "@/lib/types";
 
@@ -269,7 +270,7 @@ export function Bloque({
     default:
       return (
         <p className="texto-diario font-serif text-[0.97rem] leading-[1.72] text-ink">
-          {bloque.texto}
+          <TextoConFormato texto={bloque.texto} />
         </p>
       );
   }

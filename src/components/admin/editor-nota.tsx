@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
   ArrowUp,
+  Bold,
   Check,
+  Italic,
   Plus,
   Trash2,
   TriangleAlert,
@@ -24,6 +26,8 @@ import {
   TarjetaPanel,
 } from "@/components/admin/piezas";
 import { BorrarNota } from "@/components/admin/borrar-nota";
+import { TextoConFormato } from "@/components/texto-con-formato";
+import { alternarMarca, sinFormato } from "@/lib/formato-en-linea";
 import type { EstadoParaBorrarNota } from "@/lib/repos/nota-borrar";
 import type { BloqueNota, NotaCompleta } from "@/lib/types";
 
@@ -324,6 +328,31 @@ export function EditorNota({
 }) {
   const router = useRouter();
   const [guardando, iniciarGuardado] = useTransition();
+
+  /*
+   * La barra de Guardar es fija abajo, y la burbuja de Migue también: la
+   * burbuja le caía encima al botón. La barra publica su alto en
+   * `--alto-barra-inferior` y la burbuja se apoya por encima (ver
+   * `burbuja-movible.ts`). Se mide en vivo porque la barra crece cuando el
+   * aviso de error ocupa dos renglones.
+   */
+  const barraRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const barra = barraRef.current;
+    if (!barra) return;
+    const raiz = document.documentElement;
+    const publicar = () =>
+      raiz.style.setProperty("--alto-barra-inferior", `${barra.offsetHeight}px`);
+    // Una vez ya, sin esperar al observador: en una pestaña que todavía no se
+    // pintó, el observador no avisa hasta que se la mira.
+    publicar();
+    const observador = new ResizeObserver(publicar);
+    observador.observe(barra);
+    return () => {
+      observador.disconnect();
+      raiz.style.removeProperty("--alto-barra-inferior");
+    };
+  }, []);
   const [error, setError] = useState<string | null>(avisoInicial ?? null);
   /**
    * "Guardado" se apaga en cuanto se toca cualquier cosa.
@@ -1197,7 +1226,10 @@ export function EditorNota({
           tema y el usuario, que viven en el pie de la barra. El relleno de
           adentro repite el del <main> del panel para que "Guardar" caiga sobre
           el borde derecho de las tarjetas y no unos píxeles corrido. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-panel-borde bg-panel-tarjeta/95 backdrop-blur lg:left-72">
+      <div
+        ref={barraRef}
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-panel-borde bg-panel-tarjeta/95 backdrop-blur lg:left-72"
+      >
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <p
             role="status"
@@ -1749,6 +1781,16 @@ function CamposBloque({
     );
   }
 
+  if (bloque.tipo === "parrafo") {
+    return (
+      <ParrafoConFormato
+        texto={bloque.texto}
+        indice={indice}
+        onCambio={(texto) => onCambio({ texto })}
+      />
+    );
+  }
+
   return (
     <div className="mt-3 space-y-3">
       <textarea
@@ -1981,5 +2023,110 @@ function TraerFoto({
         Traer
       </button>
     </span>
+  );
+}
+
+/**
+ * El párrafo, con Negrita y Cursiva para una parte del texto.
+ *
+ * Lo pidió la redacción (2026-10-30): no había cómo poner en cursiva el título
+ * de una obra adentro de un párrafo. El texto sigue siendo un campo de texto y
+ * el formato se guarda con asteriscos (`**negrita**`, `*cursiva*`, ver
+ * `formato-en-linea.ts`), pero nadie los escribe: se seleccionan las palabras
+ * y se toca el botón, o Ctrl+B / Ctrl+I. Tocarlo otra vez lo saca.
+ *
+ * Abajo, cuando hay formato, se ve cómo queda en el diario: los asteriscos en
+ * el campo son la marca, no lo que lee el vecino.
+ */
+function ParrafoConFormato({
+  texto,
+  indice,
+  onCambio,
+}: {
+  texto: string;
+  indice: number;
+  onCambio: (texto: string) => void;
+}) {
+  const campoRef = useRef<HTMLTextAreaElement>(null);
+
+  function aplicar(marca: "**" | "*") {
+    const el = campoRef.current;
+    if (!el) return;
+    const r = alternarMarca(el.value, el.selectionStart, el.selectionEnd, marca);
+    onCambio(r.texto);
+    // Después de que React escriba el valor nuevo: la misma selección queda
+    // marcada, así se puede tocar Negrita y después Cursiva sobre las mismas
+    // palabras.
+    window.setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(r.inicio, r.fin);
+    }, 0);
+  }
+
+  const conFormato = sinFormato(texto) !== texto;
+  const boton =
+    "inline-flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-panel-3 border border-panel-borde-campo px-2 text-[0.78rem] text-panel-tinta-2 hover:border-panel-tinta-3 hover:text-panel-tinta";
+
+  return (
+    <div className="mt-3 space-y-2">
+      <div
+        role="toolbar"
+        aria-label={`Formato del texto del bloque ${indice + 1}`}
+        className="flex flex-wrap items-center gap-panel-controles"
+      >
+        <button
+          type="button"
+          // Que tocar el botón no le saque la selección al campo.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => aplicar("**")}
+          title="Negrita (Ctrl+B)"
+          className={cn(boton, "font-bold")}
+        >
+          <Bold className="h-3.5 w-3.5" aria-hidden="true" />
+          Negrita
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => aplicar("*")}
+          title="Cursiva (Ctrl+I)"
+          className={cn(boton, "italic")}
+        >
+          <Italic className="h-3.5 w-3.5" aria-hidden="true" />
+          Cursiva
+        </button>
+        <span className="text-[0.72rem] text-panel-tinta-3">
+          Seleccioná las palabras y tocá el botón. Otra vez, lo saca.
+        </span>
+      </div>
+      <textarea
+        ref={campoRef}
+        value={texto}
+        onChange={(e) => onCambio(e.target.value)}
+        onKeyDown={(e) => {
+          if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+          const tecla = e.key.toLowerCase();
+          if (tecla === "b" || tecla === "n") {
+            e.preventDefault();
+            aplicar("**");
+          } else if (tecla === "i" || tecla === "k") {
+            e.preventDefault();
+            aplicar("*");
+          }
+        }}
+        rows={4}
+        aria-label={`Texto del bloque ${indice + 1}`}
+        className={cn(campo, "resize-y")}
+        placeholder="El texto"
+      />
+      {conFormato && (
+        <p className="rounded-panel-3 bg-panel-tarjeta-2 px-3 py-2 font-serif text-[0.92rem] leading-relaxed text-panel-tinta">
+          <span className="mr-2 font-sans text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-panel-tinta-3">
+            Así se ve
+          </span>
+          <TextoConFormato texto={texto} />
+        </p>
+      )}
+    </div>
   );
 }

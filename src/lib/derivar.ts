@@ -13,6 +13,7 @@
  * rompería la semilla, que corre fuera de Next.
  */
 import type { BloqueNota } from "@/lib/types";
+import { sinFormato } from "@/lib/formato-en-linea";
 
 /**
  * El texto plano de un bloque, sea del tipo que sea.
@@ -31,6 +32,9 @@ import type { BloqueNota } from "@/lib/types";
 export function textoDeBloque(bloque: BloqueNota): string {
   switch (bloque.tipo) {
     case "parrafo":
+      // Sin los asteriscos de la negrita y la cursiva: el buscador y Migue
+      // leen las palabras, no las marcas. Ver `formato-en-linea.ts`.
+      return sinFormato(bloque.texto);
     case "subtitulo":
     case "destacado":
       return bloque.texto;

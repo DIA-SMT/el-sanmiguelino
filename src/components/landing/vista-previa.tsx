@@ -7,11 +7,13 @@ import {
 } from "@/lib/repos/edicion";
 import { imagenDisponible } from "@/lib/data/imagenes";
 import type { NotaCompleta } from "@/lib/types";
+import { sinFormato } from "@/lib/formato-en-linea";
 
 /** Primer párrafo de la nota, para el arranque de la principal. */
 function arranqueDe(nota: NotaCompleta): string | undefined {
   const bloque = nota.cuerpo.find((b) => b.tipo === "parrafo");
-  return bloque?.tipo === "parrafo" ? bloque.texto : undefined;
+  // Sin los asteriscos del formato: es un arranque, no el párrafo dibujado.
+  return bloque?.tipo === "parrafo" ? sinFormato(bloque.texto) : undefined;
 }
 
 /**
