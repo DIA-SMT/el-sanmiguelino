@@ -2,12 +2,18 @@ import "server-only";
 import { db } from "@/lib/db";
 
 /**
- * Quién quiere el diario en papel.
+ * Quién se anotó al newsletter de El Sanmiguelino.
  *
  * Es el único lugar del proyecto donde se guardan **datos personales de un
- * vecino** —nombre, edad, correo y domicilio—. El registro de Migue está hecho
- * a propósito para lo contrario, no guardar quién pregunta; acá el dato ES la
- * persona, porque hay que llevarle el diario a su casa.
+ * vecino** —nombre y correo—. El registro de Migue está hecho a propósito para
+ * lo contrario, no guardar quién pregunta; acá el dato ES la persona, porque
+ * hay que escribirle.
+ *
+ * **Hasta el 2026-10-30 era la suscripción al papel**, con domicilio y edad.
+ * El municipio decidió no repartir ejemplares y pasar a un newsletter, y
+ * quienes ya estaban anotados siguen en la lista (lo decidió el usuario). Las
+ * columnas `direccion` y `edad` quedan en la tabla para no migrar; lo nuevo
+ * guarda la dirección vacía, y ni el panel ni la descarga las muestran.
  *
  * Por eso vive aparte y con `server-only`: nada de esto puede llegar al
  * navegador por un import distraído.
@@ -16,9 +22,7 @@ import { db } from "@/lib/db";
 export interface Suscripcion {
   id: string;
   nombre: string;
-  edad: number | null;
   email: string;
-  direccion: string;
   fecha: string;
 }
 
@@ -32,9 +36,7 @@ export type ResultadoSuscripcion =
 
 export async function suscribir(datos: {
   nombre: string;
-  edad: number | null;
   email: string;
-  direccion: string;
   usuarioId: string;
 }): Promise<ResultadoSuscripcion> {
   const email = datos.email.trim().toLowerCase();
@@ -60,19 +62,23 @@ export async function suscribir(datos: {
     if (existente.usuarioId !== datos.usuarioId) {
       return { ok: false, motivo: "ajena" };
     }
-    // La misma persona anotándose de nuevo: se mudó o se equivocó, y la última
-    // vez que lo escribió es la buena.
+    // La misma persona anotándose de nuevo: la última vez que escribió su
+    // nombre es la buena.
     await db().suscripcion.update({
       where: { email },
-      data: {
-        nombre: datos.nombre,
-        edad: datos.edad,
-        direccion: datos.direccion,
-      },
+      data: { nombre: datos.nombre },
     });
     return { ok: true, yaEstaba: true };
   }
-  await db().suscripcion.create({ data: { ...datos, email } });
+  // `direccion` es una columna obligatoria de cuando era el papel: va vacía.
+  await db().suscripcion.create({
+    data: {
+      nombre: datos.nombre,
+      email,
+      usuarioId: datos.usuarioId,
+      direccion: "",
+    },
+  });
   return { ok: true, yaEstaba: false };
 }
 
@@ -80,14 +86,7 @@ export async function suscribir(datos: {
 export async function listarSuscripciones(): Promise<Suscripcion[]> {
   const filas = await db().suscripcion.findMany({
     orderBy: { fecha: "desc" },
-    select: {
-      id: true,
-      nombre: true,
-      edad: true,
-      email: true,
-      direccion: true,
-      fecha: true,
-    },
+    select: { id: true, nombre: true, email: true, fecha: true },
   });
   return filas.map((f) => ({ ...f, fecha: f.fecha.toISOString() }));
 }

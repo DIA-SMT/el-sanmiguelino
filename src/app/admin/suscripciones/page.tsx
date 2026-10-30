@@ -16,7 +16,7 @@ export const metadata = { title: "Suscripciones" };
 
 const DIA = 24 * 60 * 60 * 1000;
 
-const COLUMNAS = ["Nombre", "Edad", "Correo", "Dirección", "Se anotó"];
+const COLUMNAS = ["Nombre", "Correo", "Se anotó"];
 
 /**
  * El id del nombre accesible de la zona que se desplaza.
@@ -44,19 +44,23 @@ function altasRecientes(fechas: string[], dias: number): number {
 }
 
 /**
- * Quién pidió El Sanmiguelino en papel.
+ * Quién se anotó al newsletter de El Sanmiguelino.
  *
- * Es la única pantalla del panel con **datos personales de vecinos**: nombre,
- * edad, correo y domicilio. Todo lo demás del panel maneja contenido del
- * diario, y el registro de Migue está hecho a propósito para no guardar quién
- * pregunta. Acá el dato ES la persona, porque hay que llevarle el diario.
+ * Hasta el 2026-10-30 era la lista del papel, con domicilio y edad; el
+ * municipio decidió no repartir ejemplares, y quienes estaban anotados siguen
+ * acá. Domicilio y edad ya no se muestran ni se descargan.
+ *
+ * Es la única pantalla del panel con **datos personales de vecinos**: nombre y
+ * correo. Todo lo demás del panel maneja contenido del diario, y el registro de
+ * Migue está hecho a propósito para no guardar quién pregunta. Acá el dato ES
+ * la persona, porque hay que escribirle.
  *
  * Pide permiso por su cuenta aunque el layout ya lo haya hecho: en el App
  * Router el layout no es un límite de seguridad.
  *
  * El rediseño de tablero no trajo nada que muestre a la persona de más: las
  * tarjetas de arriba son **cuentas**, que no identifican a nadie; no hay
- * avatares ni iniciales de colores, y el domicilio va con el mismo peso que el
+ * avatares ni iniciales de colores, y el correo va con el mismo peso que el
  * resto —resaltarlo sería convertir en titular lo más delicado de la fila—.
  * Y la descarga sigue siendo un acto deliberado: un botón de contorno con el
  * formato escrito en la etiqueta, apoyado en el aviso de qué trae el archivo,
@@ -73,12 +77,12 @@ export default async function AdminSuscripciones() {
   return (
     <>
       <BannerPanel
-        titulo="Suscripciones al papel"
+        titulo="Suscripciones al newsletter"
         bajada={
           <span id="aviso-datos">
-            Son datos personales de vecinos, cargados por ellos para recibir el
-            diario. Se usan para eso y nada más. La lista que se baja tiene
-            domicilios: tratala como lo que es.
+            Son datos personales de vecinos, cargados por ellos para recibir
+            las novedades del diario. Se usan para eso y nada más. La lista que
+            se baja tiene sus correos: tratala como lo que es.
           </span>
         }
       >
@@ -94,7 +98,7 @@ export default async function AdminSuscripciones() {
             href="/admin/suscripciones/csv"
             aria-describedby="aviso-datos"
             /* El botón de contorno del panel. Sigue siendo secundario y no
-               primario a propósito: bajarse los domicilios de doscientos
+               primario a propósito: bajarse los correos de doscientos
                vecinos no es la acción principal de la pantalla, es la que hay
                que decidir apretar. */
             className={clasesDeBoton()}
@@ -115,7 +119,7 @@ export default async function AdminSuscripciones() {
             color="azul"
             valor={String(suscripciones.length)}
             titulo="Personas anotadas"
-            nota="Piden El Sanmiguelino impreso en su casa"
+            nota="Reciben las novedades de El Sanmiguelino"
           />
           <TarjetaDato
             icono={UserPlus}
@@ -145,13 +149,13 @@ export default async function AdminSuscripciones() {
           <SeccionPanel
             id="lista-de-anotados"
             titulo="Quiénes se anotaron"
-            bajada="Del más nuevo al más viejo. Se desplaza al costado: el domicilio no entra en un teléfono."
+            bajada="Del más nuevo al más viejo."
           >
             {/*
              * `ZonaDeTabla` trae puestos el `role="region"`, el nombre
              * accesible y el `tabIndex={0}`: la tabla mide 46rem y adentro no
              * hay un solo elemento enfocable, así que en un viewport angosto se
-             * ven dos columnas y las de la derecha —el domicilio y la fecha—
+             * ven dos columnas y la de la derecha —la fecha—
              * quedan inalcanzables con el teclado. Chrome 127+ hace enfocables
              * por su cuenta los scrollers sin hijos enfocables; Firefox y
              * Safari no, y el arreglo del navegador no es el arreglo de la
@@ -164,16 +168,15 @@ export default async function AdminSuscripciones() {
              */}
             <ZonaDeTabla
               id={ID_ZONA_TABLA}
-              nombre="Tabla de vecinos anotados, más ancha que la pantalla: se desplaza al costado con las flechas."
+              nombre="Tabla de vecinos anotados al newsletter. Si es más ancha que la pantalla, se desplaza al costado con las flechas."
             >
               {/* El ancho mínimo es lo único de la tabla que depende de cuántas
                   columnas tiene, así que no está en la pieza. Se concatena y no
                   se pasa por `cn()`: ver la nota de los botones en
                   `piezas.tsx`. */}
-              <table className={`${TABLA.tabla} min-w-[46rem]`}>
+              <table className={`${TABLA.tabla} min-w-[32rem]`}>
                 <caption className="sr-only">
-                  Vecinos anotados para recibir el diario en papel, del más
-                  nuevo al más viejo.
+                  Vecinos anotados al newsletter, del más nuevo al más viejo.
                 </caption>
                 <thead>
                   {/* La banda de la cabecera la ponen los `<th>`, que embaldosan
@@ -181,7 +184,7 @@ export default async function AdminSuscripciones() {
                       Y el `text-left` que trae `TABLA.cabecera` es el que le
                       faltaba a esta tabla: el centrado del `<th>` es una regla
                       del navegador y le ganaba al `text-left` heredado, así que
-                      los cinco títulos salían centrados sobre columnas de datos
+                      los títulos salían centrados sobre columnas de datos
                       alineadas a la izquierda. */}
                   <tr>
                     {COLUMNAS.map((t) => (
@@ -206,16 +209,9 @@ export default async function AdminSuscripciones() {
                       >
                         {s.nombre}
                       </td>
-                      <td className={`${TABLA.celda} tabular-nums`}>
-                        {s.edad ?? "—"}
-                      </td>
                       <td className={`${TABLA.celda} font-mono text-panel-xs`}>
                         {s.email}
                       </td>
-                      {/* El domicilio con el mismo peso que el resto de la
-                          fila: resaltarlo sería convertir en titular lo más
-                          delicado del dato. */}
-                      <td className={TABLA.celda}>{s.direccion}</td>
                       {/* El tiempo relativo es metadato y va en `tinta-3`, pero
                           la fila se resalta con `panel-wash` al pasar el mouse
                           y sobre ese fondo `tinta-3` cae por debajo de 4,5:1
@@ -223,7 +219,7 @@ export default async function AdminSuscripciones() {
                           Sube a `tinta-2` con `group-hover` y no con un `hover:`
                           propio para que el disparador sea la fila entera y no
                           la celda: si fuera de la celda, el texto seguiría
-                          ilegible mientras el mouse está en el domicilio de al
+                          ilegible mientras el mouse está en el correo de al
                           lado, que es justo cuando la fila ya está resaltada. */}
                       <td
                         className={`${TABLA.celda} whitespace-nowrap text-panel-xs text-panel-tinta-3 group-hover:text-panel-tinta-2`}

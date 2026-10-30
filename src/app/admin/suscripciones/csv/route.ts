@@ -3,20 +3,19 @@ import { listarSuscripciones } from "@/lib/repos/suscripciones";
 import { anotar } from "@/lib/repos/auditoria";
 
 /**
- * La lista de suscripciones, para pasársela a quien reparte.
+ * La lista del newsletter, para pasársela a quien manda los correos.
  *
  * `requerirAdmin()` acá adentro y no confiando en el layout: en el App Router
- * el layout no corre para los route handlers. Sin esto, la lista de domicilios
+ * el layout no corre para los route handlers. Sin esto, la lista de correos
  * de los vecinos sería una URL que cualquiera con sesión puede pedir.
  */
 
 /**
  * Escapa un campo para CSV.
  *
- * El apóstrofo, la coma y el salto de línea son moneda corriente en un
- * domicilio argentino —"Av. Sarmiento 1234, 2º B"—, así que esto no es
- * teórico: sin comillas, la primera dirección con coma corre todas las
- * columnas de esa fila.
+ * El apóstrofo, la coma y el salto de línea aparecen en nombres reales, así
+ * que esto no es teórico: sin comillas, el primer campo con coma corre todas
+ * las columnas de esa fila.
  *
  * Y lo que empieza con `=`, `+`, `-` o `@` se antepone con un apóstrofo: Excel
  * lo interpretaría como fórmula. Una lista de vecinos no tiene por qué poder
@@ -33,7 +32,7 @@ export async function GET() {
   const suscripciones = await listarSuscripciones();
 
   /* La única LECTURA que se anota, y por eso mismo: acá los datos personales de
-     los vecinos —nombre, correo y domicilio— salen del sistema en un archivo
+     los vecinos —nombre y correo— salen del sistema en un archivo
      que después vive en la computadora de alguien. Que eso pase sin dejar
      rastro es lo que no puede ser. Se anota cuántas filas se llevó, nunca
      cuáles. */
@@ -44,14 +43,8 @@ export async function GET() {
   });
 
   const filas = [
-    ["nombre", "edad", "email", "direccion", "fecha"],
-    ...suscripciones.map((s) => [
-      s.nombre,
-      s.edad,
-      s.email,
-      s.direccion,
-      s.fecha,
-    ]),
+    ["nombre", "email", "fecha"],
+    ...suscripciones.map((s) => [s.nombre, s.email, s.fecha]),
   ];
   // BOM al principio: sin él, Excel en Windows abre el archivo en la
   // codificación del sistema y "Tucumán" llega como "TucumÃ¡n".

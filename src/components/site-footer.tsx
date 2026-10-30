@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LogoSanmiguelino, LogoSubsecretaria } from "@/components/brand/logos";
-import { SuscripcionPapel } from "@/components/suscripcion-papel";
+import { SuscripcionNovedades } from "@/components/suscripcion-novedades";
 import { usuarioActual } from "@/lib/auth/dal";
 
 /**
@@ -14,7 +14,7 @@ import { usuarioActual } from "@/lib/auth/dal";
  * pie de imprenta—: columnas separadas por filetes finos, rótulos en
  * versalitas y, abajo de todo, la línea de créditos. Todo lo que dice es real:
  * la dirección de la Municipalidad, las dos puertas del diario que existen
- * (la edición y el archivo), el papel, quién lo hace y de quién es la foto.
+ * (la edición y el archivo), las novedades por correo y quién lo hace.
  */
 export async function SiteFooter() {
   const usuario = await usuarioActual();
@@ -60,51 +60,31 @@ export async function SiteFooter() {
             </ul>
           </nav>
 
-          {/* Anotarse para recibirlo impreso. Va en el pie y no en la bandera
-              porque no es navegación: es algo que se hace una vez, y el pie es
-              donde uno mira cuando ya leyó.
+          {/* Anotarse al newsletter. Era "en papel" hasta el 2026-10-30, cuando
+              el municipio decidió no repartir ejemplares. Va en el pie y no en
+              la bandera porque no es navegación: es algo que se hace una vez,
+              y el pie es donde uno mira cuando ya leyó.
 
               Acá iba "Publicación gratuita, prohibida su venta". Se sacó: esa
               leyenda es del EJEMPLAR IMPRESO —lo que no se puede vender es el
               papel— y en la web no dice nada. */}
           <div className="border-line lg:border-l lg:pl-8">
-            <h2 className="meta text-ink">En papel</h2>
+            <h2 className="meta text-ink">Novedades</h2>
             <p className="mt-3 mb-3 font-serif text-[0.9rem] leading-relaxed text-ink-2">
-              El mismo diario, impreso, en tu casa.
+              Cada número nuevo, avisado en tu correo.
             </p>
-            <SuscripcionPapel
+            <SuscripcionNovedades
               nombre={usuario?.nombre ?? ""}
               conSesion={usuario !== null}
             />
           </div>
         </div>
 
-        {/* Los créditos. El de la foto lo pide su licencia (CC BY-SA 4.0, ver
-            `public/portada/README.md`) y hasta acá no estaba en ningún lado.
-            El día que la panorámica se cambie por una foto propia del
-            municipio, esta línea se cambia junto con el archivo. */}
-        <div className="mt-10 flex flex-col gap-4 border-t border-ink pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="max-w-xl font-sans text-[0.68rem] leading-relaxed text-ink-3">
-            Foto de la ciudad: aeropuertotucuman.blogspot.com.ar, vía{" "}
-            <a
-              href="https://commons.wikimedia.org/wiki/File:Panor%C3%A1mica_del_centro_tucumano.jpg"
-              className="enlace"
-              rel="noopener"
-              target="_blank"
-            >
-              Wikimedia Commons
-            </a>{" "}
-            (
-            <a
-              href="https://creativecommons.org/licenses/by-sa/4.0/deed.es"
-              className="enlace"
-              rel="license noopener"
-              target="_blank"
-            >
-              CC BY-SA 4.0
-            </a>
-            ).
-          </p>
+        {/* La línea de abajo: quién lo hace. Acá iba también el crédito de la
+            foto de fondo; se sacó el 2026-10-30 a pedido del usuario. La foto
+            sigue siendo la panorámica de Wikimedia (CC BY-SA 4.0, ver
+            `public/portada/README.md`), que pide atribución. */}
+        <div className="mt-10 flex flex-col gap-4 border-t border-ink pt-4 sm:flex-row sm:items-center sm:justify-end">
           <div className="flex items-center gap-3">
             <span className="meta">Desarrollado por</span>
             <LogoSubsecretaria />

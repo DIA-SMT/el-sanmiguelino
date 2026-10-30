@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Mailbox, X } from "lucide-react";
+import { Check, Mail, X } from "lucide-react";
 import { rutaDeIngreso } from "@/lib/auth/destino";
 import { useRutaActual } from "@/lib/auth/usar-ruta-actual";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
    leyendo", volvió atrás, o Cidituc dio error) abría el formulario solo en
    otra página, horas después. En sessionStorage —se va con la pestaña— y con
    try/catch: puede no estar (ventana privada, datos del sitio bloqueados). */
-const MARCA_ABRIR = "sm-abrir-papel";
+const MARCA_ABRIR = "sm-abrir-novedades";
 function marcarParaAbrir(ruta: string) {
   try {
     sessionStorage.setItem(MARCA_ABRIR, ruta);
@@ -31,20 +31,19 @@ function sacarMarcaParaAbrir(): string | null {
 }
 
 /**
- * Anotarse para recibir El Sanmiguelino en papel.
+ * Anotarse al newsletter de El Sanmiguelino: las novedades del diario, por
+ * correo.
  *
- * Pide correo, domicilio, nombre y edad. **El nombre lo trae Cidituc y llega
- * ya puesto**; el resto se escribe a mano.
+ * Hasta el 2026-10-30 esto era "recibilo en papel" y pedía domicilio y edad.
+ * El municipio decidió no repartir ejemplares impresos y pasar a un
+ * newsletter, así que ahora pide lo único que hace falta para escribirle a
+ * alguien: el correo, y el nombre para saludarlo. Quienes ya se habían
+ * anotado para el papel quedan en la misma lista.
  *
- * Acá decía que con el SSO iban a salir de ahí "el nombre y la edad", y la
- * mitad de esa predicción no se pudo cumplir: el backend municipal devuelve
- * `id_persona`, CUIL, DNI, nombre, apellido y correo —ver `PersonaCidituc`— y
- * **nada de fecha de nacimiento ni de domicilio**. Así que la edad y la
- * dirección son manuales por falta de dato, no por falta de ganas. La fila que
- * las junta se queda donde está.
- *
- * El nombre llega prellenado pero **editable**: puede estar anotándose para la
- * abuela, o querer corregir cómo se escribe.
+ * **Pide ingresar con Ciudadano Digital**, como antes: sin identidad,
+ * cualquiera podría anotar el correo de otra persona. **El nombre lo trae
+ * Cidituc y llega ya puesto**, editable. El correo queda a mano: ver por qué
+ * en la nota de `PersonaCidituc`.
  *
  * La validación de verdad está en el servidor —`/api/suscripciones`—. Lo de
  * acá es para que quien escribe se entere antes de mandar, no una defensa.
@@ -55,7 +54,7 @@ const campo =
 const etiqueta =
   "block font-sans text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink-2";
 
-export function SuscripcionPapel({
+export function SuscripcionNovedades({
   /** El de la sesión de Cidituc. Vacío si no hay sesión. */
   nombre = "",
   /** Si quien mira ingresó. Sin sesión el formulario no se puede enviar —la
@@ -74,12 +73,7 @@ export function SuscripcionPapel({
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState<"nuevo" | "actualizado" | null>(null);
-  const [datos, setDatos] = useState({
-    nombre,
-    edad: "",
-    email: "",
-    direccion: "",
-  });
+  const [datos, setDatos] = useState({ nombre, email: "" });
 
   // De vuelta del ingreso que se pidió desde acá, en la misma página: el
   // formulario se reabre solo. La marca se saca siempre, haya sesión o no. En
@@ -147,8 +141,8 @@ export function SuscripcionPapel({
           type="button"
           className="pressable inline-flex items-center gap-2 border border-ink px-3.5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink transition-colors hover:bg-ink hover:text-paper"
         >
-          <Mailbox className="h-3.5 w-3.5" aria-hidden="true" />
-          Recibilo en papel
+          <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+          Recibir novedades
         </button>
       </Dialog.Trigger>
 
@@ -158,10 +152,10 @@ export function SuscripcionPapel({
           <header className="flex items-start justify-between gap-4 border-b border-ink bg-paper-2 px-5 py-4">
             <div>
               <Dialog.Title className="font-sans text-[0.95rem] font-bold text-ink">
-                El Sanmiguelino en papel
+                Novedades de El Sanmiguelino
               </Dialog.Title>
               <Dialog.Description className="mt-1 font-serif text-[0.85rem] italic text-ink-3">
-                Dejanos tus datos y te lo llevamos a tu casa.
+                Te avisamos por correo cuando sale un número nuevo.
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
@@ -179,8 +173,8 @@ export function SuscripcionPapel({
             /* Sin sesión no se muestra el formulario: no se puede enviar. El
                pie aparece también en la portada, que es pública, y ahí el
                formulario se completaba entero y al mandarlo contestaba "No
-               autenticado". Anotarse pide ingresar porque se guarda una
-               dirección: sin identidad, cualquiera podría anotar a otro. */
+               autenticado". Anotarse pide ingresar porque se guarda un
+               correo: sin identidad, cualquiera podría anotar el de otro. */
             <div className="space-y-4 px-5 py-7 text-center">
               <p className="font-serif text-[0.98rem] leading-relaxed text-ink-2">
                 Para anotarte necesitás ingresar con tu cuenta de Ciudadano
@@ -208,7 +202,7 @@ export function SuscripcionPapel({
                   : "Actualizamos tus datos."}
               </p>
               <p className="mt-1.5 font-sans text-[0.78rem] text-ink-3">
-                El próximo número va a {datos.direccion}.
+                Las novedades van a llegar a {datos.email}.
               </p>
             </div>
           ) : (
@@ -225,51 +219,22 @@ export function SuscripcionPapel({
                 />
               </label>
 
+              {/* El nombre lo trae Cidituc, para saludar en el correo. */}
               <label className="block">
-                <span className={etiqueta}>Dirección</span>
+                <span className={etiqueta}>Nombre</span>
                 <input
                   required
-                  value={datos.direccion}
-                  onChange={(e) => editar("direccion", e.target.value)}
+                  value={datos.nombre}
+                  onChange={(e) => editar("nombre", e.target.value)}
                   className={cn(campo, "mt-1.5")}
-                  placeholder="Calle, número, piso y barrio"
+                  placeholder="Nombre y apellido"
                 />
-                <span className="mt-1 block font-sans text-[0.72rem] text-ink-3">
-                  Es a dónde se lleva el diario.
-                </span>
+                {nombre && (
+                  <span className="mt-1.5 block font-sans text-[0.72rem] text-ink-3">
+                    Lo trajimos de tu Ciudadano Digital. Podés cambiarlo.
+                  </span>
+                )}
               </label>
-
-              {/* El nombre lo trae Cidituc; la edad no la tiene nadie más que
-                  la persona. */}
-              <div className="grid gap-4 sm:grid-cols-[1fr_6.5rem]">
-                <label className="block">
-                  <span className={etiqueta}>Nombre</span>
-                  <input
-                    required
-                    value={datos.nombre}
-                    onChange={(e) => editar("nombre", e.target.value)}
-                    className={cn(campo, "mt-1.5")}
-                    placeholder="Nombre y apellido"
-                  />
-                  {nombre && (
-                    <span className="mt-1.5 block font-sans text-[0.72rem] text-ink-3">
-                      Lo trajimos de tu Ciudadano Digital. Podés cambiarlo.
-                    </span>
-                  )}
-                </label>
-                <label className="block">
-                  <span className={etiqueta}>Edad</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={datos.edad}
-                    onChange={(e) => editar("edad", e.target.value)}
-                    className={cn(campo, "mt-1.5")}
-                    placeholder="—"
-                  />
-                </label>
-              </div>
 
               {error && (
                 <p
@@ -285,7 +250,7 @@ export function SuscripcionPapel({
                   className="border border-red-300 bg-red-50 px-3 py-2 font-sans text-[0.8rem] text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
                 >
                   {rechazo === "bloqueado" ? (
-                    "Tu cuenta no puede anotarse para recibir el diario en papel."
+                    "Tu cuenta no puede anotarse para recibir novedades."
                   ) : (
                     <>
                       Se venció tu sesión.{" "}
@@ -304,8 +269,8 @@ export function SuscripcionPapel({
 
               <div className="flex items-center justify-between gap-4 border-t border-hairline pt-4">
                 <p className="font-sans text-[0.7rem] leading-relaxed text-ink-3">
-                  Tus datos los usa la Municipalidad sólo para llevarte el
-                  diario.
+                  Tu correo lo usa la Municipalidad sólo para mandarte las
+                  novedades del diario.
                 </p>
                 <button
                   type="submit"

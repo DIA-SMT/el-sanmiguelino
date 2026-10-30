@@ -170,7 +170,7 @@ export const AYUDA: Record<
       {
         pregunta: "¿Qué es esta lista?",
         respuesta:
-          "Las personas que se anotaron para recibir el diario impreso, con nombre, edad, correo, dirección y fecha. Desde acá sólo se consulta: no se edita ni se borra.",
+          "Las personas que se anotaron al newsletter para recibir las novedades del diario por correo, con nombre, correo y fecha. Las que se habían anotado para el diario en papel siguen en la lista. Desde acá sólo se consulta: no se edita ni se borra.",
       },
       {
         pregunta: "¿Cómo bajo la lista?",
