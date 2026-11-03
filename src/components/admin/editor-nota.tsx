@@ -1418,9 +1418,9 @@ function CamposBloque({
                   })
                 }
                 {...sinEnviarConEnter}
-                aria-label={`Encabezado de la entrada ${j + 1}`}
+                aria-label={`Encabezado de la entrada ${j + 1} (opcional)`}
                 className={cn(campo, "font-semibold")}
-                placeholder="Encabezado de la entrada"
+                placeholder="Encabezado (opcional)"
               />
               <button
                 type="button"

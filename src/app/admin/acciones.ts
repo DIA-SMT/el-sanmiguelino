@@ -132,13 +132,14 @@ function validarBloque(v: unknown, i: number): BloqueNota {
     if (!Array.isArray(v.entradas) || v.entradas.length === 0) {
       throw new Error(`La ficha del bloque ${i + 1} no tiene entradas.`);
     }
+    // Lo que hace falta es el dato; el encabezado es opcional.
     const entradas = v.entradas.map((e, j) => {
-      if (!esObjeto(e) || !textoNoVacio(e.lead) || !textoNoVacio(e.texto)) {
+      if (!esObjeto(e) || !textoNoVacio(e.texto)) {
         throw new Error(
-          `La entrada ${j + 1} de la ficha del bloque ${i + 1} está incompleta.`,
+          `La entrada ${j + 1} de la ficha del bloque ${i + 1} no tiene texto.`,
         );
       }
-      return { lead: e.lead, texto: e.texto };
+      return { lead: textoNoVacio(e.lead) ? e.lead : "", texto: e.texto };
     });
     /* La foto del recuadro es opcional, pero si se empezó a cargar tiene que
        estar entera: con la misma regla que el bloque de foto (archivo, y algo

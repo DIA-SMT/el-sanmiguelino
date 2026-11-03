@@ -87,7 +87,11 @@ export type BloqueNota =
     }
   /** Recuadro de datos: un título y una lista de entradas, cada una con su
    *  encabezado en negrita. En el impreso va en un marco de esquinas
-   *  redondeadas y en dos columnas. */
+   *  redondeadas y en dos columnas.
+   *
+   *  El encabezado es opcional (`lead` vacío): la redacción contó que la
+   *  mayoría de sus fichas no lo llevan, y para poder guardar ponían un punto
+   *  que después salía en el diario. */
   | {
       tipo: "ficha";
       titulo: string;

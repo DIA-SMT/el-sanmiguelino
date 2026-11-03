@@ -95,7 +95,14 @@ export function Bloque({
         </div>
       );
     }
-    case "ficha":
+    case "ficha": {
+      /* Una lista de definiciones pide un término por cada dato. Si alguna
+         entrada no tiene encabezado —es opcional—, el recuadro pasa a ser
+         párrafos sueltos; se ve igual, pero no promete lo que no hay. */
+      const conEncabezados = bloque.entradas.every((e) => e.lead.trim());
+      const Lista = conEncabezados ? "dl" : "div";
+      const Encabezado = conEncabezados ? "dt" : "p";
+      const Dato = conEncabezados ? "dd" : "p";
       /* Recuadro de datos. El marco de esquinas redondeadas es del impreso y
          es el único lugar del diario donde hay una curva: todo lo demás son
          filetes rectos. Va entero en la sans, incluido el cuerpo, porque no es
@@ -127,7 +134,7 @@ export function Bloque({
               sizes="(min-width: 1100px) 480px, (min-width: 768px) 44vw, 100vw"
             />
           )}
-          <dl
+          <Lista
             className={cn(
               "mt-4",
               // Sin foto, dos columnas parejas. Con foto, una sola que la
@@ -148,19 +155,22 @@ export function Bloque({
                     : "[break-inside:auto]",
                 )}
               >
-                <dt className="font-sans text-[0.85rem] font-semibold leading-snug text-ink [break-after:avoid]">
-                  {e.lead}
-                </dt>
-                <dd className="mt-1 font-sans text-[0.82rem] leading-[1.55] text-ink-2">
+                {e.lead.trim() && (
+                  <Encabezado className="mb-1 font-sans text-[0.85rem] font-semibold leading-snug text-ink [break-after:avoid]">
+                    {e.lead}
+                  </Encabezado>
+                )}
+                <Dato className="font-sans text-[0.82rem] leading-[1.55] text-ink-2">
                   {e.texto}
-                </dd>
+                </Dato>
               </div>
             ))}
-          </dl>
+          </Lista>
           {/* El recuadro termina debajo de la foto aunque el texto sea corto. */}
           {bloque.foto && <div className="clear-both" aria-hidden="true" />}
         </section>
       );
+    }
     case "foto":
       /* Una foto dentro del cuerpo. NO cruza las columnas: se queda en la suya
          y deja que el multicol la acomode. Es lo que convierte una página de
