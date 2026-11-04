@@ -24,7 +24,7 @@ Source Serif 4 / Inter.
 
 | Pieza | Estado | Dónde se conecta lo real |
 | --- | --- | --- |
-| **Ingreso con Cidituc** | **Real, sin mock.** Botón → derivador → callback → validación contra `estadisticas.smt.gob.ar` → sesión propia. Verificar con `npm run verificar:cidituc` | Falta registrar el diario en el repo `derivador` y cargar las variables. Ver [docs/integracion-cidituc.md](docs/integracion-cidituc.md) |
+| **Ingreso con Cidituc** | **Real, sin mock.** Botón → login de Ciudad Digital → callback → validación contra `estadisticas.smt.gob.ar` → sesión propia. Verificar con `npm run verificar:cidituc` | Falta que el equipo de Cidituc publique la rama del diario en el repo `cidituc` y prender `CIDITUC_HABILITADO` después. Ver [docs/integracion-cidituc.md](docs/integracion-cidituc.md) |
 | **Chatbot Migue** | Mock (retrieval naive sobre la edición) | `src/app/api/migue/route.ts` — proxyear el motor Migue existente o instancia con RAG |
 | **Comentarios y votos** | In-memory con seed | `src/lib/repos/comentarios.ts` — reemplazar por Postgres + Prisma; definir política de moderación con el municipio |
 | **Contenido de la edición** | Mock en `src/lib/data/edicion-actual.ts` | Repo de ediciones cuando haya persistencia |

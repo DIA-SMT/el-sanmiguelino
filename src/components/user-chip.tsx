@@ -50,14 +50,26 @@ export function UserChip({
   async function cerrarSesion() {
     setSaliendo(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      const respuesta = await fetch("/api/auth/logout", { method: "POST" });
       // Después del logout y no antes: si el POST falla, la sesión sigue
       // abierta y las páginas guardadas siguen siendo de esta persona.
       await olvidarPaginasGuardadas();
       // Y los comentarios a medio escribir que esperaban un nuevo ingreso: no
       // son del que viene (ver `src/lib/borradores.ts`).
       olvidarBorradores();
-      // Leer es libre: quien sale de su cuenta se queda en lo que estaba
+      // Con Cidituc, a cerrar también la sesión de Ciudad Digital, que vuelve
+      // al inicio del diario. Si no, en una computadora compartida la próxima
+      // persona que apriete "Ingresar" entra como esta, sin contraseña: ese
+      // login guarda el token en el navegador y no lo borra nunca.
+      const { salida: cierre } = (await respuesta.json().catch(() => ({}))) as {
+        salida?: string | null;
+      };
+      if (cierre) {
+        window.location.assign(cierre);
+        return;
+      }
+      // Sin integración (desarrollo, o Cidituc apagado) no hay nada más que
+      // cerrar. Leer es libre: quien sale de su cuenta se queda en lo que estaba
       // leyendo, ahora sin nombre. Antes iba a "/", que para alguien sin
       // sesión es la presentación. Desde el panel o desde la vista previa de
       // una edición, en cambio, se va a la tapa: sin sesión los dos son 404.

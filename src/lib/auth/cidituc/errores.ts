@@ -3,7 +3,8 @@
  *
  * Se distinguen a propósito: un genérico "no se pudo ingresar" no deja ninguna
  * pista de qué arreglar, y cada uno de estos se arregla en un lugar distinto —el
- * entorno, el derivador, el backend municipal, o el navegador de la persona—.
+ * entorno, el login de Ciudad Digital, el backend municipal, o el navegador de
+ * la persona—.
  *
  * Este módulo no importa nada. Es a propósito: lo lee la pantalla de ingreso
  * para mostrar el mensaje, y no tiene por qué arrastrar hasta ahí el transporte
@@ -27,8 +28,6 @@ export type ErrorIngreso =
   | "sin-token"
   /** No teníamos cookie: pasaron los diez minutos, o el navegador no la mandó. */
   | "state-vencido"
-  /** El derivador no nos devolvió el `state`. Es del lado de ellos. */
-  | "state-ausente"
   /** Cookie y `state` no coinciden: dos pedidos pisándose (dos pestañas). */
   | "state-distinto"
   /**
@@ -64,7 +63,6 @@ export const TEXTO_ERROR: Record<ErrorIngreso, string> = {
   "sin-token": "El ingreso volvió sin credencial. Probá de nuevo.",
   "state-vencido":
     "La solicitud de ingreso venció. Volvé a empezar desde el botón.",
-  "state-ausente": "El ingreso volvió incompleto. Probá de nuevo.",
   "state-distinto":
     "Había otro ingreso en curso. Cerrá las demás pestañas y probá de nuevo.",
   "sesion-fallida":
@@ -72,6 +70,24 @@ export const TEXTO_ERROR: Record<ErrorIngreso, string> = {
   bloqueado:
     "Tu cuenta no puede ingresar al diario. Si te parece un error, escribinos.",
 };
+
+/**
+ * ¿El reintento tiene que borrar el token que Ciudad Digital guardó en el
+ * navegador?
+ *
+ * Ese login no lo borra nunca y redirige apenas lo ve, sin confirmar que siga
+ * válido. Con un token vencido, reintentar sin limpiar devuelve el mismo token
+ * una y otra vez. Con una cuenta dada de baja o bloqueada en el diario, en una
+ * computadora compartida, la próxima persona que apriete el botón chocaría con
+ * la cuenta de la anterior sin que se le pida la contraseña.
+ */
+export function reintentoLimpia(valor: unknown): boolean {
+  return (
+    valor === "token-invalido" ||
+    valor === "cuenta-inactiva" ||
+    valor === "bloqueado"
+  );
+}
 
 /**
  * El mensaje para lo que venga en `?error=`, o `null`.

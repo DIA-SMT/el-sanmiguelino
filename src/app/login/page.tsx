@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { LogoSanmiguelino, LogoSubsecretaria } from "@/components/brand/logos";
-import { textoDeError } from "@/lib/auth/cidituc/errores";
+import { reintentoLimpia, textoDeError } from "@/lib/auth/cidituc/errores";
 import { usuarioActual } from "@/lib/auth/dal";
 import { destinoSeguro } from "@/lib/auth/destino";
 import { getResumenEdicion } from "@/lib/repos/edicion";
@@ -61,7 +61,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           </p>
         )}
 
-        <BotonIngresar destino={destino} />
+        <BotonIngresar destino={destino} limpiar={reintentoLimpia(error)} />
 
         <Link
           href={destino}

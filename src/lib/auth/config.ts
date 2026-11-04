@@ -6,19 +6,21 @@
  * ingresar en desarrollo; se fue con el gate.
  */
 
+import { urlDeSalida } from "@/lib/auth/cidituc/login";
+
 function limpio(valor: string | undefined): string {
   return valor?.trim() ?? "";
 }
 
 /**
- * La pantalla de ingreso del municipio. Va el **origen solo**, sin `#`: el
- * `#/login` lo agrega `urlDelDerivador()`.
+ * El login de Ciudad Digital. Va el **origen solo**, sin `#`: el `#/login` lo
+ * agregan las funciones de `src/lib/auth/cidituc/login.ts`.
  *
  * Y es a propósito. La URL completa lleva un `#`, que en un `.env` sin comillas
  * abre comentario y se come `/login`: queda una URL que parece bien hasta que
  * alguien la usa. Manteniendo el fragmento en el código, esa trampa no existe.
  */
-export const CIDITUC_DERIVADOR = limpio(process.env.CIDITUC_DERIVADOR_URL);
+export const CIDITUC_LOGIN = limpio(process.env.CIDITUC_LOGIN_URL);
 
 /** El backend contra el que se valida el token. Sin barra final. */
 export const CIDITUC_API = limpio(process.env.CIDITUC_API_URL).replace(
@@ -26,10 +28,13 @@ export const CIDITUC_API = limpio(process.env.CIDITUC_API_URL).replace(
   "",
 );
 
-/** La URL de retorno. Tiene que ser **la misma** registrada en el derivador. */
+/**
+ * La URL de retorno. Tiene que ser **la misma** que tiene escrita el login de
+ * Ciudad Digital para el diario (repo `cidituc`, `src/routes/PrivateRoute.jsx`).
+ */
 export const CIDITUC_CALLBACK = limpio(process.env.CIDITUC_CALLBACK_URL);
 
-/** La clave con la que el derivador nos identifica: `?next=<clave>`. */
+/** La clave con la que el login nos identifica: `?next=<clave>`. */
 export const CIDITUC_CLAVE =
   limpio(process.env.CIDITUC_CLAVE_APP) || "sanmiguelino";
 
@@ -45,7 +50,26 @@ export const CIDITUC_CLAVE =
  */
 export const CIDITUC_CONFIGURADO =
   process.env.CIDITUC_HABILITADO === "1" &&
-  Boolean(CIDITUC_DERIVADOR && CIDITUC_API && CIDITUC_CALLBACK);
+  Boolean(CIDITUC_LOGIN && CIDITUC_API && CIDITUC_CALLBACK);
+
+/**
+ * A dónde mandar a quien cierra sesión: al cierre de Ciudad Digital, que borra
+ * el token guardado en el navegador y vuelve al inicio del diario. `null` si no
+ * hay integración, y entonces la persona se queda donde estaba.
+ *
+ * Sin esto, en una computadora compartida la próxima persona que apriete
+ * "Ingresar" entraría como la anterior: el login de Ciudad Digital guarda el
+ * token y no lo borra nunca.
+ */
+export function salidaCidituc(): string | null {
+  if (!CIDITUC_CONFIGURADO) return null;
+  try {
+    return urlDeSalida(CIDITUC_LOGIN, CIDITUC_CLAVE);
+  } catch {
+    // CIDITUC_LOGIN_URL mal escrita: el inicio del ingreso ya lo avisa en el log.
+    return null;
+  }
+}
 
 /**
  * Los `id_persona` de Cidituc que administran el diario, separados por coma.

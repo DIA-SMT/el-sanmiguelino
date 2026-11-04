@@ -24,19 +24,39 @@
       "port": 3005
     },
     {
-      "name": "derivador",
+      "name": "el-sanmiguelino-con-cidituc-local",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
-        "--prefix",
-        "C:/repo/derivador",
         "run",
         "dev",
         "--",
         "--port",
-        "5174",
+        "3000"
+      ],
+      "port": 3000,
+      "env": {
+        "CIDITUC_LOGIN_URL": "http://localhost:5175",
+        "CIDITUC_CALLBACK_URL": "http://localhost:3000/auth/cidituc/callback"
+      }
+    },
+    {
+      "name": "cidituc",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "C:/repo/cidituc",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5175",
         "--strictPort"
       ],
-      "port": 5174
+      "port": 5175,
+      "env": {
+        "VITE_APP_RUTA_BACK": "https://estadisticas.smt.gob.ar:5000",
+        "VITE_APP_SANMIGUELINO_CALLBACK_URL": "http://localhost:3000/auth/cidituc/callback"
+      }
     }
   ]
 }

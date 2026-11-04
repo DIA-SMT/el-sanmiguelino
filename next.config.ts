@@ -60,21 +60,20 @@ const nextConfig: NextConfig = {
    * `el-sanmiguelino.vercel.app` seguía sirviendo la aplicación **completa**, sin
    * redirigir. Eso rompe el ingreso de una forma que no se arregla reintentando…
    * salvo reintentando, que es lo peor: quien entra por un dominio deja la cookie
-   * del `state` ahí, el derivador lo devuelve al OTRO dominio, y una cookie no
+   * del flujo ahí, el login de Cidituc lo devuelve al OTRO dominio, y una cookie no
    * viaja entre dominios distintos. Resultado: "la solicitud de ingreso venció"
    * en el primer intento, y el segundo entra bien —porque para entonces la
    * persona ya está parada en el dominio al que la devolvieron—.
    *
-   * Le pasó igual a UrbanIA entre el 2026-08-10 y el 2026-08-19, y el comentario
-   * del repo `derivador` lo tiene escrito arriba de `RESPALDO_CALLBACK`. Ahora le
-   * tocó al diario, por el mismo motivo: se agregó el dominio de `smt.gob.ar` y
-   * el registro del derivador quedó apuntando al de Vercel.
+   * Le pasó igual a UrbanIA entre el 2026-08-10 y el 2026-08-19. Ahora le tocó al
+   * diario, por el mismo motivo: se agregó el dominio de `smt.gob.ar` y la
+   * vuelta registrada en el login de Cidituc quedó apuntando al de Vercel.
    *
    * Con esto hay **un solo dominio** que sostiene cookies: el que vuelva a
    * `el-sanmiguelino.vercel.app/auth/cidituc/callback?auth=…&state=…` es
    * redirigido a `sanmiguelino.smt.gob.ar` con la query intacta —Next la
    * conserva— y ahí la cookie sí está. Arregla el ingreso incluso sin tocar el
-   * derivador, que es de otro equipo.
+   * login de Cidituc, que es de otro equipo.
    *
    * Se redirige en vez de dar de baja el dominio para que los enlaces que ya
    * circulan sigan funcionando **con su ruta**: quien tenía guardado

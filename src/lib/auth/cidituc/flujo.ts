@@ -4,10 +4,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   CIDITUC_CLAVE,
   CIDITUC_CONFIGURADO,
-  CIDITUC_DERIVADOR,
+  CIDITUC_LOGIN,
 } from "@/lib/auth/config";
 import { validarToken } from "@/lib/auth/cidituc/persona";
-import { urlDelDerivador } from "@/lib/auth/cidituc/derivador";
+import { urlDelLogin } from "@/lib/auth/cidituc/login";
 import { nombreDeDiario } from "@/lib/auth/cidituc/nombre";
 import { registrarIngreso } from "@/lib/repos/usuarios";
 import type { ErrorIngreso } from "@/lib/auth/cidituc/errores";
@@ -18,7 +18,7 @@ import { crearToken } from "@/lib/auth/session";
 /**
  * El ingreso por Cidituc, de punta a punta.
  *
- *   /auth/cidituc/inicio  →  derivador  →  /auth/cidituc/callback?auth=…
+ *   /auth/cidituc/inicio  →  Ciudad Digital  →  /auth/cidituc/callback?auth=…
  *
  * El token de Cidituc no se guarda en ningún lado y no sobrevive al callback: lo
  * único que queda es **nuestra** sesión firmada con nuestro secreto. Cidituc dice
@@ -29,8 +29,9 @@ import { crearToken } from "@/lib/auth/session";
  * Cookie del flujo: `<nonce>|<a dónde volver>`, diez minutos de vida.
  *
  * El nonce es protección CSRF —que alguien nos empuje un token ajeno al
- * callback— y el destino viaja acá y no en la URL porque el derivador no nos
- * devuelve parámetros propios: sólo `auth` y lo que pusimos en `state`.
+ * callback— y el destino viaja acá y no en la URL porque el login de Ciudad
+ * Digital no nos devuelve parámetros propios: sólo `auth` y lo que pusimos en
+ * `state`.
  */
 const COOKIE_FLUJO = "sm_cidituc";
 const VIDA_FLUJO_SEG = 10 * 60;
@@ -98,24 +99,30 @@ function leerFlujo(request: NextRequest): { nonce: string; destino: string } {
 }
 
 /**
- * Arranca el ingreso: guarda el nonce y manda al derivador.
+ * Arranca el ingreso: guarda el nonce y manda al login de Ciudad Digital.
  *
- * El `#` de la URL no es decorativo — el derivador usa HashRouter y sin él te
- * expulsa a `ciudaddigital.smt.gob.ar`, que es otro sitio.
+ * Con `?limpiar=1` —el reintento después de un token que no sirvió— el login
+ * borra antes el token que tenga guardado. Ver `src/lib/auth/cidituc/login.ts`.
  */
 export function inicioCidituc(request: NextRequest): NextResponse {
   if (!CIDITUC_CONFIGURADO) return conError(request, "sin-configurar");
 
-  const destino = destinoSeguro(request.nextUrl.searchParams.get("volverA"));
+  const parametros = request.nextUrl.searchParams;
+  const destino = destinoSeguro(parametros.get("volverA"));
   const nonce = crypto.randomUUID();
 
   let destinoCidituc: string;
   try {
-    destinoCidituc = urlDelDerivador(CIDITUC_DERIVADOR, CIDITUC_CLAVE, nonce);
+    destinoCidituc = urlDelLogin(
+      CIDITUC_LOGIN,
+      CIDITUC_CLAVE,
+      nonce,
+      parametros.get("limpiar") === "1",
+    );
   } catch {
     console.error(
-      `CIDITUC_DERIVADOR_URL no es una URL válida: ${JSON.stringify(CIDITUC_DERIVADOR)}. ` +
-        "Va el origen solo (https://cidituc.smt.gob.ar); el #/login lo agrega urlDelDerivador().",
+      `CIDITUC_LOGIN_URL no es una URL válida: ${JSON.stringify(CIDITUC_LOGIN)}. ` +
+        "Va el origen solo (https://ciudaddigital.smt.gob.ar); el #/login lo agrega urlDelLogin().",
     );
     return conError(request, "sin-configurar");
   }
@@ -130,6 +137,12 @@ export function inicioCidituc(request: NextRequest): NextResponse {
 
 /**
  * Vuelta desde Cidituc: valida el token y emite la sesión del diario.
+ *
+ * La cookie del flujo se exige siempre: un enlace al callback armado por otro
+ * llega sin ella y se rechaza. El `state`, en cambio, se compara sólo si viene:
+ * el login de Ciudad Digital lo devuelve únicamente porque la rama del diario
+ * en `PrivateRoute.jsx` lo reenvía, y si algún día deja de hacerlo el ingreso
+ * no se tiene que cortar.
  */
 export async function callbackCidituc(
   request: NextRequest,
@@ -140,12 +153,8 @@ export async function callbackCidituc(
 
   const { nonce, destino } = leerFlujo(request);
 
-  if (!nonce || !estadoDevuelto || nonce !== estadoDevuelto) {
-    const causa: ErrorIngreso = !estadoDevuelto
-      ? "state-ausente"
-      : !nonce
-        ? "state-vencido"
-        : "state-distinto";
+  if (!nonce || (estadoDevuelto && nonce !== estadoDevuelto)) {
+    const causa: ErrorIngreso = !nonce ? "state-vencido" : "state-distinto";
     // Sólo si estaban, nunca el valor: identifica el caso sin registrar el nonce.
     console.error("Ingreso por Cidituc rechazado al comparar el state.", {
       causa,

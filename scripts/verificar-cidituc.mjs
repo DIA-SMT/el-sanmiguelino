@@ -26,9 +26,9 @@
  *     Se manda una consulta con prefijo sólo para dejar dicho en pantalla que ese
  *     401 no prueba nada.
  *
- * Lo que este script NO puede probar: que el derivador tenga registrado al
- * diario. Eso vive en otro repositorio y se verifica mirando el bundle
- * desplegado. Ver docs/integracion-cidituc.md.
+ * Lo que este script NO puede probar: que el login de Ciudad Digital publicado
+ * tenga la rama del diario. Eso vive en otro repositorio (`cidituc`) y se
+ * verifica mirando el bundle desplegado. Ver docs/integracion-cidituc.md.
  */
 import { config as cargarEnv } from "dotenv";
 import tls from "node:tls";
@@ -38,8 +38,8 @@ import http from "node:http";
 const { SECTIGO_CA_DV_R36 } = await import(
   new URL("../src/lib/auth/cidituc/sectigo-ca.ts", import.meta.url).href
 );
-const { urlDelDerivador } = await import(
-  new URL("../src/lib/auth/cidituc/derivador.ts", import.meta.url).href
+const { urlDelLogin, urlDeSalida } = await import(
+  new URL("../src/lib/auth/cidituc/login.ts", import.meta.url).href
 );
 const { nombreDeDiario } = await import(
   new URL("../src/lib/auth/cidituc/nombre.ts", import.meta.url).href
@@ -75,13 +75,14 @@ function ok(nombre, condicion, detalle = "") {
 console.log("\nConfiguración\n");
 
 const api = (process.env.CIDITUC_API_URL ?? "").trim().replace(/\/+$/, "");
-const derivador = (process.env.CIDITUC_DERIVADOR_URL ?? "").trim();
+const login = (process.env.CIDITUC_LOGIN_URL ?? "").trim();
 const callback = (process.env.CIDITUC_CALLBACK_URL ?? "").trim();
 const clave = (process.env.CIDITUC_CLAVE_APP ?? "").trim() || "sanmiguelino";
 
-// A propósito no cuenta como falla: hasta que el derivador tenga registrado al
-// diario, tenerlo apagado es la configuración CORRECTA —un botón que manda a una
-// pantalla que no sabe volver es peor que ningún botón—. Todo lo demás se puede
+// A propósito no cuenta como falla: hasta que el login de Ciudad Digital
+// publicado tenga la rama del diario, tenerlo apagado es la configuración
+// CORRECTA —un botón que manda a una pantalla que no sabe volver es peor que
+// ningún botón—. Todo lo demás se puede
 // verificar igual, y de hecho es lo que hay que verificar antes de prenderlo.
 const habilitado = (process.env.CIDITUC_HABILITADO ?? "").trim();
 const prendido = habilitado === "1";
@@ -96,7 +97,7 @@ if (prendido) {
 } else {
   console.log(
     "  --  CIDITUC_HABILITADO apagado: el botón de /login no aparece todavía\n" +
-      "        Es lo correcto hasta que el derivador tenga registrado al diario.",
+      "        Es lo correcto hasta que Ciudad Digital publique la rama del diario.",
   );
 }
 
@@ -111,42 +112,69 @@ ok("SESSION_SECRET de 32 caracteres o más", secreto.length >= 32,
       ? `tiene ${secreto.length}; en produccion la app tira`
       : "");
 ok("CIDITUC_API_URL cargada", Boolean(api), api || "falta en .env.local");
-ok("CIDITUC_DERIVADOR_URL cargada", Boolean(derivador), derivador || "falta en .env.local");
+ok("CIDITUC_LOGIN_URL cargada", Boolean(login), login || "falta en .env.local");
 ok("CIDITUC_CALLBACK_URL cargada", Boolean(callback), callback || "falta en .env.local");
 
-if (derivador) {
+if (login) {
   // El origen solo: el "#/login" lo agrega la app. Si acá viene con hash, el
-  // flujo arma una URL con dos fragmentos y el derivador no entiende ninguno.
-  ok("el derivador es el origen solo, sin #", !derivador.includes("#"),
-    derivador.includes("#") ? "sacale el #/login: eso lo agrega urlDelDerivador()" : "");
+  // flujo arma una URL con dos fragmentos y el login no entiende ninguno.
+  ok("el login es el origen solo, sin #", !login.includes("#"),
+    login.includes("#") ? "sacale el #/login: eso lo agrega urlDelLogin()" : "");
 }
 
 if (callback) {
   ok("el callback termina en /auth/cidituc/callback",
     callback.endsWith("/auth/cidituc/callback"),
-    "tiene que ser idéntico al registrado en el repo `derivador`");
+    "tiene que ser idéntico al escrito en PrivateRoute.jsx del repo `cidituc`");
 }
 
 /* --------------------------------------------------------- a dónde se manda */
 
-if (derivador) {
-  console.log("\nLa URL del derivador\n");
+/** Las partes de una URL del login: la query real y la del fragmento. */
+function partes(armada) {
+  const url = new URL(armada);
+  const [ruta, query = ""] = url.hash.slice(1).split("?");
+  return { real: url.searchParams, ruta, hash: new URLSearchParams(query) };
+}
 
-  // Es `urlDelDerivador()` de verdad, la misma que corre en el ingreso.
-  let armada = "";
-  try {
-    armada = urlDelDerivador(derivador, clave, "nonce-de-prueba");
-  } catch {
-    armada = "";
-  }
+if (login) {
+  console.log("\nLas URLs del login de Ciudad Digital\n");
 
-  ok("se puede armar", Boolean(armada), armada || `${derivador} no es una URL válida`);
-  if (armada) {
-    // Sin el `#` el derivador te expulsa a ciudaddigital.smt.gob.ar. Es el error
+  // Son las funciones de verdad, las mismas que corren en el ingreso y la
+  // salida.
+  const armar = (f) => {
+    try {
+      return f();
+    } catch {
+      return "";
+    }
+  };
+  const ida = armar(() => urlDelLogin(login, clave, "nonce-de-prueba"));
+  const reintento = armar(() => urlDelLogin(login, clave, "nonce-de-prueba", true));
+  const salida = armar(() => urlDeSalida(login, clave));
+
+  ok("se pueden armar", Boolean(ida && reintento && salida),
+    ida ? "" : `${login} no es una URL válida`);
+  if (ida && reintento && salida) {
+    // Sin el `#` el login no encuentra la ruta: usa HashRouter. Es el error
     // más fácil de cometer y el que menos se parece a su causa.
-    ok("lleva el fragmento #/login", armada.includes("#/login?"));
-    ok(`identifica al diario como "${clave}"`, armada.includes(`next=${clave}`));
-    ok("manda el state", armada.includes("state=nonce-de-prueba"));
+    const i = partes(ida);
+    ok("la ida lleva el fragmento #/login", i.ruta === "/login");
+    ok(`la ida identifica al diario como "${clave}"`, i.hash.get("next") === clave);
+    ok("la ida manda el state", i.hash.get("state") === "nonce-de-prueba");
+    ok("la ida NO borra el token guardado", !i.real.has("logout"));
+
+    // El `logout=1` va en la query real, antes del `#`: ahí lo lee App.jsx.
+    // Dentro del fragmento no lo ve nadie y el token vencido vuelve siempre.
+    const r = partes(reintento);
+    ok("el reintento borra el token (logout=1 antes del #)", r.real.get("logout") === "1");
+    ok("el reintento vuelve al login del diario con state",
+      r.ruta === "/login" && r.hash.get("next") === clave && r.hash.has("state"));
+
+    const s = partes(salida);
+    ok("la salida borra el token (logout=1 antes del #)", s.real.get("logout") === "1");
+    ok("la salida pide volver al diario (next y salir=1)",
+      s.ruta === "/login" && s.hash.get("next") === clave && s.hash.get("salir") === "1");
   }
 }
 
