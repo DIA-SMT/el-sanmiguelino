@@ -422,6 +422,7 @@ model Suscripcion {
   confirmacionPedidaEn DateTime?
 
   eventos EventoSuscripcion[]
+  envios  EnvioBoletin[]
 
   @@index([fecha])
   @@index([estado])
@@ -441,7 +442,8 @@ model EventoSuscripcion {
   fecha         DateTime    @default(now())
   /// "alta" | "confirmacion-pedida" | "confirmacion" | "baja" | "reactivacion"
   tipo          String
-  /// "formulario" | "enlace" | "un-click" | "panel"
+  /// "formulario" | "enlace" | "un-click" | "panel" | "papel" | "cola" (el
+  /// correo para confirmar que mandó la cola del newsletter)
   via           String
 
   @@index([suscripcionId, fecha])
@@ -461,15 +463,83 @@ model Boletin {
   introduccion  String   @default("")
   notas         Json
   cierre        String   @default("")
-  /// "borrador" por ahora. Programar y enviar llegan con el proveedor.
+  /// "borrador" | "programado" | "enviando" | "enviado" | "cancelado".
+  ///
+  /// Sólo un borrador se edita. "programado" espera su hora; a esa hora la cola
+  /// lo pasa a "enviando", congela el contenido y anota a cada destinatario.
+  /// "cancelado" es un envío que se detuvo a mitad de camino: lo que ya salió,
+  /// salió. Cancelar una programación, en cambio, lo devuelve a borrador.
   estado        String   @default("borrador")
   autorId       String
   autorNombre   String
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
+  /// Cuándo tiene que salir. "Enviar ahora" también pasa por acá, con la hora
+  /// del momento: la cola lo toma en el minuto siguiente.
+  programadoPara      DateTime?
+  programadoPorId     String?
+  programadoPorNombre String?
+
+  /// Lo que se manda, congelado al empezar el envío: las notas ya resueltas
+  /// (título, bajada, foto) y los textos. Así el que recibe a las 10:00 y el
+  /// que recibe a las 10:40 leen el mismo correo aunque en el medio alguien
+  /// haya corregido una nota. Vacío mientras no empezó.
+  contenido        Json?
+  /// Cuántos destinatarios tenía la lista al empezar.
+  destinatarios    Int?
+  envioIniciadoEn  DateTime?
+  envioTerminadoEn DateTime?
+
+  canceladoEn          DateTime?
+  canceladoPorNombre   String?
+  /// Por qué se detuvo, si no lo detuvo una persona (ej.: se borraron todas
+  /// las notas antes de la hora programada).
+  motivoCancelacion    String?
+
+  envios EnvioBoletin[]
+
   @@index([actualizadoEn])
+  @@index([estado, programadoPara])
   @@map("boletines")
+}
+
+/// Un newsletter para una persona: la cola del envío.
+///
+/// La clave es el par (newsletter, suscripción), y eso es lo que garantiza que
+/// nadie lo reciba dos veces: anotar de nuevo a la misma persona choca con la
+/// clave y no hace nada.
+///
+/// **No se guarda el correo de la persona** ni una copia del mensaje: el correo
+/// se lee de la suscripción al momento de mandar (si se dio de baja en el
+/// medio, no se le manda) y el mensaje se arma con `Boletin.contenido`. Con
+/// dos mil destinatarios, guardar el HTML de cada uno serían decenas de MB por
+/// newsletter para decir lo mismo dos mil veces.
+model EnvioBoletin {
+  boletinId     String
+  boletin       Boletin     @relation(fields: [boletinId], references: [id], onDelete: Cascade)
+  suscripcionId String
+  suscripcion   Suscripcion @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+
+  /// "pendiente" | "enviando" | "enviado" | "simulado" | "fallido" |
+  /// "omitido" (se dio de baja antes de que le tocara) | "cancelado" (se
+  /// detuvo el envío antes de que le tocara).
+  estado         String    @default("pendiente")
+  intentos       Int       @default(0)
+  /// Desde cuándo se lo puede volver a intentar. Los reintentos esperan cada
+  /// vez más (ver `src/lib/newsletter/cola.ts`).
+  proximoIntento DateTime  @default(now())
+  /// Cuándo lo tomó la cola. Uno que quedó "enviando" mucho tiempo es un envío
+  /// que se cortó en el medio: no se sabe si salió, y no se repite.
+  tomadoEn       DateTime?
+  enviadoEn      DateTime?
+  error          String?
+
+  @@id([boletinId, suscripcionId])
+  @@index([estado, proximoIntento])
+  @@index([boletinId, estado])
+  @@index([suscripcionId])
+  @@map("boletin_envios")
 }
 
 /// Cada correo que el diario manda, o que habría mandado.

@@ -2,17 +2,19 @@ import "server-only";
 import nodemailer from "nodemailer";
 import { db } from "@/lib/db";
 import type { CorreoArmado } from "@/lib/newsletter/plantilla";
+import { clasificarError, type ClaseDeError } from "@/lib/newsletter/cola";
 
 /**
  * Por acá sale todo correo del diario.
  *
- * **Hoy sólo salen de verdad las pruebas del panel** (`TIPOS_QUE_SALEN`), y
- * sólo si están cargadas las credenciales de la cuenta. Lo demás —el correo
- * para confirmar una suscripción, el newsletter a la lista— se guarda en
- * `correos_salientes` con estado "simulado" y el panel lo muestra tal cual
- * habría llegado. Abrir el envío a los vecinos es una decisión aparte (etapa
- * 2): mientras tanto no hay manera de que un correo le llegue a un suscriptor
- * por error.
+ * **Las pruebas del panel salen siempre** que estén las credenciales de la
+ * cuenta. **A los vecinos** —el correo para confirmar una suscripción y el
+ * newsletter a la lista— sólo se les escribe si además está prendido
+ * `NEWSLETTER_ENVIO_REAL=1`. Esa variable es la autorización explícita del
+ * municipio para empezar a escribirles, y no se prende al pasar. Sin ella, la
+ * confirmación queda "simulada" en `correos_salientes`, y el newsletter
+ * recorre la cola entera pero cada destinatario queda "simulado": se puede
+ * probar el envío completo sin que le llegue nada a nadie.
  *
  * **Cómo sale:** por el SMTP de Google con la cuenta `sanmiguelino@smt.gob.ar`.
  * smt.gob.ar usa Google Workspace y su SPF ya incluye `_spf.google.com`, así que
@@ -34,9 +36,18 @@ export const REMITENTE = {
 
 export type TipoDeCorreo = "prueba" | "confirmacion" | "boletin";
 
-/** Lo que sale de verdad cuando hay credenciales. Sumar acá "confirmacion" o
- *  "boletin" es empezar a escribirles a los vecinos: no se hace al pasar. */
-const TIPOS_QUE_SALEN: readonly TipoDeCorreo[] = ["prueba"];
+/** Si el municipio autorizó escribirles a los vecinos. Ver arriba. */
+export function envioALosVecinosAutorizado(): boolean {
+  return process.env.NEWSLETTER_ENVIO_REAL === "1";
+}
+
+/** Lo que sale de verdad cuando hay credenciales: las pruebas siempre, y lo que
+ *  le llega a un vecino sólo con la autorización de arriba. */
+function tiposQueSalen(): readonly TipoDeCorreo[] {
+  return envioALosVecinosAutorizado()
+    ? ["prueba", "confirmacion", "boletin"]
+    : ["prueba"];
+}
 
 /** "smtp" si están las credenciales; "prueba" si no, y nada sale. */
 export type ModoDeCorreo = "smtp" | "prueba";
@@ -55,15 +66,31 @@ export function modoDeCorreo(): ModoDeCorreo {
 
 /** Si un correo de este tipo sale de verdad con la configuración de hoy. */
 export function saleDeVerdad(tipo: TipoDeCorreo): boolean {
-  return modoDeCorreo() === "smtp" && TIPOS_QUE_SALEN.includes(tipo);
+  return modoDeCorreo() === "smtp" && tiposQueSalen().includes(tipo);
 }
 
-function transporte(c: { usuario: string; clave: string }) {
+/**
+ * Google Workspace deja mandar unos 2000 correos por día y por cuenta. Contando
+ * todo —pruebas, confirmaciones y newsletters—, la cola frena antes de llegar,
+ * con margen para que las confirmaciones de quien se anota ese día sigan
+ * saliendo. Lo que no salió hoy sale mañana: nadie se queda sin su correo.
+ */
+export function topeDiario(): number {
+  const n = Number(process.env.NEWSLETTER_TOPE_DIARIO);
+  return Number.isInteger(n) && n > 0 ? n : 1800;
+}
+
+function transporte(c: { usuario: string; clave: string }, pool = false) {
+  const puerto = Number(process.env.CORREO_SMTP_PUERTO) || 465;
   return nodemailer.createTransport({
     host: process.env.CORREO_SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.CORREO_SMTP_PUERTO) || 465,
-    secure: (Number(process.env.CORREO_SMTP_PUERTO) || 465) === 465,
+    port: puerto,
+    secure: puerto === 465,
     auth: { user: c.usuario, pass: c.clave },
+    // La cola manda varios en una misma llamada: con una conexión abierta se
+    // ahorra el saludo y el TLS de cada uno. Una sola, para no parecerle a
+    // Google una ráfaga.
+    ...(pool ? { pool: true, maxConnections: 1 } : {}),
     // Una función de Vercel se corta a los 10 s: mejor fallar con un mensaje
     // que quedarse colgado.
     connectionTimeout: 4000,
@@ -77,8 +104,12 @@ export type ResultadoDeEnvio =
   | { id: string; estado: "fallido"; error: string };
 
 /**
- * Manda (o simula) un correo y lo deja anotado. Nunca tira por un error del
- * servidor de correo: lo devuelve, y queda guardado con el correo.
+ * Manda (o simula) un correo suelto y lo deja anotado en `correos_salientes`:
+ * las pruebas y las confirmaciones. Nunca tira por un error del servidor de
+ * correo: lo devuelve, y queda guardado con el correo.
+ *
+ * El newsletter a la lista NO pasa por acá: va por la cola (`abrirCorreo`),
+ * que anota a cada destinatario en `boletin_envios` sin copiar el mensaje.
  */
 export async function enviarCorreo(datos: {
   para: string;
@@ -88,7 +119,7 @@ export async function enviarCorreo(datos: {
   autorId?: string;
 }): Promise<ResultadoDeEnvio> {
   const c = credenciales();
-  const sale = Boolean(c) && TIPOS_QUE_SALEN.includes(datos.tipo);
+  const sale = Boolean(c) && tiposQueSalen().includes(datos.tipo);
 
   let estado: "simulado" | "enviado" | "fallido" = "simulado";
   let error: string | null = null;
@@ -104,7 +135,7 @@ export async function enviarCorreo(datos: {
       estado = "enviado";
     } catch (e) {
       estado = "fallido";
-      error = explicar(e);
+      error = clasificarError(e).mensaje;
     }
   }
 
@@ -128,20 +159,76 @@ export async function enviarCorreo(datos: {
     : { id: fila.id, estado };
 }
 
-/** El error del servidor de correo, en una línea que sirva para arreglarlo. */
-function explicar(e: unknown): string {
-  const codigo = (e as { code?: string; responseCode?: number })?.code;
-  const respuesta = (e as { responseCode?: number })?.responseCode;
-  if (codigo === "EAUTH" || respuesta === 535) {
-    return "Google rechazó la cuenta o la contraseña de aplicación del correo del diario.";
+export type ResultadoDeEnvioEnCola =
+  | { estado: "enviado" | "simulado" }
+  | { estado: "fallido"; clase: ClaseDeError; mensaje: string };
+
+/**
+ * Una conexión para mandar varios newsletters seguidos, desde la cola.
+ *
+ * Si el municipio no autorizó escribirles a los vecinos, o no hay cuenta
+ * conectada, `mandar` no sale a ningún lado y devuelve "simulado".
+ *
+ * Cada correo lleva su propia baja de un clic (`List-Unsubscribe` +
+ * `List-Unsubscribe-Post`, RFC 8058): Gmail y Yahoo la exigen a quien manda en
+ * cantidad, y es el botón «Anular suscripción» que muestran junto al
+ * remitente. Va a la dirección firmada de esa persona.
+ */
+export function abrirCorreo(): {
+  real: boolean;
+  mandar: (datos: {
+    para: string;
+    correo: CorreoArmado;
+    bajaUnClic: string;
+  }) => Promise<ResultadoDeEnvioEnCola>;
+  cerrar: () => void;
+} {
+  const c = credenciales();
+  if (!c || !saleDeVerdad("boletin")) {
+    return {
+      real: false,
+      mandar: async () => ({ estado: "simulado" }),
+      cerrar: () => {},
+    };
   }
-  if (codigo === "ETIMEDOUT" || codigo === "ECONNECTION" || codigo === "ESOCKET") {
-    return "No se pudo conectar con el servidor de correo. Probá de nuevo en un rato.";
-  }
-  if (respuesta && respuesta >= 500) {
-    return "El servidor de correo no aceptó el mensaje. Revisá la dirección.";
-  }
-  return "No se pudo enviar el correo.";
+  const t = transporte(c, true);
+  return {
+    real: true,
+    mandar: async ({ para, correo, bajaUnClic }) => {
+      try {
+        await t.sendMail({
+          from: { name: REMITENTE.nombre, address: c.usuario },
+          to: para,
+          subject: correo.asunto,
+          html: correo.html,
+          text: correo.texto,
+          headers: {
+            "List-Unsubscribe": `<${bajaUnClic}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
+        });
+        return { estado: "enviado" };
+      } catch (e) {
+        return { estado: "fallido", ...clasificarError(e) };
+      }
+    },
+    cerrar: () => t.close(),
+  };
+}
+
+/** Cuántos correos salieron de verdad en las últimas 24 horas, de todo tipo.
+ *  Es lo que se compara con `topeDiario()`. */
+export async function enviadosUltimas24h(ahora = new Date()): Promise<number> {
+  const desde = new Date(ahora.getTime() - 24 * 60 * 60 * 1000);
+  const [sueltos, boletines] = await Promise.all([
+    db().correoSaliente.count({
+      where: { estado: "enviado", fecha: { gte: desde } },
+    }),
+    db().envioBoletin.count({
+      where: { estado: "enviado", enviadoEn: { gte: desde } },
+    }),
+  ]);
+  return sueltos + boletines;
 }
 
 export interface CorreoGuardado {

@@ -106,6 +106,56 @@ async function pedirConfirmacion(s: {
   return "enviado";
 }
 
+/**
+ * Los correos para confirmar que quedaron esperando: los de quienes se
+ * anotaron mientras el envío a los vecinos todavía no estaba autorizado (y
+ * los del papel, si quedara alguno). Lo llama la cola cada minuto, y sólo
+ * cuando la autorización está prendida: si no, sería simular el mismo correo
+ * una y otra vez.
+ *
+ * Se marca ANTES de mandar, con el "todavía no se pidió" en el filtro: dos
+ * vueltas de la cola que se pisen no le mandan dos veces a la misma persona.
+ * Si el correo falla, queda marcado igual y no se insiste solo (una dirección
+ * que rebota rebotaría cada minuto); la persona puede volver a anotarse y le
+ * llega otro.
+ */
+export async function pedirConfirmacionesPendientes(
+  tope: number,
+  quedaTiempo: () => boolean,
+): Promise<number> {
+  const candidatas = await db().suscripcion.findMany({
+    where: { estado: "pendiente", confirmacionPedidaEn: null },
+    orderBy: { fecha: "asc" },
+    take: tope,
+    select: { id: true, nombre: true, email: true },
+  });
+  let enviadas = 0;
+  for (const s of candidatas) {
+    if (!quedaTiempo()) break;
+    const r = await db().suscripcion.updateMany({
+      where: { id: s.id, estado: "pendiente", confirmacionPedidaEn: null },
+      data: { confirmacionPedidaEn: new Date() },
+    });
+    if (r.count === 0) continue;
+    const token = firmarEnlace(secretoDeEnlaces(), "confirmar", s.id);
+    const envio = await enviarCorreo({
+      para: s.email,
+      correo: armarConfirmacion({
+        nombre: s.nombre,
+        enlace: `${SITIO_URL.origin}/newsletter/confirmar?t=${token}`,
+      }),
+      tipo: "confirmacion",
+    });
+    if (envio.estado === "enviado") {
+      await db().eventoSuscripcion.create({
+        data: { suscripcionId: s.id, tipo: "confirmacion-pedida", via: "cola" },
+      });
+      enviadas++;
+    }
+  }
+  return enviadas;
+}
+
 /** Entre un correo para confirmar y el siguiente, por lo menos esto. Si no, el
  *  botón del formulario sería una manera de llenarle la bandeja a alguien. */
 const FRENO_CONFIRMACION_MS = 10 * 60 * 1000;

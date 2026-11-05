@@ -6,8 +6,9 @@ import type { NotaDelBoletin } from "@/lib/newsletter/plantilla";
 /**
  * Los newsletters que se arman en el panel.
  *
- * Etapa 1: se arman, se guardan como borrador, se ven y se mandan de prueba.
- * Programar y enviar a la lista llegan con el proveedor de correo.
+ * Se arman, se guardan como borrador, se ven y se mandan de prueba. Programar
+ * y enviar a la lista vive en `newsletter/envios.ts`: desde que se programa,
+ * deja de ser borrador y ya no se edita.
  *
  * Las notas se guardan por slug, no copiadas: el correo se arma con la nota tal
  * como esté al momento de mandarlo. Si en el medio alguien corrige un título,
@@ -32,6 +33,15 @@ export interface Boletin {
   autorNombre: string;
   creadoEn: string;
   actualizadoEn: string;
+  /* El envío (etapa 2). Vacíos mientras es borrador. */
+  programadoPara: string | null;
+  programadoPorNombre: string | null;
+  envioIniciadoEn: string | null;
+  envioTerminadoEn: string | null;
+  canceladoEn: string | null;
+  canceladoPorNombre: string | null;
+  motivoCancelacion: string | null;
+  destinatarios: number | null;
 }
 
 export interface BoletinEnLista {
@@ -41,7 +51,11 @@ export interface BoletinEnLista {
   notas: number;
   autorNombre: string;
   actualizadoEn: string;
+  programadoPara: string | null;
+  destinatarios: number | null;
 }
+
+const iso = (d: Date | null) => d?.toISOString() ?? null;
 
 /** Lo que ofrece el buscador del editor. */
 export interface NotaCandidata extends NotaDelBoletin {
@@ -84,6 +98,8 @@ export async function listarBoletines(): Promise<BoletinEnLista[]> {
       notas: true,
       autorNombre: true,
       actualizadoEn: true,
+      programadoPara: true,
+      destinatarios: true,
     },
   });
   return filas.map((f) => ({
@@ -93,6 +109,8 @@ export async function listarBoletines(): Promise<BoletinEnLista[]> {
     notas: aNotas(f.notas).length,
     autorNombre: f.autorNombre,
     actualizadoEn: f.actualizadoEn.toISOString(),
+    programadoPara: iso(f.programadoPara),
+    destinatarios: f.destinatarios,
   }));
 }
 
@@ -110,6 +128,14 @@ export async function obtenerBoletin(id: string): Promise<Boletin | null> {
     autorNombre: f.autorNombre,
     creadoEn: f.creadoEn.toISOString(),
     actualizadoEn: f.actualizadoEn.toISOString(),
+    programadoPara: iso(f.programadoPara),
+    programadoPorNombre: f.programadoPorNombre,
+    envioIniciadoEn: iso(f.envioIniciadoEn),
+    envioTerminadoEn: iso(f.envioTerminadoEn),
+    canceladoEn: iso(f.canceladoEn),
+    canceladoPorNombre: f.canceladoPorNombre,
+    motivoCancelacion: f.motivoCancelacion,
+    destinatarios: f.destinatarios,
   };
 }
 

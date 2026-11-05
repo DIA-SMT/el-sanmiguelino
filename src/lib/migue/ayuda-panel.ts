@@ -174,9 +174,24 @@ export const AYUDA: Record<
           "Tocá «Nuevo newsletter». Escribí el asunto, buscá las notas en «Agregar notas del diario» y ordenalas con las flechas. A la derecha ves el correo tal cual llega, en «Compu» o «Celular». Tocá «Guardar borrador» para guardarlo.",
       },
       {
-        pregunta: "¿Ya puedo mandarlo a los suscriptores?",
+        pregunta: "¿Cómo lo mando a los suscriptores?",
         respuesta:
-          "Todavía no: el envío a la lista se habilita más adelante. Por ahora podés armarlo, guardarlo y mandarte una prueba con «Enviar prueba». La prueba sale de verdad desde sanmiguelino@smt.gob.ar a la dirección que escribas, y queda anotada en «Correos de prueba».",
+          "Abajo del editor, en «Enviar a la lista», elegí «Ahora» o una fecha y hora (de Tucumán) y confirmá. Sale lo que está guardado. Desde ese momento ya no se edita: si lo programaste, hasta la hora elegida podés tocar «Cancelar y volver a editar». Mientras el aviso de arriba diga que el envío es de práctica, recorre la lista pero no le llega a nadie.",
+      },
+      {
+        pregunta: "¿Cuánto tarda en llegarle a todos?",
+        respuesta:
+          "Sale de a tandas, unas 700 personas por hora, para que el correo del diario no quede marcado como spam. En la pantalla del envío ves cuántos van, a quiénes no les llegó y por qué. Si un envío falla por un problema pasajero, se reintenta solo.",
+      },
+      {
+        pregunta: "¿Puedo frenar un envío que ya empezó?",
+        respuesta:
+          "Sí, con «Detener el envío». A quien ya le llegó, le llegó; al resto no le llega. No se puede retomar: para mandarlo a los que faltaron habría que armar uno nuevo.",
+      },
+      {
+        pregunta: "¿Cómo me mando una prueba?",
+        respuesta:
+          "Escribí tu correo en «Mandarme una prueba a» y tocá «Enviar prueba». Sale desde sanmiguelino@smt.gob.ar con «[Prueba]» en el asunto, y queda anotada en «Correos de prueba».",
       },
       {
         pregunta: "¿Qué texto aparece debajo de cada nota?",
@@ -186,7 +201,7 @@ export const AYUDA: Record<
       {
         pregunta: "¿Quiénes lo recibirían?",
         respuesta:
-          "Sólo quienes confirmaron su correo con el enlace que les llega al anotarse. Los que se habían anotado para el diario en papel figuran como «Falta que confirmen»: antes del primer envío se les pide que confirmen.",
+          "Sólo quienes confirmaron su correo con el enlace que les llega al anotarse. Los que figuran como «Falta que confirmen» no lo reciben hasta que confirmen. La lista se toma en el momento en que el newsletter empieza a salir.",
       },
     ],
   },

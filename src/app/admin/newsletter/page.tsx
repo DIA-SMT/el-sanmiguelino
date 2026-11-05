@@ -20,11 +20,53 @@ import {
 import { requerirAdmin } from "@/lib/auth/dal";
 import { listarBoletines } from "@/lib/repos/boletines";
 import { contarPorEstado } from "@/lib/repos/suscripciones";
-import { REMITENTE, listarCorreos, modoDeCorreo } from "@/lib/correo/enviar";
+import {
+  REMITENTE,
+  envioALosVecinosAutorizado,
+  listarCorreos,
+  modoDeCorreo,
+} from "@/lib/correo/enviar";
+import { fechaLegible } from "@/lib/newsletter/cola";
 import { tiempoRelativo } from "@/lib/utils";
 import { crearBoletinAction } from "./acciones";
 
 export const metadata = { title: "Newsletter" };
+
+/** Cómo está cada newsletter, con el color de su píldora. */
+const ESTADOS_DE_BOLETIN: Record<string, { nombre: string; tono: string }> = {
+  borrador: { nombre: "Borrador", tono: "var(--grafico-diario)" },
+  programado: { nombre: "Programado", tono: "var(--grafico-acento)" },
+  enviando: { nombre: "Saliendo", tono: "var(--grafico-indice)" },
+  enviado: { nombre: "Enviado", tono: "var(--grafico-nota)" },
+  cancelado: { nombre: "Detenido", tono: "var(--grafico-alerta)" },
+};
+
+/** La línea de abajo de cada newsletter de la lista. */
+function detalleDeBoletin(b: {
+  estado: string;
+  notas: number;
+  autorNombre: string;
+  actualizadoEn: string;
+  programadoPara: string | null;
+  destinatarios: number | null;
+}): string {
+  const notas = b.notas === 1 ? "1 nota" : `${b.notas} notas`;
+  const personas = (n: number) => (n === 1 ? "1 persona" : `${n} personas`);
+  switch (b.estado) {
+    case "programado":
+      return b.programadoPara
+        ? `${notas} · sale el ${fechaLegible(b.programadoPara)}`
+        : notas;
+    case "enviando":
+      return `${notas} · saliendo a ${personas(b.destinatarios ?? 0)}`;
+    case "enviado":
+      return `${notas} · enviado a ${personas(b.destinatarios ?? 0)}`;
+    case "cancelado":
+      return `${notas} · se detuvo`;
+    default:
+      return `${notas} · lo tocó ${b.autorNombre} ${tiempoRelativo(b.actualizadoEn)}`;
+  }
+}
 
 /** Cómo quedó cada correo, con el color de su píldora. */
 const ESTADOS_DE_CORREO: Record<string, { nombre: string; tono: string }> = {
@@ -43,14 +85,15 @@ const TIPOS: Record<string, string> = {
  * El newsletter: los borradores, cuánta gente lo recibiría y la bandeja de los
  * correos de prueba.
  *
- * **Etapa 1.** Todavía no se le escribe a ningún suscriptor. Las pruebas sí
- * salen de verdad cuando la cuenta del diario está conectada; si no, quedan
- * simuladas en la bandeja de abajo. El aviso de arriba dice en cuál de los dos
- * casos se está, para que nadie crea que algo salió (o que no).
+ * Hay tres situaciones posibles, y el aviso de arriba dice en cuál se está
+ * para que nadie crea que algo salió (o que no): sin la cuenta conectada no
+ * sale nada; con la cuenta, salen las pruebas y el envío a la lista es de
+ * práctica; con la cuenta y la autorización del municipio, sale todo.
  */
 export default async function AdminNewsletter() {
   await requerirAdmin();
   const conectada = modoDeCorreo() === "smtp";
+  const aLosVecinos = envioALosVecinosAutorizado();
   const [cuentas, boletines, correos] = await Promise.all([
     contarPorEstado(),
     listarBoletines(),
@@ -72,7 +115,18 @@ export default async function AdminNewsletter() {
       </BannerPanel>
 
       <div className="grid gap-6">
-        {conectada ? (
+        {conectada && aLosVecinos ? (
+          <Aviso icono={MailCheck} tono="var(--grafico-nota)">
+            <strong className="font-semibold text-panel-tinta">
+              Los correos salen de verdad
+            </strong>{" "}
+            desde{" "}
+            <strong className="font-semibold text-panel-tinta">
+              {REMITENTE.correo}
+            </strong>
+            : las pruebas, las confirmaciones y el newsletter a la lista.
+          </Aviso>
+        ) : conectada ? (
           <Aviso icono={MailCheck} tono="var(--grafico-nota)">
             <strong className="font-semibold text-panel-tinta">
               Las pruebas salen de verdad
@@ -81,8 +135,8 @@ export default async function AdminNewsletter() {
             <strong className="font-semibold text-panel-tinta">
               {REMITENTE.correo}
             </strong>
-            , a la dirección que escribas. El envío a los suscriptores
-            todavía no está habilitado.
+            , a la dirección que escribas. El envío a la lista todavía es de
+            práctica: recorre a todos, pero no le llega a nadie.
           </Aviso>
         ) : (
           <Aviso icono={FlaskConical} tono="var(--grafico-diario)">
@@ -108,7 +162,7 @@ export default async function AdminNewsletter() {
             color="oro"
             valor={String(cuentas.pendiente)}
             titulo="Falta que confirmen"
-            nota="Se les pide antes del primer envío"
+            nota="Hasta que confirmen, no lo reciben"
           />
           <TarjetaDato
             icono={MailX}
@@ -121,8 +175,8 @@ export default async function AdminNewsletter() {
 
         <SeccionPanel
           id="borradores"
-          titulo="Borradores"
-          bajada="Del último que se tocó al primero."
+          titulo="Newsletters"
+          bajada="Del último que se tocó al primero. Tocá uno para editarlo o ver cómo va su envío."
         >
           {boletines.length === 0 ? (
             <EstadoVacio ilustracion="periodico">
@@ -144,12 +198,12 @@ export default async function AdminNewsletter() {
                       {b.asunto}
                     </Link>
                     <p className="mt-0.5 text-panel-sm text-panel-tinta-3">
-                      {b.notas === 1 ? "1 nota" : `${b.notas} notas`} · lo
-                      tocó {b.autorNombre}{" "}
-                      {tiempoRelativo(b.actualizadoEn)}
+                      {detalleDeBoletin(b)}
                     </p>
                   </div>
-                  <Pildora tono="var(--grafico-diario)">Borrador</Pildora>
+                  <Pildora tono={ESTADOS_DE_BOLETIN[b.estado]?.tono}>
+                    {ESTADOS_DE_BOLETIN[b.estado]?.nombre ?? b.estado}
+                  </Pildora>
                 </li>
               ))}
             </ul>

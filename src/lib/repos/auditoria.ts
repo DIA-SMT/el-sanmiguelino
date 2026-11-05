@@ -109,6 +109,22 @@ export const ACCIONES = {
     grave: true,
   },
   "newsletter.prueba": { objeto: "newsletter", nombre: "Mandó una prueba" },
+  /* «Enviar ahora» también se anota así: es programar para este momento. Lo
+     que pasó después con cada destinatario está en el seguimiento del envío,
+     no acá: este registro dice quién decidió, no qué hizo la cola. */
+  "newsletter.programado": {
+    objeto: "newsletter",
+    nombre: "Mandó o programó un newsletter",
+  },
+  "newsletter.programacion-cancelada": {
+    objeto: "newsletter",
+    nombre: "Canceló un envío programado",
+  },
+  "newsletter.envio-detenido": {
+    objeto: "newsletter",
+    nombre: "Detuvo un envío",
+    grave: true,
+  },
 } as const;
 
 export type Accion = keyof typeof ACCIONES;

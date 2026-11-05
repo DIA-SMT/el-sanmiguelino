@@ -14,11 +14,22 @@ import {
   type CambiosDelBoletin,
 } from "@/lib/repos/boletines";
 import {
+  contarPorEstado,
   darDeBaja,
   nombreDeSuscripcion,
 } from "@/lib/repos/suscripciones";
-import { enviarCorreo, pruebasRecientes } from "@/lib/correo/enviar";
+import {
+  enviarCorreo,
+  pruebasRecientes,
+  saleDeVerdad,
+} from "@/lib/correo/enviar";
 import { armarBoletin } from "@/lib/newsletter/plantilla";
+import {
+  cancelarProgramacion,
+  detenerEnvio,
+  programarEnvio,
+} from "@/lib/newsletter/envios";
+import { fechaLegible, horaDeTucuman, revisarHora } from "@/lib/newsletter/cola";
 import { SITIO_URL } from "@/lib/compartir";
 
 /**
@@ -29,9 +40,11 @@ import { SITIO_URL } from "@/lib/compartir";
  * valida lo que recibe aunque venga de nuestro propio formulario, y anota en
  * la auditoría lo que hizo.
  *
- * **Ninguna le escribe a un suscriptor.** «Enviar prueba» sí sale de verdad, a
- * la dirección que se escribe, cuando la cuenta del diario está conectada (ver
- * `correo/enviar.ts`); si no, queda en la bandeja del panel.
+ * **Ninguna le escribe directamente a un suscriptor.** «Enviar prueba» sale de
+ * verdad, a la dirección que se escribe, cuando la cuenta del diario está
+ * conectada (ver `correo/enviar.ts`); si no, queda en la bandeja del panel.
+ * «Enviar a la lista» sólo lo programa: lo manda la cola (`newsletter/envios.ts`),
+ * y les llega a los vecinos sólo si el municipio autorizó el envío real.
  */
 
 /** El enlace de baja de un correo de prueba: no da de baja a nadie, y la
@@ -214,6 +227,135 @@ export async function enviarPruebaAction(datos: unknown): Promise<{
     return { ok: false, error: envio.error, correoId: envio.id };
   }
   return { ok: true, correoId: envio.id, enviado: envio.estado === "enviado" };
+}
+
+/**
+ * «Enviar ahora» o «Programar envío». Manda lo guardado: el editor guarda
+ * antes de llamar a esto.
+ *
+ * No manda nada por sí misma: deja el newsletter "programado" y la cola lo
+ * toma a su hora. Hasta entonces se puede cancelar.
+ */
+export async function programarEnvioAction(
+  datos: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  const { usuario } = await requerirAdmin();
+  const d = (typeof datos === "object" && datos !== null ? datos : {}) as {
+    id?: unknown;
+    cuando?: unknown;
+  };
+  if (typeof d.id !== "string") return { ok: false, error: "Falta el newsletter." };
+
+  const ahora = new Date();
+  let cuando: Date | null = null;
+  if (d.cuando === "ahora") {
+    cuando = ahora;
+  } else if (typeof d.cuando === "object" && d.cuando !== null) {
+    const { fecha, hora } = d.cuando as { fecha?: unknown; hora?: unknown };
+    if (typeof fecha === "string" && typeof hora === "string") {
+      cuando = horaDeTucuman(fecha, hora);
+    }
+  }
+  if (!cuando) return { ok: false, error: "Elegí una fecha y una hora que existan." };
+  const problema = revisarHora(cuando, ahora);
+  if (problema === "pasada") {
+    return { ok: false, error: "Esa hora ya pasó. Elegí una más adelante, o «Ahora»." };
+  }
+  if (problema === "muy-lejos") {
+    return { ok: false, error: "Se puede programar hasta dos meses para adelante." };
+  }
+
+  const boletin = await obtenerBoletin(d.id);
+  if (!boletin) return { ok: false, error: "Este newsletter ya no existe." };
+  if (boletin.estado !== "borrador") {
+    return { ok: false, error: "Este newsletter ya está programado o enviado." };
+  }
+  const { notas, faltan } = await resolverNotas(boletin.notas);
+  if (notas.length === 0) {
+    return { ok: false, error: "Agregá al menos una nota antes de enviarlo." };
+  }
+  if (faltan.length > 0) {
+    return {
+      ok: false,
+      error: "Hay notas que ya no existen en el diario. Guardá de nuevo para sacarlas y revisalo antes de enviar.",
+    };
+  }
+  const { activa } = await contarPorEstado();
+  if (activa === 0) {
+    return {
+      ok: false,
+      error: "Todavía nadie confirmó su suscripción: no hay a quién mandárselo.",
+    };
+  }
+
+  if (!(await programarEnvio(boletin.id, cuando, usuario))) {
+    return { ok: false, error: "Este newsletter ya está programado o enviado." };
+  }
+  const real = saleDeVerdad("boletin");
+  await anotar(usuario, {
+    accion: "newsletter.programado",
+    objetoId: boletin.id,
+    resumen:
+      d.cuando === "ahora"
+        ? `Mandó el newsletter «${boletin.asunto}» a la lista${real ? "" : " (de práctica)"}`
+        : `Programó el newsletter «${boletin.asunto}» para el ${fechaLegible(cuando)}${real ? "" : " (de práctica)"}`,
+    detalle: {
+      para: cuando.toISOString(),
+      destinatarios: activa,
+      notas: notas.length,
+      real,
+    },
+  });
+  revalidatePath("/admin/newsletter");
+  revalidatePath(`/admin/newsletter/${boletin.id}`);
+  return { ok: true };
+}
+
+/** Vuelve un programado a borrador, si todavía no empezó a salir. */
+export async function cancelarProgramacionAction(
+  id: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  const { usuario } = await requerirAdmin();
+  if (typeof id !== "string") return { ok: false, error: "Falta el newsletter." };
+  const boletin = await obtenerBoletin(id);
+  if (!boletin) return { ok: false, error: "Este newsletter ya no existe." };
+  if (!(await cancelarProgramacion(id))) {
+    return {
+      ok: false,
+      error: "Ya empezó a salir. Si querés frenarlo, usá «Detener el envío».",
+    };
+  }
+  await anotar(usuario, {
+    accion: "newsletter.programacion-cancelada",
+    objetoId: id,
+    resumen: `Canceló el envío programado del newsletter «${boletin.asunto}»`,
+  });
+  revalidatePath("/admin/newsletter");
+  revalidatePath(`/admin/newsletter/${id}`);
+  return { ok: true };
+}
+
+/** Frena un envío en curso. Lo que ya salió, salió. */
+export async function detenerEnvioAction(
+  id: unknown,
+): Promise<{ ok: boolean; error?: string; sinRecibir?: number }> {
+  const { usuario } = await requerirAdmin();
+  if (typeof id !== "string") return { ok: false, error: "Falta el newsletter." };
+  const boletin = await obtenerBoletin(id);
+  if (!boletin) return { ok: false, error: "Este newsletter ya no existe." };
+  const sinRecibir = await detenerEnvio(id, usuario);
+  if (sinRecibir === null) {
+    return { ok: false, error: "Este envío ya no está en curso." };
+  }
+  await anotar(usuario, {
+    accion: "newsletter.envio-detenido",
+    objetoId: id,
+    resumen: `Detuvo el envío del newsletter «${boletin.asunto}»`,
+    detalle: { sinRecibir },
+  });
+  revalidatePath("/admin/newsletter");
+  revalidatePath(`/admin/newsletter/${id}`);
+  return { ok: true, sinRecibir };
 }
 
 export async function borrarBoletinAction(

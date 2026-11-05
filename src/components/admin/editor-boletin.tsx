@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  CalendarClock,
   Check,
   FlaskConical,
   Maximize2,
@@ -25,13 +26,20 @@ import {
   Send,
   Smartphone,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import {
   borrarBoletinAction,
   enviarPruebaAction,
   guardarBoletinAction,
+  programarEnvioAction,
 } from "@/app/admin/newsletter/acciones";
+import {
+  enTucuman,
+  fechaLegible,
+  horaDeTucuman,
+} from "@/lib/newsletter/cola";
 import {
   Aviso,
   ChipFiltro,
@@ -92,6 +100,8 @@ export function EditorBoletin({
   candidatas,
   elegidasIniciales,
   faltan,
+  destinatarios,
+  envioReal,
 }: {
   boletin: Boletin;
   candidatas: NotaCandidata[];
@@ -99,6 +109,10 @@ export function EditorBoletin({
   elegidasIniciales: NotaCandidata[];
   /** Las que ya no existen: se avisan y se caen al guardar. */
   faltan: string[];
+  /** Cuántas suscripciones confirmadas hay hoy. */
+  destinatarios: number;
+  /** Si el envío a la lista llega de verdad o es de práctica. */
+  envioReal: boolean;
 }) {
   const router = useRouter();
 
@@ -139,6 +153,25 @@ export function EditorBoletin({
   >(null);
   const [borrando, setBorrando] = useState(false);
   const [enCurso, iniciar] = useTransition();
+
+  // Mandar a la lista: ahora, o a una fecha y hora de Tucumán.
+  const [modoEnvio, setModoEnvio] = useState<"ahora" | "programar">("ahora");
+  const [fechaEnvio, setFechaEnvio] = useState("");
+  const [horaEnvio, setHoraEnvio] = useState("10:00");
+  const [confirmandoEnvio, setConfirmandoEnvio] = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+
+  // Mañana, de arranque. Después de hidratar: "mañana" depende del reloj de
+  // quien mira, y el servidor no tiene por qué coincidir.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFechaEnvio(enTucuman(new Date(Date.now() + 86_400_000)).fecha);
+    });
+    return () => clearTimeout(t);
+  }, []);
+
+  const horaElegida =
+    modoEnvio === "programar" ? horaDeTucuman(fechaEnvio, horaEnvio) : null;
 
   const datos = { asunto, preencabezado, introduccion, cierre, notas: elegidas };
   const sinGuardar = JSON.stringify(datos) !== guardado;
@@ -279,6 +312,46 @@ export function EditorBoletin({
         router.refresh();
       } catch {
         setError("No se pudo hablar con el servidor.");
+      }
+    });
+  }
+
+  function pedirEnvio() {
+    setErrorEnvio(null);
+    if (modoEnvio === "programar" && !horaElegida) {
+      setErrorEnvio("Elegí una fecha y una hora que existan.");
+      return;
+    }
+    setConfirmandoEnvio(true);
+  }
+
+  function enviarALaLista() {
+    tocar();
+    setErrorEnvio(null);
+    iniciar(async () => {
+      try {
+        // Lo que sale es lo guardado: se guarda primero, como en la prueba.
+        if (!(await guardarAhora())) {
+          setConfirmandoEnvio(false);
+          return;
+        }
+        const res = await programarEnvioAction({
+          id: boletin.id,
+          cuando:
+            modoEnvio === "ahora"
+              ? "ahora"
+              : { fecha: fechaEnvio, hora: horaEnvio },
+        });
+        if (!res.ok) {
+          setErrorEnvio(res.error ?? "No se pudo programar el envío.");
+          setConfirmandoEnvio(false);
+          return;
+        }
+        // La página pasa a mostrar el seguimiento del envío.
+        router.refresh();
+      } catch {
+        setErrorEnvio("No se pudo hablar con el servidor.");
+        setConfirmandoEnvio(false);
       }
     });
   }
@@ -662,6 +735,164 @@ export function EditorBoletin({
             </div>
           </div>
         </SeccionPanel>
+
+        <SeccionPanel
+          id="nl-enviar"
+          titulo="Enviar a la lista"
+          bajada="A quienes confirmaron su suscripción. Sale lo que está guardado."
+        >
+          <div className="grid gap-4">
+            {!envioReal && (
+              <Aviso icono={FlaskConical} tono="var(--grafico-diario)" sobre="tarjeta">
+                <strong className="font-semibold text-panel-tinta">
+                  Por ahora el envío es de práctica:
+                </strong>{" "}
+                recorre la lista entera, pero no le llega a nadie. Sirve para
+                ver cómo funciona antes de mandarlo de verdad.
+              </Aviso>
+            )}
+            {errorEnvio && (
+              <Aviso icono={AlertTriangle} tono="var(--grafico-alerta)" sobre="tarjeta" rol="alert">
+                {errorEnvio}
+              </Aviso>
+            )}
+
+            <p className="flex items-center gap-2 text-panel-sm text-panel-tinta-2">
+              <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {destinatarios === 0
+                ? "Todavía nadie confirmó su suscripción: no hay a quién mandárselo."
+                : destinatarios === 1
+                  ? "Lo recibiría 1 persona."
+                  : `Lo recibirían ${destinatarios.toLocaleString("es-AR")} personas.`}
+            </p>
+
+            {destinatarios > 0 && !confirmandoEnvio && (
+              <>
+                <fieldset className="grid gap-2">
+                  <legend className={etiqueta}>Cuándo</legend>
+                  <label className="flex items-center gap-2 text-panel-sm text-panel-tinta">
+                    <input
+                      type="radio"
+                      name="nl-cuando"
+                      checked={modoEnvio === "ahora"}
+                      onChange={() => {
+                        setErrorEnvio(null);
+                        setModoEnvio("ahora");
+                      }}
+                    />
+                    Ahora
+                  </label>
+                  <label className="flex items-center gap-2 text-panel-sm text-panel-tinta">
+                    <input
+                      type="radio"
+                      name="nl-cuando"
+                      checked={modoEnvio === "programar"}
+                      onChange={() => {
+                        setErrorEnvio(null);
+                        setModoEnvio("programar");
+                      }}
+                    />
+                    En una fecha y hora
+                  </label>
+                </fieldset>
+
+                {modoEnvio === "programar" && (
+                  <div className="flex flex-wrap gap-3">
+                    <div>
+                      <label htmlFor="nl-fecha" className={etiqueta}>
+                        Fecha
+                      </label>
+                      <input
+                        id="nl-fecha"
+                        type="date"
+                        value={fechaEnvio}
+                        onChange={(e) => setFechaEnvio(e.target.value)}
+                        className={cn(campo, "mt-1.5")}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="nl-hora" className={etiqueta}>
+                        Hora
+                      </label>
+                      <input
+                        id="nl-hora"
+                        type="time"
+                        step={300}
+                        value={horaEnvio}
+                        onChange={(e) => setHoraEnvio(e.target.value)}
+                        className={cn(campo, "mt-1.5")}
+                      />
+                    </div>
+                    <span className={cn(ayudaCampo, "basis-full")}>
+                      Hora de Tucumán.
+                      {horaElegida && ` Sale el ${fechaLegible(horaElegida)}.`}
+                    </span>
+                  </div>
+                )}
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={pedirEnvio}
+                    disabled={enCurso || elegidas.length === 0}
+                    className={clasesDeBoton({ tono: "primario" })}
+                  >
+                    {modoEnvio === "ahora" ? (
+                      <Send className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <CalendarClock className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {modoEnvio === "ahora" ? "Enviar ahora" : "Programar envío"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {confirmandoEnvio && (
+              <div
+                role="group"
+                aria-labelledby="nl-confirmar-envio"
+                className="grid gap-3 rounded-panel border border-panel-borde p-4"
+              >
+                <p id="nl-confirmar-envio" className="text-panel-sm text-panel-tinta">
+                  {modoEnvio === "ahora"
+                    ? "¿Mandar ahora"
+                    : `¿Programar para el ${horaElegida ? fechaLegible(horaElegida) : ""}`}{" "}
+                  «{asunto || "sin asunto"}» a{" "}
+                  {destinatarios === 1 ? "1 persona" : `${destinatarios.toLocaleString("es-AR")} personas`}?{" "}
+                  {envioReal
+                    ? "Les llega de verdad."
+                    : "Es de práctica: no le llega a nadie."}{" "}
+                  {modoEnvio === "ahora"
+                    ? "Empieza a salir en el próximo minuto."
+                    : "Hasta esa hora se puede cancelar y volver a editar."}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={enviarALaLista}
+                    disabled={enCurso}
+                    className={clasesDeBoton({ tono: "primario", tamano: "chico" })}
+                  >
+                    {enCurso
+                      ? "Un momento…"
+                      : modoEnvio === "ahora"
+                        ? "Sí, enviar"
+                        : "Sí, programar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoEnvio(false)}
+                    disabled={enCurso}
+                    className={clasesDeBoton({ tono: "fantasma", tamano: "chico" })}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </SeccionPanel>
       </div>
 
       {/* ------------------------------------------------ Cómo se ve */}
@@ -844,7 +1075,7 @@ function MarcoCelular({ html }: { html: string }) {
  * en ningún programa. «Ver en grande» lo abre a tamaño real, con su botón para
  * cerrar.
  */
-function VistaPrevia({
+export function VistaPrevia({
   html,
   asunto,
   preencabezado,

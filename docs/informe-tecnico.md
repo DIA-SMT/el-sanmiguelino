@@ -147,6 +147,112 @@ Lo que hay que saber para usarlo:
 - Si se agrega una Server Action y no llama a `anotar()`, queda un hueco
   silencioso. La regla está escrita en `src/lib/repos/auditoria.ts`.
 
+## Newsletter
+
+**Cómo sale el correo.** Por el SMTP de Google (`smtp.gmail.com:465`) con la
+cuenta `sanmiguelino@smt.gob.ar` y una contraseña de aplicación
+(`CORREO_SMTP_USUARIO`, `CORREO_SMTP_CLAVE`). smt.gob.ar está en Google
+Workspace y su SPF ya incluye `_spf.google.com`: no hace falta tocar el DNS.
+
+**Tres llaves, en este orden** (`src/lib/correo/enviar.ts`):
+
+| Situación | Pruebas del panel | Confirmaciones y newsletter a la lista |
+| --- | --- | --- |
+| Sin `CORREO_SMTP_*` | Simuladas | Simuladas |
+| Con `CORREO_SMTP_*` | Salen | Simuladas ("de práctica") |
+| Con `CORREO_SMTP_*` y `NEWSLETTER_ENVIO_REAL=1` | Salen | Salen |
+
+`NEWSLETTER_ENVIO_REAL=1` es la autorización explícita del municipio para
+escribirles a los vecinos. En modo de práctica la cola recorre la lista entera
+y anota a cada destinatario como "simulado": se prueba todo el circuito sin
+mandar nada.
+
+### La cola
+
+Programar no manda nada: deja el newsletter en `programado` con su hora
+(«Enviar ahora» es programar para este momento). Lo manda la cola,
+`procesarCola()` en `src/lib/newsletter/envios.ts`, que corre una vez por
+minuto desde `POST /api/newsletter/procesar`:
+
+1. Los destinatarios que quedaron "enviando" más de 5 minutos (una vuelta que
+   se murió) pasan a fallido **sin reintentar**: no se sabe si salieron, y
+   repetir sería mandar dos veces el mismo correo.
+2. Los programados cuya hora llegó pasan a `enviando`: se **congela** el
+   contenido (`boletines.contenido`) y se anota a cada suscripción activa en
+   `boletin_envios`.
+3. Si el envío real está autorizado, salen hasta 5 correos para confirmar que
+   estaban esperando (gente que se anotó antes de la autorización).
+4. Se reserva una tanda de 12 destinatarios y se les manda, hasta los 6,5 s.
+   Lo que no llegó a salir vuelve a la fila sin gastar intentos.
+5. Los newsletters sin nadie esperando pasan a `enviado`.
+
+Detalles que importan:
+
+- **Sin duplicados:** la clave de `boletin_envios` es (newsletter, suscripción),
+  y la tanda se reserva con un único `UPDATE … FOR UPDATE SKIP LOCKED`.
+- **Reintentos:** un error pasajero (conexión, 4xx) se reintenta a los 5, 30 y
+  120 minutos; al cuarto intento queda fallido. Un rechazo de la dirección
+  (5xx) no se reintenta. Si Google rechaza **la cuenta** (contraseña, tope), no
+  se le gasta el intento a nadie: la cola espera 15 minutos.
+- **Tope diario:** `NEWSLETTER_TOPE_DIARIO` (1800 por defecto) contando todo lo
+  que salió en 24 horas. Google deja unos 2000 por cuenta.
+- **Velocidad:** 12 por minuto, unos 720 por hora.
+- **Baja:** cada correo lleva el enlace de baja firmado de esa persona y las
+  cabeceras `List-Unsubscribe` / `List-Unsubscribe-Post` (baja de un clic, RFC
+  8058), que Gmail y Yahoo exigen.
+- **Antes de salir** cada correo vuelve a mirar la suscripción: quien se dio de
+  baja después de que arrancó el envío queda "omitido".
+- **Lo que no se sabe:** "enviado" quiere decir que Google aceptó el correo. Si
+  después rebotó en el buzón de la persona, el rebote llega como correo a
+  `sanmiguelino@smt.gob.ar` y el sistema no lo lee. Tampoco se miden aperturas
+  ni clics (decisión del 2026-11-05).
+
+### Instalar el cron en Supabase (una sola vez)
+
+Vercel Hobby corre un cron por día, así que el reloj lo pone Supabase. Hay que
+cargar `NEWSLETTER_CRON_SECRET` en Vercel (32 caracteres o más) y después, en
+Supabase:
+
+1. **Database → Extensions:** prender `pg_cron` y `pg_net`.
+2. **SQL Editor**, con el mismo secreto que se cargó en Vercel:
+
+```sql
+-- El secreto queda cifrado en el Vault, no escrito en el cron.
+select vault.create_secret('<el NEWSLETTER_CRON_SECRET>', 'newsletter_cron_secret');
+
+select cron.schedule(
+  'newsletter-cola',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://sanmiguelino.smt.gob.ar/api/newsletter/procesar',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (
+        select decrypted_secret from vault.decrypted_secrets
+        where name = 'newsletter_cron_secret'
+      )
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 15000
+  );
+  $$
+);
+```
+
+Para ver que anda: `select * from cron.job_run_details order by start_time desc
+limit 5;` y `select status_code, content from net._http_response order by
+created desc limit 5;`. Una respuesta 200 trae las cuentas de la vuelta. Un 503
+es que falta `NEWSLETTER_CRON_SECRET` en Vercel; un 401, que el secreto del Vault
+no coincide.
+
+Para sacarlo: `select cron.unschedule('newsletter-cola');`.
+
+**Orden del despliegue:** primero la migración
+(`20261105120000_newsletter_envios`, sólo agrega), después el código, después
+el cron. Si el cron se instala antes que el código, cada minuto recibe un 401
+(el proxy viejo no conoce la ruta) y no pasa nada.
+
 ## Dónde mirar si algo no cierra
 
 - `docs/panel-administracion.md` — el plan y la historia del panel, etapa por
