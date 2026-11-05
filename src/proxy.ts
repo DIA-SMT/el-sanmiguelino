@@ -10,9 +10,10 @@ import { SESSION_COOKIE, cookieMuerta } from "@/lib/auth/cookie";
  *
  * Lo que queda acá:
  *
- * - Las rutas de `/api` piden sesión, salvo el ingreso en sí y LEER los
+ * - Las rutas de `/api` piden sesión, salvo el ingreso en sí, LEER los
  *   comentarios de una nota (`GET /api/comentarios`, exacto: ni el POST de la
- *   misma ruta ni los votos, que cuelgan de ella). Es un atajo para cortar
+ *   misma ruta ni los votos, que cuelgan de ella) y la baja de un clic del
+ *   newsletter (`POST /api/newsletter/baja`, exacto). Es un atajo para cortar
  *   temprano: el control de verdad está en cada handler, porque acá sólo se
  *   mira la FORMA de la cookie (versión y vencimiento), no la firma.
  *
@@ -40,7 +41,11 @@ export function proxy(request: NextRequest) {
     const esAuth = pathname.startsWith("/api/auth/");
     const leeComentarios =
       request.method === "GET" && pathname === "/api/comentarios";
-    if (!esAuth && !leeComentarios && !tieneSesion) {
+    // La baja de un clic del newsletter la pide el servidor de correo de quien
+    // lo recibe, sin sesión. La llave es el enlace firmado: ver la ruta.
+    const bajaDeNewsletter =
+      request.method === "POST" && pathname === "/api/newsletter/baja";
+    if (!esAuth && !leeComentarios && !bajaDeNewsletter && !tieneSesion) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
   }

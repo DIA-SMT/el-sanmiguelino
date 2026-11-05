@@ -93,6 +93,22 @@ export const ACCIONES = {
     nombre: "Descargó el padrón",
     grave: true,
   },
+  /* A pedido del vecino, por teléfono o en persona. Grave porque deja de
+     recibir los correos y, para volver, tiene que anotarse y confirmar de
+     nuevo. */
+  "suscripciones.baja": {
+    objeto: "suscripciones",
+    nombre: "Dio de baja a un vecino",
+    grave: true,
+  },
+  "newsletter.creado": { objeto: "newsletter", nombre: "Creó un newsletter" },
+  "newsletter.guardado": { objeto: "newsletter", nombre: "Guardó un newsletter" },
+  "newsletter.borrado": {
+    objeto: "newsletter",
+    nombre: "Borró un newsletter",
+    grave: true,
+  },
+  "newsletter.prueba": { objeto: "newsletter", nombre: "Mandó una prueba" },
 } as const;
 
 export type Accion = keyof typeof ACCIONES;

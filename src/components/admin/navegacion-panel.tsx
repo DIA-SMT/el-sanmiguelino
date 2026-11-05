@@ -13,6 +13,7 @@ import {
   Newspaper,
   PanelLeftClose,
   PanelLeftOpen,
+  Send,
   Users,
 } from "lucide-react";
 import { HojaSanmiguelino, LogoSanmiguelino } from "@/components/brand/logos";
@@ -42,6 +43,7 @@ const SECCIONES = [
   // el buscador del diario que además contesta, y el brillito lo vendía como
   // otra cosa.
   { href: "/admin/migue", icono: Bot, texto: "Migue" },
+  { href: "/admin/newsletter", icono: Send, texto: "Newsletter" },
   { href: "/admin/suscripciones", icono: Mailbox, texto: "Suscripciones" },
   { href: "/admin/usuarios", icono: Users, texto: "Usuarios" },
   // Última y no primera: no se entra al panel a mirar el registro, se entra a

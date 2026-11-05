@@ -26,6 +26,7 @@ export type PantallaDelPanel =
   | "ediciones"
   | "comentarios"
   | "migue"
+  | "newsletter"
   | "suscripciones"
   | "usuarios"
   | "auditoria";
@@ -164,13 +165,44 @@ export const AYUDA: Record<
     ],
   },
 
+  newsletter: {
+    nombre: "Newsletter",
+    preguntas: [
+      {
+        pregunta: "¿Cómo armo un newsletter?",
+        respuesta:
+          "Tocá «Nuevo newsletter». Escribí el asunto, buscá las notas en «Agregar notas del diario» y ordenalas con las flechas. A la derecha ves el correo tal cual llega, en «Compu» o «Celular». Tocá «Guardar borrador» para guardarlo.",
+      },
+      {
+        pregunta: "¿Ya puedo mandarlo a los suscriptores?",
+        respuesta:
+          "Todavía no: el envío a la lista se habilita más adelante. Por ahora podés armarlo, guardarlo y mandarte una prueba con «Enviar prueba». La prueba sale de verdad desde sanmiguelino@smt.gob.ar a la dirección que escribas, y queda anotada en «Correos de prueba».",
+      },
+      {
+        pregunta: "¿Qué texto aparece debajo de cada nota?",
+        respuesta:
+          "La bajada de la nota. Si querés otro, escribilo en «Texto en el correo» de esa nota. Las notas se toman como estén al momento de enviar: si corregís un título en el diario, sale corregido.",
+      },
+      {
+        pregunta: "¿Quiénes lo recibirían?",
+        respuesta:
+          "Sólo quienes confirmaron su correo con el enlace que les llega al anotarse. Los que se habían anotado para el diario en papel figuran como «Falta que confirmen»: antes del primer envío se les pide que confirmen.",
+      },
+    ],
+  },
+
   suscripciones: {
     nombre: "Suscripciones",
     preguntas: [
       {
         pregunta: "¿Qué es esta lista?",
         respuesta:
-          "Las personas que se anotaron al newsletter para recibir las novedades del diario por correo, con nombre, correo y fecha. Las que se habían anotado para el diario en papel siguen en la lista. Desde acá sólo se consulta: no se edita ni se borra.",
+          "Las personas que se anotaron al newsletter, con nombre, correo, estado y fecha. «Confirmada» quiere decir que confirmó su correo y lo recibe; «Falta confirmar», que todavía no; «De baja», que pidió no recibirlo más. Las que se habían anotado para el diario en papel siguen en la lista, sin confirmar.",
+      },
+      {
+        pregunta: "¿Cómo doy de baja a alguien?",
+        respuesta:
+          "Con «Dar de baja» en su fila, cuando lo pide por teléfono o en persona. Queda anotado en la auditoría. Desde acá no se puede anotar a nadie: cada persona se anota desde el diario y confirma con su correo.",
       },
       {
         pregunta: "¿Cómo bajo la lista?",

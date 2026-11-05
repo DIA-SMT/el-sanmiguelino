@@ -1,7 +1,9 @@
-import { CalendarDays, Download, UserPlus, Users } from "lucide-react";
+import { CalendarDays, Download, Hourglass, MailCheck } from "lucide-react";
 import {
   BannerPanel,
+  ChipFiltro,
   EstadoVacio,
+  Pildora,
   SeccionPanel,
   TABLA,
   TarjetaDato,
@@ -9,14 +11,42 @@ import {
   clasesDeBoton,
 } from "@/components/admin/piezas";
 import { requerirAdmin } from "@/lib/auth/dal";
-import { listarSuscripciones } from "@/lib/repos/suscripciones";
+import {
+  ESTADOS,
+  contarPorEstado,
+  listarSuscripciones,
+  type EstadoSuscripcion,
+} from "@/lib/repos/suscripciones";
+import { BajaSuscripcion } from "@/components/admin/baja-suscripcion";
 import { tiempoRelativo } from "@/lib/utils";
 
 export const metadata = { title: "Suscripciones" };
 
 const DIA = 24 * 60 * 60 * 1000;
 
-const COLUMNAS = ["Nombre", "Correo", "Se anotó"];
+const COLUMNAS = ["Nombre", "Correo", "Estado", "Se anotó", "Acción"];
+
+/** Cómo se lee cada estado, con el color de su píldora y de su filtro. */
+const ESTADO: Record<
+  EstadoSuscripcion,
+  { nombre: string; filtro: string; tono: string }
+> = {
+  activa: {
+    nombre: "Confirmada",
+    filtro: "Confirmadas",
+    tono: "var(--grafico-nota)",
+  },
+  pendiente: {
+    nombre: "Falta confirmar",
+    filtro: "Falta confirmar",
+    tono: "var(--grafico-diario)",
+  },
+  baja: { nombre: "De baja", filtro: "De baja", tono: "var(--grafico-alerta)" },
+};
+
+function esEstado(v: unknown): v is EstadoSuscripcion {
+  return typeof v === "string" && (ESTADOS as string[]).includes(v);
+}
 
 /**
  * El id del nombre accesible de la zona que se desplaza.
@@ -66,13 +96,26 @@ function altasRecientes(fechas: string[], dias: number): number {
  * formato escrito en la etiqueta, apoyado en el aviso de qué trae el archivo,
  * y no un ícono al pasar que uno aprieta sin querer.
  */
-export default async function AdminSuscripciones() {
+export default async function AdminSuscripciones({
+  searchParams,
+}: {
+  searchParams: Promise<{ estado?: string | string[] }>;
+}) {
   await requerirAdmin();
-  const suscripciones = await listarSuscripciones();
+  const { estado } = await searchParams;
+  const filtro = esEstado(estado) ? estado : undefined;
+  const [todas, cuentas] = await Promise.all([
+    listarSuscripciones(),
+    contarPorEstado(),
+  ]);
+  const suscripciones = filtro
+    ? todas.filter((s) => s.estado === filtro)
+    : todas;
 
-  const fechas = suscripciones.map((s) => s.fecha);
-  const semana = altasRecientes(fechas, 7);
-  const mes = altasRecientes(fechas, 30);
+  const mes = altasRecientes(
+    todas.map((s) => s.fecha),
+    30,
+  );
 
   return (
     <>
@@ -86,7 +129,7 @@ export default async function AdminSuscripciones() {
           </span>
         }
       >
-        {suscripciones.length > 0 && (
+        {todas.length > 0 && (
           /* Un enlace y no un botón: es una descarga, y el navegador ya sabe
              hacer eso. Con un botón habría que armar el archivo en el cliente
              con los datos ya en memoria.
@@ -115,18 +158,18 @@ export default async function AdminSuscripciones() {
       <div className="grid gap-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <TarjetaDato
-            icono={Users}
+            icono={MailCheck}
             color="azul"
-            valor={String(suscripciones.length)}
-            titulo="Personas anotadas"
+            valor={String(cuentas.activa)}
+            titulo="Confirmaron"
             nota="Reciben las novedades de El Sanmiguelino"
           />
           <TarjetaDato
-            icono={UserPlus}
+            icono={Hourglass}
             color="celeste"
-            valor={String(semana)}
-            titulo="Se anotaron esta semana"
-            nota="En los últimos siete días"
+            valor={String(cuentas.pendiente)}
+            titulo="Falta que confirmen"
+            nota="No reciben nada hasta confirmar por correo"
           />
           <TarjetaDato
             icono={CalendarDays}
@@ -137,9 +180,39 @@ export default async function AdminSuscripciones() {
           />
         </div>
 
+        {/* Los filtros son enlaces, como en Comentarios: el filtro vive en la
+            URL (?estado=…). */}
+        <nav
+          aria-label="Filtrar por estado"
+          className="flex flex-wrap items-center gap-panel-controles"
+        >
+          <ChipFiltro
+            como="enlace"
+            href="/admin/suscripciones"
+            superficie="pagina"
+            activo={!filtro}
+            cuenta={todas.length}
+          >
+            Todas
+          </ChipFiltro>
+          {ESTADOS.map((e) => (
+            <ChipFiltro
+              key={e}
+              como="enlace"
+              href={`/admin/suscripciones?estado=${e}`}
+              superficie="pagina"
+              color={ESTADO[e].tono}
+              activo={filtro === e}
+              cuenta={cuentas[e]}
+            >
+              {ESTADO[e].filtro}
+            </ChipFiltro>
+          ))}
+        </nav>
+
         {suscripciones.length === 0 ? (
           <EstadoVacio ilustracion="estadisticas" sobre="pagina">
-            Todavía no se anotó nadie.
+            {filtro ? "No hay ninguna en este estado." : "Todavía no se anotó nadie."}
           </EstadoVacio>
         ) : (
           /* La tabla va adentro de una `SeccionPanel`, con su título, igual que
@@ -174,9 +247,10 @@ export default async function AdminSuscripciones() {
                   columnas tiene, así que no está en la pieza. Se concatena y no
                   se pasa por `cn()`: ver la nota de los botones en
                   `piezas.tsx`. */}
-              <table className={`${TABLA.tabla} min-w-[32rem]`}>
+              <table className={`${TABLA.tabla} min-w-[46rem]`}>
                 <caption className="sr-only">
-                  Vecinos anotados al newsletter, del más nuevo al más viejo.
+                  Vecinos anotados al newsletter, con su estado, del más nuevo
+                  al más viejo.
                 </caption>
                 <thead>
                   {/* La banda de la cabecera la ponen los `<th>`, que embaldosan
@@ -212,6 +286,11 @@ export default async function AdminSuscripciones() {
                       <td className={`${TABLA.celda} font-mono text-panel-xs`}>
                         {s.email}
                       </td>
+                      <td className={TABLA.celda}>
+                        <Pildora tono={ESTADO[s.estado].tono}>
+                          {ESTADO[s.estado].nombre}
+                        </Pildora>
+                      </td>
                       {/* El tiempo relativo es metadato y va en `tinta-3`, pero
                           la fila se resalta con `panel-wash` al pasar el mouse
                           y sobre ese fondo `tinta-3` cae por debajo de 4,5:1
@@ -225,6 +304,11 @@ export default async function AdminSuscripciones() {
                         className={`${TABLA.celda} whitespace-nowrap text-panel-xs text-panel-tinta-3 group-hover:text-panel-tinta-2`}
                       >
                         {tiempoRelativo(s.fecha)}
+                      </td>
+                      <td className={TABLA.celda}>
+                        {s.estado !== "baja" && (
+                          <BajaSuscripcion id={s.id} nombre={s.nombre} />
+                        )}
                       </td>
                     </tr>
                   ))}

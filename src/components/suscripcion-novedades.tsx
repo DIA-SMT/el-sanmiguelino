@@ -72,7 +72,11 @@ export function SuscripcionNovedades({
   const [rechazo, setRechazo] = useState<"sesion" | "bloqueado" | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [listo, setListo] = useState<"nuevo" | "actualizado" | null>(null);
+  /** Cómo quedó: ya confirmada, o pendiente de confirmar por correo (con el
+   *  correo ya enviado, o para más adelante si todavía no hay envíos). */
+  const [listo, setListo] = useState<
+    "activa" | "enviado" | "en-espera" | null
+  >(null);
   const [datos, setDatos] = useState({ nombre, email: "" });
 
   // De vuelta del ingreso que se pidió desde acá, en la misma página: el
@@ -115,7 +119,13 @@ export function SuscripcionNovedades({
         setError(cuerpo.error ?? "No se pudo guardar.");
         return;
       }
-      setListo(cuerpo.yaEstaba ? "actualizado" : "nuevo");
+      setListo(
+        cuerpo.activa
+          ? "activa"
+          : cuerpo.confirmacion === "enviado"
+            ? "enviado"
+            : "en-espera",
+      );
     } catch {
       setError("No se pudo hablar con el servidor. Probá de nuevo.");
     } finally {
@@ -197,12 +207,22 @@ export function SuscripcionNovedades({
                 aria-hidden="true"
               />
               <p className="mt-3 font-serif text-[1rem] text-ink">
-                {listo === "nuevo"
-                  ? "Listo, quedaste anotado."
-                  : "Actualizamos tus datos."}
+                {listo === "activa"
+                  ? "Ya estabas anotado."
+                  : listo === "enviado"
+                    ? "Revisá tu correo."
+                    : "Listo, quedaste anotado."}
               </p>
-              <p className="mt-1.5 font-sans text-[0.78rem] text-ink-3">
-                Las novedades van a llegar a {datos.email}.
+              {/* Doble confirmación: nadie recibe el newsletter sin haber
+                  confirmado con el enlace que le llega al correo. Mientras no
+                  haya envíos ("en-espera"), ese correo llega antes del
+                  primero. */}
+              <p className="mt-1.5 font-sans text-[0.78rem] leading-relaxed text-ink-3">
+                {listo === "activa"
+                  ? `Las novedades llegan a ${datos.email}.`
+                  : listo === "enviado"
+                    ? `Te mandamos un enlace a ${datos.email} para que confirmes. Sin confirmar no te vamos a escribir.`
+                    : `Antes del primer envío te vamos a escribir a ${datos.email} para que confirmes que querés recibirlo.`}
               </p>
             </div>
           ) : (

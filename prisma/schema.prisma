@@ -406,8 +406,98 @@ model Suscripcion {
 
   fecha DateTime @default(now())
 
+  /// "pendiente" | "activa" | "baja". Sólo una "activa" recibe newsletters.
+  ///
+  /// Arranca en "pendiente" para todo el mundo, también para las filas que ya
+  /// estaban: se anotaron para el papel, no para recibir correos, así que antes
+  /// del primer envío tienen que confirmar (doble confirmación). Texto y no
+  /// enum por lo mismo que `Usuario.rol`.
+  estado               String    @default("pendiente")
+  /// Cuándo confirmó con el enlace del correo.
+  confirmadaEn         DateTime?
+  /// Cuándo se dio de baja (o la dio de baja el municipio a pedido suyo).
+  bajaEn               DateTime?
+  /// Cuándo se le mandó el último correo para confirmar. Sirve de freno: el
+  /// formulario no puede disparar un correo por cada vez que alguien aprieta.
+  confirmacionPedidaEn DateTime?
+
+  eventos EventoSuscripcion[]
+
   @@index([fecha])
+  @@index([estado])
   @@map("suscripciones")
+}
+
+/// El historial del consentimiento de cada suscripción: cuándo se anotó, cuándo
+/// confirmó, cuándo se dio de baja y por qué vía.
+///
+/// Es la prueba de que a cada persona se le escribe porque lo pidió. Se va con
+/// la suscripción (cascada): si un vecino pide que se borren sus datos, el
+/// historial es dato suyo también.
+model EventoSuscripcion {
+  id            String      @id @default(cuid())
+  suscripcionId String
+  suscripcion   Suscripcion @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  fecha         DateTime    @default(now())
+  /// "alta" | "confirmacion-pedida" | "confirmacion" | "baja" | "reactivacion"
+  tipo          String
+  /// "formulario" | "enlace" | "un-click" | "panel"
+  via           String
+
+  @@index([suscripcionId, fecha])
+  @@map("suscripcion_eventos")
+}
+
+/// Un newsletter: lo que se arma en el panel antes de mandarlo.
+///
+/// Las notas van como `[{ slug, resumen? }]` y no copiadas: el correo se arma
+/// con la nota como esté al momento de mandarlo. El `resumen` es el texto propio
+/// que el editor quiera poner en lugar de la bajada.
+model Boletin {
+  id            String   @id @default(cuid())
+  asunto        String
+  /// La línea que los programas de correo muestran al lado del asunto.
+  preencabezado String   @default("")
+  introduccion  String   @default("")
+  notas         Json
+  cierre        String   @default("")
+  /// "borrador" por ahora. Programar y enviar llegan con el proveedor.
+  estado        String   @default("borrador")
+  autorId       String
+  autorNombre   String
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([actualizadoEn])
+  @@map("boletines")
+}
+
+/// Cada correo que el diario manda, o que habría mandado.
+///
+/// Mientras no haya proveedor de correo (modo de prueba) nada sale: el correo
+/// queda acá con estado "simulado", y el panel lo muestra tal cual habría
+/// llegado. Con proveedor, la misma tabla es el registro de lo enviado.
+model CorreoSaliente {
+  id        String   @id @default(cuid())
+  fecha     DateTime @default(now())
+  /// "prueba" | "confirmacion" | "boletin"
+  tipo      String
+  para      String
+  asunto    String
+  html      String
+  texto     String
+  /// "prueba" mientras no haya proveedor.
+  proveedor String
+  /// "simulado" | "enviado" | "fallido"
+  estado    String
+  error     String?
+  boletinId String?
+  /// Quién lo pidió desde el panel. Vacío si lo disparó un vecino.
+  autorId   String?
+
+  @@index([fecha])
+  @@index([tipo, fecha])
+  @@map("correos_salientes")
 }
 
 /// Quién entró al diario por Cidituc, y qué puede hacer acá.

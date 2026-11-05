@@ -43,8 +43,8 @@ export async function GET() {
   });
 
   const filas = [
-    ["nombre", "email", "fecha"],
-    ...suscripciones.map((s) => [s.nombre, s.email, s.fecha]),
+    ["nombre", "email", "estado", "fecha"],
+    ...suscripciones.map((s) => [s.nombre, s.email, s.estado, s.fecha]),
   ];
   // BOM al principio: sin él, Excel en Windows abre el archivo en la
   // codificación del sistema y "Tucumán" llega como "TucumÃ¡n".

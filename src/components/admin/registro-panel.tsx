@@ -53,6 +53,7 @@ const OBJETOS: Record<string, { nombre: string; color: string }> = {
   edicion: { nombre: "Ediciones", color: "var(--grafico-diario)" },
   nota: { nombre: "Notas", color: "var(--grafico-acento)" },
   suscripciones: { nombre: "Suscripciones", color: "var(--grafico-alerta)" },
+  newsletter: { nombre: "Newsletter", color: "var(--grafico-indice)" },
 };
 
 /**
@@ -93,6 +94,11 @@ const CLASE_DE_ACCION: Record<string, keyof typeof CLASES> = {
   "comentario.revision": "moderacion",
   "comentario.restitucion": "moderacion",
   "suscripciones.descarga": "moderacion",
+  "suscripciones.baja": "moderacion",
+  "newsletter.creado": "alta",
+  "newsletter.guardado": "cambio",
+  "newsletter.borrado": "baja",
+  "newsletter.prueba": "otro",
   "usuario.rol": "permisos",
   "usuario.bloqueo": "permisos",
   "usuario.desbloqueo": "permisos",
