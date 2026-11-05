@@ -21,6 +21,7 @@ import {
   enviosConProblema,
 } from "@/lib/newsletter/envios";
 import { armarBoletin, type DatosDelBoletin } from "@/lib/newsletter/plantilla";
+import { iaDisponible } from "@/lib/newsletter/borrador-ia";
 import { SITIO_URL } from "@/lib/compartir";
 
 export const metadata = { title: "Newsletter" };
@@ -82,6 +83,7 @@ export default async function PaginaNewsletter({
           faltan={faltan}
           destinatarios={cuentas.activa}
           envioReal={envioReal}
+          iaDisponible={iaDisponible()}
         />
       </>
     );

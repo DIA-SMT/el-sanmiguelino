@@ -30,6 +30,13 @@ import {
   programarEnvio,
 } from "@/lib/newsletter/envios";
 import { fechaLegible, horaDeTucuman, revisarHora } from "@/lib/newsletter/cola";
+import {
+  escribirBorrador,
+  iaDisponible,
+  proponerNotas,
+  type BorradorIA,
+} from "@/lib/newsletter/borrador-ia";
+import { contarConsultaAlModelo } from "@/lib/migue/tope";
 import { SITIO_URL } from "@/lib/compartir";
 
 /**
@@ -356,6 +363,69 @@ export async function detenerEnvioAction(
   revalidatePath("/admin/newsletter");
   revalidatePath(`/admin/newsletter/${id}`);
   return { ok: true, sinRecibir };
+}
+
+/* ------------------------------------------------------- borrador con IA */
+
+/** Los slugs que manda el editor, validados: texto, sin repetir, con tope. */
+function slugsValidos(v: unknown, tope: number): string[] | null {
+  if (!Array.isArray(v) || v.length === 0 || v.length > tope) return null;
+  const s = v.filter((x): x is string => typeof x === "string" && x.length > 0 && x.length <= 200);
+  return s.length === v.length ? [...new Set(s)] : null;
+}
+
+const SIN_IA = "La escritura automática no está disponible ahora.";
+const TOPE_IA =
+  "Ya se pidieron muchos borradores en esta hora. Esperá un rato y probá de nuevo.";
+
+/**
+ * Paso 1 del borrador con IA: de las notas de una edición, cuáles van. No
+ * escribe en la base: sólo devuelve la propuesta.
+ */
+export async function proponerNotasIAAction(
+  datos: unknown,
+): Promise<{ ok: boolean; error?: string; slugs?: string[] }> {
+  const { usuario } = await requerirAdmin();
+  if (!iaDisponible()) return { ok: false, error: SIN_IA };
+  const d = (typeof datos === "object" && datos !== null ? datos : {}) as { slugs?: unknown };
+  const ofrecidas = slugsValidos(d.slugs, 80);
+  if (!ofrecidas) return { ok: false, error: "Elegí una edición con notas." };
+  if (!(await contarConsultaAlModelo(usuario.id)).permitido) {
+    return { ok: false, error: TOPE_IA };
+  }
+  return proponerNotas(ofrecidas);
+}
+
+/**
+ * Paso 2: escribe los textos para las notas elegidas. Tampoco guarda: el
+ * editor pone el resultado en pantalla y la persona decide. Se anota en la
+ * auditoría, porque es texto que puede terminar en el correo de los vecinos.
+ */
+export async function escribirBorradorIAAction(
+  datos: unknown,
+): Promise<{ ok: boolean; error?: string; borrador?: BorradorIA }> {
+  const { usuario } = await requerirAdmin();
+  if (!iaDisponible()) return { ok: false, error: SIN_IA };
+  const d = (typeof datos === "object" && datos !== null ? datos : {}) as {
+    id?: unknown;
+    slugs?: unknown;
+    edicion?: unknown;
+  };
+  const slugs = slugsValidos(d.slugs, TOPES.notas);
+  if (!slugs) return { ok: false, error: "Faltan las notas." };
+  const edicion = typeof d.edicion === "string" ? d.edicion.slice(0, 80) : "";
+  if (!(await contarConsultaAlModelo(usuario.id)).permitido) {
+    return { ok: false, error: TOPE_IA };
+  }
+  const r = await escribirBorrador(slugs, edicion);
+  if (!r.ok) return { ok: false, error: r.error };
+  await anotar(usuario, {
+    accion: "newsletter.ia",
+    objetoId: typeof d.id === "string" ? d.id : null,
+    resumen: `Pidió un borrador con IA para el newsletter (${edicion || "sin edición"})`,
+    detalle: { notas: r.borrador.notas.length, descartes: r.borrador.descartes.length },
+  });
+  return { ok: true, borrador: r.borrador };
 }
 
 export async function borrarBoletinAction(

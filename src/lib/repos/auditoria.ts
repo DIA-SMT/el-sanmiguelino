@@ -120,6 +120,10 @@ export const ACCIONES = {
     objeto: "newsletter",
     nombre: "Canceló un envío programado",
   },
+  /* No escribe en la base: el borrador queda en pantalla hasta que alguien lo
+     guarda. Se anota igual porque es texto de una máquina que puede terminar
+     en el correo de los vecinos, y tiene que poder saberse quién lo pidió. */
+  "newsletter.ia": { objeto: "newsletter", nombre: "Pidió un borrador con IA" },
   "newsletter.envio-detenido": {
     objeto: "newsletter",
     nombre: "Detuvo un envío",

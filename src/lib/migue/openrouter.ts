@@ -225,16 +225,29 @@ export async function pedirAlModelo({
   sistema,
   historial = [],
   pregunta,
+  modelo,
+  maximoTokens = MAXIMO_TOKENS,
+  timeoutMs = TIMEOUT_MS,
+  sinRazonar = false,
 }: {
   sistema: string[];
   historial?: Turno[];
   pregunta: string;
+  /** Otro modelo que el de Migue. Lo usa el borrador del newsletter. */
+  modelo?: string;
+  maximoTokens?: number;
+  timeoutMs?: number;
+  /** Pide que el modelo no "piense" antes de contestar. Los modelos que
+   *  razonan gastan en eso parte de `maximoTokens` y del tiempo: con un JSON
+   *  largo, la respuesta quedaba cortada a la mitad. Los que no razonan lo
+   *  ignoran. */
+  sinRazonar?: boolean;
 }): Promise<string | null> {
   const clave = process.env.OPENROUTER_API_KEY;
   if (!clave) return null;
 
   const control = new AbortController();
-  const reloj = setTimeout(() => control.abort(), TIMEOUT_MS);
+  const reloj = setTimeout(() => control.abort(), timeoutMs);
 
   try {
     const res = await fetch(endpoint(), {
@@ -250,8 +263,9 @@ export async function pedirAlModelo({
         "X-Title": "El Sanmiguelino",
       },
       body: JSON.stringify({
-        model: modeloDeMigue(),
-        max_tokens: MAXIMO_TOKENS,
+        model: modelo || modeloDeMigue(),
+        max_tokens: maximoTokens,
+        ...(sinRazonar ? { reasoning: { enabled: false } } : {}),
         // Bajo a propósito: no se le pide creatividad, se le pide que no se
         // aparte de lo que se le pasa.
         temperature: 0.2,

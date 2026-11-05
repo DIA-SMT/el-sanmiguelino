@@ -207,6 +207,46 @@ Detalles que importan:
   `sanmiguelino@smt.gob.ar` y el sistema no lo lee. Tampoco se miden aperturas
   ni clics (decisión del 2026-11-05).
 
+### Borrador con IA
+
+«Armar con IA» (en el editor) usa la misma clave de OpenRouter que Migue y su
+modelo, salvo que se cargue `NEWSLETTER_IA_MODELO`
+(`src/lib/newsletter/borrador-ia.ts`). Son dos pedidos desde el navegador,
+para que cada uno entre en los 10 s de Vercel:
+
+1. **Elegir notas:** el modelo ve título, sección y bajada de las notas de la
+   edición y devuelve de 4 a 6 slugs. Sólo se aceptan slugs de esa edición.
+2. **Escribir:** en paralelo, un pedido por nota (que ve sólo esa nota, hasta
+   3500 caracteres) y uno para asunto, línea de vista previa, introducción y
+   cierre (que ve títulos y bajadas). Se pide sin "razonamiento" previo: los
+   modelos que razonan gastaban en eso parte del tope de tokens y el JSON
+   llegaba cortado.
+
+**Control contra datos inventados** (`src/lib/newsletter/verificar-ia.ts`):
+cada número y cada palabra con mayúscula que no abre oración tiene que
+aparecer en las notas (el texto de una nota, sólo en *esa* nota). Lo que no
+pasa se descarta —la nota vuelve a su bajada, la introducción queda vacía— y
+el editor dice qué se descartó y por qué. No reemplaza la lectura humana: una
+frase puede ser falsa con palabras que sí están en la nota.
+
+No guarda ni manda: el resultado queda en pantalla hasta que alguien toca
+«Guardar borrador». Cada pedido cuenta para el tope por hora de Migue
+(`MIGUE_TOPE_PERSONA`, `MIGUE_TOPE_GLOBAL`) y se anota en la auditoría como
+`newsletter.ia`.
+
+Medido el 2026-11-05 con `anthropic/claude-sonnet-5` y la edición N.º 5 (8
+notas): elegir, 2,1 s; escribir 5 notas, 4,1 s; ningún descarte.
+
+### Estadísticas
+
+«Cómo viene», en la pantalla del newsletter
+(`src/lib/newsletter/estadisticas.ts`), muestra sólo lo que se sabe: altas,
+confirmaciones y bajas de los últimos 30 días (de `suscripcion_eventos`) y, de
+cada envío, a cuántos les salió, a cuántos no, cuántos se habían dado de baja
+antes y cuántas bajas por el enlace del correo hubo en los 7 días siguientes.
+No hay aperturas ni clics (decisión del 2026-11-05) ni rebotes posteriores.
+Donde no hay datos, la pantalla lo dice con palabras en vez de mostrar un 0 %.
+
 ### Instalar el cron en Supabase (una sola vez)
 
 Vercel Hobby corre un cron por día, así que el reloj lo pone Supabase. Hay que

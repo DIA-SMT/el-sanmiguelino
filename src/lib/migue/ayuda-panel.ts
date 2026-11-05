@@ -179,6 +179,16 @@ export const AYUDA: Record<
           "Abajo del editor, en «Enviar a la lista», elegí «Ahora» o una fecha y hora (de Tucumán) y confirmá. Sale lo que está guardado. Desde ese momento ya no se edita: si lo programaste, hasta la hora elegida podés tocar «Cancelar y volver a editar». Mientras el aviso de arriba diga que el envío es de práctica, recorre la lista pero no le llega a nadie.",
       },
       {
+        pregunta: "¿Cómo uso «Armar con IA»?",
+        respuesta:
+          "Arriba del editor, elegí la edición y tocá «Proponer con IA». Elige de 4 a 6 notas y escribe el asunto, la introducción, el texto de cada nota y el cierre, sólo con lo que dicen esas notas. Si escribe un dato que no está en las notas, ese texto se descarta y te avisa. No se guarda ni se manda solo: leelo, cambiá lo que quieras y tocá «Guardar borrador».",
+      },
+      {
+        pregunta: "¿Qué muestran los números de «Cómo viene»?",
+        respuesta:
+          "Cuánta gente se anotó, confirmó y se dio de baja en los últimos 30 días, y de cada envío a cuántos les llegó, a cuántos no y cuántos se dieron de baja con el enlace del correo en la semana siguiente. No se mide quién abre los correos ni en qué hace clic.",
+      },
+      {
         pregunta: "¿Cuánto tarda en llegarle a todos?",
         respuesta:
           "Sale de a tandas, unas 700 personas por hora, para que el correo del diario no quede marcado como spam. En la pantalla del envío ves cuántos van, a quiénes no les llegó y por qué. Si un envío falla por un problema pasajero, se reintenta solo.",

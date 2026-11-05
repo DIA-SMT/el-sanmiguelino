@@ -102,6 +102,7 @@ const CLASE_DE_ACCION: Record<string, keyof typeof CLASES> = {
   "newsletter.programado": "alta",
   "newsletter.programacion-cancelada": "cambio",
   "newsletter.envio-detenido": "baja",
+  "newsletter.ia": "otro",
   "usuario.rol": "permisos",
   "usuario.bloqueo": "permisos",
   "usuario.desbloqueo": "permisos",

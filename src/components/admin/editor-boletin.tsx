@@ -25,6 +25,7 @@ import {
   Search,
   Send,
   Smartphone,
+  Sparkles,
   Trash2,
   Users,
   X,
@@ -32,8 +33,10 @@ import {
 import {
   borrarBoletinAction,
   enviarPruebaAction,
+  escribirBorradorIAAction,
   guardarBoletinAction,
   programarEnvioAction,
+  proponerNotasIAAction,
 } from "@/app/admin/newsletter/acciones";
 import {
   enTucuman,
@@ -102,6 +105,7 @@ export function EditorBoletin({
   faltan,
   destinatarios,
   envioReal,
+  iaDisponible = false,
 }: {
   boletin: Boletin;
   candidatas: NotaCandidata[];
@@ -113,6 +117,8 @@ export function EditorBoletin({
   destinatarios: number;
   /** Si el envío a la lista llega de verdad o es de práctica. */
   envioReal: boolean;
+  /** Si se puede pedir un borrador con IA. Sin esto, el bloque no aparece. */
+  iaDisponible?: boolean;
 }) {
   const router = useRouter();
 
@@ -245,6 +251,17 @@ export function EditorBoletin({
     () => candidatas[0]?.edicion ?? null,
   );
 
+  // El borrador con IA tiene su propia elección de edición: arranca en la más
+  // nueva, igual que el buscador, pero no se pisan entre sí.
+  const [edicionIA, setEdicionIA] = useState<string | null>(
+    () => candidatas[0]?.edicion ?? null,
+  );
+  const [faseIA, setFaseIA] = useState<"eligiendo" | "escribiendo" | null>(null);
+  const [errorIA, setErrorIA] = useState<string | null>(null);
+  /** null = no hay aviso; [] = salió todo bien; con algo = lo descartado. */
+  const [avisoIA, setAvisoIA] = useState<string[] | null>(null);
+  const [confirmandoIA, setConfirmandoIA] = useState(false);
+
   const resultados = useMemo(() => {
     const elegido = new Set(elegidas.map((e) => e.slug));
     const q = normalizar(busqueda.trim());
@@ -343,6 +360,64 @@ export function EditorBoletin({
     });
   }
 
+  /* ---------------------------------------------------- borrador con IA */
+
+  function pedirIA() {
+    setErrorIA(null);
+    setAvisoIA(null);
+    const hayAlgo =
+      elegidas.length > 0 || introduccion.trim() !== "" || cierre.trim() !== "";
+    if (hayAlgo) {
+      setConfirmandoIA(true);
+      return;
+    }
+    armarConIA();
+  }
+
+  function armarConIA() {
+    setConfirmandoIA(false);
+    tocar();
+    if (!edicionIA) return;
+    const ofrecidas = candidatas
+      .filter((n) => n.edicion === edicionIA)
+      .map((n) => n.slug);
+    iniciar(async () => {
+      try {
+        setFaseIA("eligiendo");
+        const propuesta = await proponerNotasIAAction({ slugs: ofrecidas });
+        if (!propuesta.ok || !propuesta.slugs) {
+          setErrorIA(propuesta.error ?? "No se pudo armar la propuesta.");
+          return;
+        }
+        setFaseIA("escribiendo");
+        const r = await escribirBorradorIAAction({
+          id: boletin.id,
+          slugs: propuesta.slugs,
+          edicion: edicionIA,
+        });
+        if (!r.ok || !r.borrador) {
+          setErrorIA(r.error ?? "No se pudo escribir el borrador.");
+          return;
+        }
+        const b = r.borrador;
+        setAsunto(b.asunto);
+        setPreencabezado(b.preencabezado);
+        setIntroduccion(b.introduccion);
+        setCierre(b.cierre);
+        setElegidas(
+          b.notas
+            .filter((n) => fichas.has(n.slug))
+            .map((n) => ({ slug: n.slug, resumen: n.resumen })),
+        );
+        setAvisoIA(b.descartes);
+      } catch {
+        setErrorIA("No se pudo hablar con el servidor.");
+      } finally {
+        setFaseIA(null);
+      }
+    });
+  }
+
   function pedirEnvio() {
     setErrorEnvio(null);
     if (modoEnvio === "programar" && !horaElegida) {
@@ -400,6 +475,109 @@ export function EditorBoletin({
               : `${faltan.length} notas de este newsletter ya no existen`}{" "}
             (alguien la borró del diario). Se saca al guardar.
           </Aviso>
+        )}
+
+        {iaDisponible && (
+          <SeccionPanel
+            id="nl-ia"
+            titulo="Armar con IA"
+            bajada="Elegí una edición: la IA propone las notas y escribe los textos sólo con lo que dicen esas notas. No se guarda ni se manda solo: revisalo antes de guardar."
+          >
+            <div className="grid gap-4">
+              <div role="group" aria-label="Edición para el borrador" className="flex flex-wrap gap-2">
+                {ediciones.map((e) => {
+                  const [numero, ...resto] = e.nombre.split(" · ");
+                  return (
+                    <ChipFiltro
+                      key={e.nombre}
+                      activo={edicionIA === e.nombre}
+                      aria-pressed={edicionIA === e.nombre}
+                      onClick={() => {
+                        setEdicionIA(e.nombre);
+                        setConfirmandoIA(false);
+                      }}
+                    >
+                      {resto.length > 0 ? `${resto.join(" · ")} (${numero})` : e.nombre}
+                    </ChipFiltro>
+                  );
+                })}
+              </div>
+
+              {errorIA && (
+                <Aviso icono={AlertTriangle} tono="var(--grafico-alerta)" sobre="tarjeta" rol="alert">
+                  {errorIA}
+                </Aviso>
+              )}
+              {avisoIA && (
+                <Aviso
+                  icono={avisoIA.length > 0 ? AlertTriangle : Sparkles}
+                  tono={avisoIA.length > 0 ? "var(--grafico-alerta)" : "var(--grafico-nota)"}
+                  sobre="tarjeta"
+                  rol="status"
+                >
+                  <strong className="font-semibold text-panel-tinta">
+                    Listo el borrador.
+                  </strong>{" "}
+                  Leelo entero antes de guardar.
+                  {avisoIA.length > 0 && (
+                    <>
+                      {" "}
+                      Algunas partes quedaron vacías o con la bajada de la nota
+                      porque la IA escribió datos que no están en las notas:
+                      <ul className="mt-1 list-disc pl-5">
+                        {avisoIA.map((a) => (
+                          <li key={a}>{a}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </Aviso>
+              )}
+
+              {confirmandoIA ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-panel-sm text-panel-tinta-2">
+                    Reemplaza el asunto, los textos y las notas que hay ahora.
+                    ¿Seguimos?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={armarConIA}
+                    disabled={enCurso}
+                    className={clasesDeBoton({ tono: "primario", tamano: "chico" })}
+                  >
+                    Sí, reemplazar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoIA(false)}
+                    className={clasesDeBoton({ tono: "fantasma", tamano: "chico" })}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={pedirIA}
+                    disabled={enCurso || !edicionIA}
+                    className={clasesDeBoton({ tono: "primario" })}
+                  >
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    {faseIA === "eligiendo"
+                      ? "Eligiendo las notas…"
+                      : faseIA === "escribiendo"
+                        ? "Escribiendo los textos…"
+                        : "Proponer con IA"}
+                  </button>
+                  <span className={ayudaCampo} aria-live="polite">
+                    {faseIA ? "Tarda unos segundos." : ""}
+                  </span>
+                </div>
+              )}
+            </div>
+          </SeccionPanel>
         )}
 
         <SeccionPanel id="nl-encabezado" titulo="Asunto">

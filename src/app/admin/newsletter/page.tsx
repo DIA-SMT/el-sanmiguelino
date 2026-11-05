@@ -27,10 +27,17 @@ import {
   modoDeCorreo,
 } from "@/lib/correo/enviar";
 import { fechaLegible } from "@/lib/newsletter/cola";
+import {
+  historialDeEnvios,
+  resumenDeSuscripciones,
+} from "@/lib/newsletter/estadisticas";
+import { EstadisticasNewsletter } from "@/components/admin/estadisticas-newsletter";
 import { tiempoRelativo } from "@/lib/utils";
 import { crearBoletinAction } from "./acciones";
 
 export const metadata = { title: "Newsletter" };
+
+const POR_PAGINA = 10;
 
 /** Cómo está cada newsletter, con el color de su píldora. */
 const ESTADOS_DE_BOLETIN: Record<string, { nombre: string; tono: string }> = {
@@ -90,15 +97,28 @@ const TIPOS: Record<string, string> = {
  * sale nada; con la cuenta, salen las pruebas y el envío a la lista es de
  * práctica; con la cuenta y la autorización del municipio, sale todo.
  */
-export default async function AdminNewsletter() {
+export default async function AdminNewsletter({
+  searchParams,
+}: {
+  searchParams: Promise<{ envios?: string }>;
+}) {
   await requerirAdmin();
   const conectada = modoDeCorreo() === "smtp";
   const aLosVecinos = envioALosVecinosAutorizado();
-  const [cuentas, boletines, correos] = await Promise.all([
+  const { envios } = await searchParams;
+  const pedida = Math.max(1, Math.floor(Number(envios)) || 1);
+  const [cuentas, boletines, correos, suscripciones, primera] = await Promise.all([
     contarPorEstado(),
     listarBoletines(),
     listarCorreos(30),
+    resumenDeSuscripciones(30),
+    historialDeEnvios(pedida, POR_PAGINA),
   ]);
+  // Si la página pedida quedó más allá del final, se muestra la última.
+  const ultima = Math.max(1, Math.ceil(primera.total / POR_PAGINA));
+  const paginaEnvios = Math.min(pedida, ultima);
+  const historial =
+    pedida > ultima ? await historialDeEnvios(ultima, POR_PAGINA) : primera;
 
   return (
     <>
@@ -172,6 +192,13 @@ export default async function AdminNewsletter() {
             nota="No se les escribe más"
           />
         </div>
+
+        <EstadisticasNewsletter
+          suscripciones={suscripciones}
+          historial={historial}
+          pagina={paginaEnvios}
+          porPagina={POR_PAGINA}
+        />
 
         <SeccionPanel
           id="borradores"
