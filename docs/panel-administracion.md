@@ -90,8 +90,8 @@ identidad de la persona y nada más. Así que "el rol viene de Cidituc" no era
 cumplible tal cual. Lo reemplaza `CIDITUC_ADMINS`, la lista de `id_persona` que
 carga el municipio en el entorno, hasta que haya una tabla propia.
 
-**Lo que sigue pendiente del lado del municipio**: registrar el diario en el repo
-`derivador` y cargar las variables en Vercel.
+**Lo que sigue pendiente del lado del municipio**: publicar la rama del diario en
+el login de Ciudad Digital (repo `cidituc`) y cargar las variables en Vercel.
 
 ## El diario en PDF (2026-09-01)
 
