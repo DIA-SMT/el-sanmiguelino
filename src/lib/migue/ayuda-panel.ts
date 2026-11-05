@@ -171,7 +171,7 @@ export const AYUDA: Record<
       {
         pregunta: "¿Cómo armo un newsletter?",
         respuesta:
-          "Tocá «Nuevo newsletter». Escribí el asunto, buscá las notas en «Agregar notas del diario» y ordenalas con las flechas. A la derecha ves el correo tal cual llega, en «Compu» o «Celular». Tocá «Guardar borrador» para guardarlo.",
+          "Tocá «Nuevo newsletter». Escribí el asunto y, en «Agregar notas del diario», elegí primero la edición y después las notas (o «Todas» para buscar en todas las ediciones). Ordenalas con las flechas. A la derecha ves el correo tal cual llega, en «Compu» o «Celular». Tocá «Guardar borrador» para guardarlo.",
       },
       {
         pregunta: "¿Cómo lo mando a los suscriptores?",

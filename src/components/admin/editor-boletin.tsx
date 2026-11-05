@@ -219,18 +219,45 @@ export function EditorBoletin({
     return correo.html.replace("<head>", '<head><base target="_blank">');
   }, [diferido, fichas]);
 
+  /*
+   * Las notas se eligen en dos pasos: primero la edición y después la nota.
+   * Mezcladas, las de seis ediciones eran una lista larga donde lo único que
+   * distinguía a una nota de otra era una línea gris al pie. Las ediciones van
+   * en el orden en que llegan (la más nueva primero), que es el que les da
+   * `notasCandidatas()`.
+   */
+  const ediciones = useMemo(() => {
+    const elegido = new Set(elegidas.map((e) => e.slug));
+    const lista: { nombre: string; disponibles: number }[] = [];
+    for (const n of candidatas) {
+      let e = lista.find((x) => x.nombre === n.edicion);
+      if (!e) {
+        e = { nombre: n.edicion, disponibles: 0 };
+        lista.push(e);
+      }
+      if (!elegido.has(n.slug)) e.disponibles++;
+    }
+    return lista;
+  }, [candidatas, elegidas]);
+
+  /** null = todas las ediciones. Arranca en la más nueva. */
+  const [edicionVista, setEdicionVista] = useState<string | null>(
+    () => candidatas[0]?.edicion ?? null,
+  );
+
   const resultados = useMemo(() => {
     const elegido = new Set(elegidas.map((e) => e.slug));
     const q = normalizar(busqueda.trim());
     return candidatas
       .filter((n) => !elegido.has(n.slug))
+      .filter((n) => edicionVista === null || n.edicion === edicionVista)
       .filter(
         (n) =>
           !q ||
           normalizar(`${n.titulo} ${n.seccion} ${n.bajada}`).includes(q),
       )
-      .slice(0, 40);
-  }, [candidatas, elegidas, busqueda]);
+      .slice(0, 60);
+  }, [candidatas, elegidas, busqueda, edicionVista]);
 
   function tocar() {
     setError(null);
@@ -549,8 +576,47 @@ export function EditorBoletin({
           )}
 
           <div className="mt-5 border-t border-panel-borde pt-4">
-            <label htmlFor="nl-buscar" className={etiqueta}>
-              Agregar notas del diario
+            <h3 className={etiqueta}>Agregar notas del diario</h3>
+
+            <p id="nl-paso-edicion" className="mt-3 text-panel-sm text-panel-tinta-2">
+              1. Elegí la edición
+            </p>
+            <div
+              role="group"
+              aria-labelledby="nl-paso-edicion"
+              className="mt-2 flex flex-wrap gap-2"
+            >
+              {ediciones.map((e) => {
+                const [numero, ...resto] = e.nombre.split(" · ");
+                return (
+                  <ChipFiltro
+                    key={e.nombre}
+                    activo={edicionVista === e.nombre}
+                    aria-pressed={edicionVista === e.nombre}
+                    onClick={() => setEdicionVista(e.nombre)}
+                    cuenta={e.disponibles}
+                    aria-label={`${e.nombre}: ${e.disponibles} ${e.disponibles === 1 ? "nota" : "notas"} para agregar`}
+                  >
+                    {resto.length > 0 ? `${resto.join(" · ")} (${numero})` : e.nombre}
+                  </ChipFiltro>
+                );
+              })}
+              {ediciones.length > 1 && (
+                <ChipFiltro
+                  activo={edicionVista === null}
+                  aria-pressed={edicionVista === null}
+                  onClick={() => setEdicionVista(null)}
+                >
+                  Todas
+                </ChipFiltro>
+              )}
+            </div>
+
+            <label
+              htmlFor="nl-buscar"
+              className="mt-4 block text-panel-sm text-panel-tinta-2"
+            >
+              2. Elegí las notas
             </label>
             <div className="relative mt-1.5">
               <Search
@@ -562,7 +628,11 @@ export function EditorBoletin({
                 type="search"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar por título o sección"
+                placeholder={
+                  edicionVista === null
+                    ? "Buscar en todas las ediciones"
+                    : "Buscar en esta edición"
+                }
                 className={cn(campo, "pl-9")}
               />
             </div>
@@ -577,7 +647,11 @@ export function EditorBoletin({
             >
               {resultados.length === 0 ? (
                 <li className="px-3 py-4 text-center text-panel-sm text-panel-tinta-3">
-                  {busqueda ? "Nada con esa búsqueda." : "No hay más notas para agregar."}
+                  {busqueda
+                    ? "Nada con esa búsqueda."
+                    : edicionVista === null
+                      ? "No hay más notas para agregar."
+                      : "Ya agregaste todas las notas de esta edición."}
                 </li>
               ) : (
                 resultados.map((n) => (
@@ -587,7 +661,8 @@ export function EditorBoletin({
                         {n.titulo}
                       </p>
                       <p className="truncate text-panel-xs text-panel-tinta-3">
-                        {n.seccion} · {n.edicion}
+                        {n.seccion}
+                        {edicionVista === null && ` · ${n.edicion}`}
                         {!n.publicada && " · todavía no salió"}
                       </p>
                     </div>
