@@ -1,7 +1,11 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { imagenDisponible } from "@/lib/data/imagenes";
-import type { NotaDelBoletin } from "@/lib/newsletter/plantilla";
+import {
+  esBloque,
+  type BloqueDelBoletin,
+  type NotaDelBoletin,
+} from "@/lib/newsletter/plantilla";
 
 /**
  * Los newsletters que se arman en el panel.
@@ -22,12 +26,18 @@ export interface NotaElegida {
   resumen: string;
 }
 
+/** Lo que se guarda en la lista: notas por referencia, bloques copiados. */
+export type PiezaElegida = NotaElegida | BloqueDelBoletin;
+
+/** Una pieza lista para el correo: la nota con sus datos, o el bloque. */
+export type PiezaResuelta = NotaCandidata | BloqueDelBoletin;
+
 export interface Boletin {
   id: string;
   asunto: string;
   preencabezado: string;
   introduccion: string;
-  notas: NotaElegida[];
+  notas: PiezaElegida[];
   cierre: string;
   estado: string;
   autorNombre: string;
@@ -73,19 +83,44 @@ export const TOPES = {
   notas: 12,
 };
 
-/** Lee lo que vuelve de la columna Json sin confiar en su forma. */
-function aNotas(valor: unknown): NotaElegida[] {
+/** Un bloque leído de la columna Json, o null si no tiene forma de bloque. */
+function aBloque(v: Record<string, unknown>): BloqueDelBoletin | null {
+  if (v.tipo !== "bloque" || typeof v.enlace !== "string") return null;
+  if (!/^https:\/\//.test(v.enlace)) return null;
+  const t = (x: unknown) => (typeof x === "string" ? x : "");
+  const img = v.imagen as { src?: unknown; alt?: unknown } | undefined;
+  return {
+    tipo: "bloque",
+    id: t(v.id) || Math.random().toString(36).slice(2, 10),
+    titulo: t(v.titulo),
+    texto: t(v.texto),
+    enlace: v.enlace,
+    boton: t(v.boton),
+    ...(img && typeof img.src === "string" && /^https:\/\//.test(img.src)
+      ? { imagen: { src: img.src, alt: t(img.alt) } }
+      : {}),
+  };
+}
+
+/** Lee lo que vuelve de la columna Json sin confiar en su forma: notas
+ *  (`{ slug, resumen }`) y bloques propios (`{ tipo: "bloque", … }`). */
+export function aPiezas(valor: unknown): PiezaElegida[] {
   if (!Array.isArray(valor)) return [];
-  return valor.flatMap((v) =>
-    v && typeof v === "object" && typeof v.slug === "string"
+  return valor.flatMap((v): PiezaElegida[] => {
+    if (!v || typeof v !== "object") return [];
+    if ((v as { tipo?: unknown }).tipo === "bloque") {
+      const b = aBloque(v as Record<string, unknown>);
+      return b ? [b] : [];
+    }
+    return typeof v.slug === "string"
       ? [
           {
             slug: v.slug,
             resumen: typeof v.resumen === "string" ? v.resumen : "",
           },
         ]
-      : [],
-  );
+      : [];
+  });
 }
 
 export async function listarBoletines(): Promise<BoletinEnLista[]> {
@@ -106,7 +141,7 @@ export async function listarBoletines(): Promise<BoletinEnLista[]> {
     id: f.id,
     asunto: f.asunto,
     estado: f.estado,
-    notas: aNotas(f.notas).length,
+    notas: aPiezas(f.notas).length,
     autorNombre: f.autorNombre,
     actualizadoEn: f.actualizadoEn.toISOString(),
     programadoPara: iso(f.programadoPara),
@@ -122,7 +157,7 @@ export async function obtenerBoletin(id: string): Promise<Boletin | null> {
     asunto: f.asunto,
     preencabezado: f.preencabezado,
     introduccion: f.introduccion,
-    notas: aNotas(f.notas),
+    notas: aPiezas(f.notas),
     cierre: f.cierre,
     estado: f.estado,
     autorNombre: f.autorNombre,
@@ -159,7 +194,7 @@ export interface CambiosDelBoletin {
   asunto: string;
   preencabezado: string;
   introduccion: string;
-  notas: NotaElegida[];
+  notas: PiezaElegida[];
   cierre: string;
 }
 
@@ -268,23 +303,37 @@ export async function notasCandidatas(ediciones = 6): Promise<NotaCandidata[]> {
  * avise: mandar un newsletter con un enlace a una nota borrada es mandar a la
  * gente a un 404.
  */
-export async function resolverNotas(elegidas: NotaElegida[]): Promise<{
-  notas: NotaCandidata[];
+export async function resolverNotas(elegidas: PiezaElegida[]): Promise<{
+  /** Notas y bloques, en el orden elegido. */
+  notas: PiezaResuelta[];
   faltan: string[];
 }> {
   if (elegidas.length === 0) return { notas: [], faltan: [] };
-  const filas = await db().nota.findMany({
-    where: { slug: { in: elegidas.map((e) => e.slug) } },
-    select: SELECCION_NOTA,
-  });
+  const slugs = elegidas.flatMap((e) => (esBloque(e) ? [] : [e.slug]));
+  const filas = slugs.length
+    ? await db().nota.findMany({
+        where: { slug: { in: slugs } },
+        select: SELECCION_NOTA,
+      })
+    : [];
   const ahora = new Date();
   const porSlug = new Map(filas.map((f) => [f.slug, aCandidata(f, ahora)]));
-  const notas: NotaCandidata[] = [];
+  const notas: PiezaResuelta[] = [];
   const faltan: string[] = [];
   for (const e of elegidas) {
+    // Un bloque propio no depende de nada: va como está.
+    if (esBloque(e)) {
+      notas.push(e);
+      continue;
+    }
     const n = porSlug.get(e.slug);
     if (!n) faltan.push(e.slug);
     else notas.push({ ...n, resumen: e.resumen.trim() || n.bajada });
   }
   return { notas, faltan };
+}
+
+/** Sólo las notas del diario de una lista resuelta, sin los bloques. */
+export function soloNotas(piezas: PiezaResuelta[]): NotaCandidata[] {
+  return piezas.filter((p): p is NotaCandidata => !esBloque(p));
 }

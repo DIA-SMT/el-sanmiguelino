@@ -12,6 +12,7 @@ import {
   notasCandidatas,
   obtenerBoletin,
   resolverNotas,
+  soloNotas,
 } from "@/lib/repos/boletines";
 import { contarPorEstado } from "@/lib/repos/suscripciones";
 import { saleDeVerdad } from "@/lib/correo/enviar";
@@ -79,7 +80,7 @@ export default async function PaginaNewsletter({
         <EditorBoletin
           boletin={boletin}
           candidatas={candidatas}
-          elegidasIniciales={notas}
+          elegidasIniciales={soloNotas(notas)}
           faltan={faltan}
           destinatarios={cuentas.activa}
           envioReal={envioReal}

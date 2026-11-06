@@ -12,6 +12,7 @@ import {
   obtenerBoletin,
   resolverNotas,
   type CambiosDelBoletin,
+  type PiezaElegida,
 } from "@/lib/repos/boletines";
 import {
   contarPorEstado,
@@ -23,7 +24,7 @@ import {
   pruebasRecientes,
   saleDeVerdad,
 } from "@/lib/correo/enviar";
-import { armarBoletin } from "@/lib/newsletter/plantilla";
+import { armarBoletin, type BloqueDelBoletin } from "@/lib/newsletter/plantilla";
 import {
   cancelarProgramacion,
   detenerEnvio,
@@ -73,6 +74,47 @@ function texto(v: unknown, tope: number, campo: string): string {
   return t;
 }
 
+/** Una dirección https completa, o null. Nada de `javascript:` ni `http:` en
+ *  un correo oficial. */
+function https(v: unknown, tope = 500): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  if (t.length > tope) return null;
+  try {
+    const u = new URL(t);
+    return u.protocol === "https:" && u.hostname.includes(".") ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Un bloque con enlace, tal como lo manda el editor. */
+function validarBloque(n: object, i: number): BloqueDelBoletin {
+  const b = n as Record<string, unknown>;
+  const cual = `El bloque ${i + 1}`;
+  const enlace = https(b.enlace);
+  if (!enlace) {
+    throw new Error(`${cual} necesita un enlace completo que empiece con https://.`);
+  }
+  const titulo = texto(b.titulo, TOPES.asunto, `El título del bloque ${i + 1}`);
+  const cuerpo = texto(b.texto, TOPES.resumen, `El texto del bloque ${i + 1}`);
+  if (!titulo && !cuerpo) throw new Error(`${cual} necesita un título o un texto.`);
+  const img = b.imagen as { src?: unknown; alt?: unknown } | undefined;
+  const src = img ? https(img.src) : null;
+  if (img && !src) throw new Error(`La foto del bloque ${i + 1} no vino bien.`);
+  return {
+    tipo: "bloque",
+    id: typeof b.id === "string" && /^[\w-]{1,40}$/.test(b.id) ? b.id : `b${i}`,
+    titulo,
+    texto: cuerpo,
+    enlace,
+    boton: texto(b.boton, 40, `El botón del bloque ${i + 1}`) || "Ver más",
+    ...(src
+      ? { imagen: { src, alt: texto(img?.alt, 200, "La descripción de la foto") } }
+      : {}),
+  };
+}
+
 function validar(datos: unknown): { id: string; cambios: CambiosDelBoletin } {
   if (typeof datos !== "object" || datos === null) {
     throw new Error("Datos inválidos.");
@@ -86,10 +128,11 @@ function validar(datos: unknown): { id: string; cambios: CambiosDelBoletin } {
     throw new Error(`Son muchas notas: el tope es ${TOPES.notas}.`);
   }
   const vistas = new Set<string>();
-  const notas = d.notas.map((n, i) => {
+  const notas = d.notas.map((n, i): PiezaElegida => {
     if (typeof n !== "object" || n === null) {
       throw new Error(`La nota ${i + 1} no vino bien.`);
     }
+    if ((n as { tipo?: unknown }).tipo === "bloque") return validarBloque(n, i);
     const { slug, resumen } = n as Record<string, unknown>;
     if (typeof slug !== "string" || !slug || slug.length > 200) {
       throw new Error(`La nota ${i + 1} no vino bien.`);
@@ -115,6 +158,15 @@ function validar(datos: unknown): { id: string; cambios: CambiosDelBoletin } {
       cierre: texto(d.cierre, TOPES.texto, "El cierre"),
     },
   };
+}
+
+/** Sin notas, sin bloques y sin texto propio: no hay nada que mandar. Un
+ *  newsletter de puro texto (un aviso) sí vale. */
+function vacio(
+  b: { introduccion: string; cierre: string },
+  piezas: number,
+): boolean {
+  return piezas === 0 && !b.introduccion.trim() && !b.cierre.trim();
 }
 
 function mensaje(error: unknown): string {
@@ -191,8 +243,11 @@ export async function enviarPruebaAction(datos: unknown): Promise<{
   const boletin = await obtenerBoletin(d.id);
   if (!boletin) return { ok: false, error: "Este newsletter ya no existe." };
   const { notas, faltan } = await resolverNotas(boletin.notas);
-  if (notas.length === 0) {
-    return { ok: false, error: "Agregá al menos una nota antes de probar." };
+  if (vacio(boletin, notas.length)) {
+    return {
+      ok: false,
+      error: "Escribí una introducción o agregá al menos una nota o un bloque antes de probar.",
+    };
   }
   if ((await pruebasRecientes(usuario.id)) >= TOPE_PRUEBAS_HORA) {
     return {
@@ -278,8 +333,11 @@ export async function programarEnvioAction(
     return { ok: false, error: "Este newsletter ya está programado o enviado." };
   }
   const { notas, faltan } = await resolverNotas(boletin.notas);
-  if (notas.length === 0) {
-    return { ok: false, error: "Agregá al menos una nota antes de enviarlo." };
+  if (vacio(boletin, notas.length)) {
+    return {
+      ok: false,
+      error: "Escribí una introducción o agregá al menos una nota o un bloque antes de enviarlo.",
+    };
   }
   if (faltan.length > 0) {
     return {

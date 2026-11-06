@@ -179,6 +179,16 @@ export const AYUDA: Record<
           "Abajo del editor, en «Enviar a la lista», elegí «Ahora» o una fecha y hora (de Tucumán) y confirmá. Sale lo que está guardado. Desde ese momento ya no se edita: si lo programaste, hasta la hora elegida podés tocar «Cancelar y volver a editar». Mientras el aviso de arriba diga que el envío es de práctica, recorre la lista pero no le llega a nadie.",
       },
       {
+        pregunta: "¿Cómo pongo un video de YouTube u otro enlace?",
+        respuesta:
+          "En «Notas», tocá «Agregar un bloque con enlace». Pegá la dirección, escribí un título, un texto corto y el texto del botón (por ejemplo «Ver la entrevista»). Si es un video de YouTube, la foto se pone sola; si no, podés subir una con «Subir una foto». Se ordena con las flechas, igual que las notas.",
+      },
+      {
+        pregunta: "¿Por qué no puedo enviar la prueba?",
+        respuesta:
+          "Porque el newsletter todavía está vacío. Escribile una introducción, o agregale al menos una nota del diario o un bloque con enlace, y el botón «Enviar prueba» se habilita. Un newsletter puede ser sólo texto, por ejemplo un aviso.",
+      },
+      {
         pregunta: "¿Cómo uso «Armar con IA»?",
         respuesta:
           "Arriba del editor, elegí la edición y tocá «Proponer con IA». Elige de 4 a 6 notas y escribe el asunto, la introducción, el texto de cada nota y el cierre, sólo con lo que dicen esas notas. Si escribe un dato que no está en las notas, ese texto se descarta y te avisa. No se guarda ni se manda solo: leelo, cambiá lo que quieras y tocá «Guardar borrador».",

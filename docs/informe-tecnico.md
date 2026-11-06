@@ -207,6 +207,24 @@ Detalles que importan:
   `sanmiguelino@smt.gob.ar` y el sistema no lo lee. Tampoco se miden aperturas
   ni clics (decisión del 2026-11-05).
 
+### El correo: logo y bloques con enlace
+
+**Logo.** La cabecera usa `public/correo/logo-sanmiguelino.png` (720×74, se
+muestra a 360 px), generado desde `scripts/marca/logo-sanmiguelino-color.svg`
+con `npm run marca:iconos`. Va en PNG porque Gmail no muestra SVG, y se pide al
+sitio publicado: un correo armado antes de desplegar el PNG lo muestra roto
+(queda el texto alternativo «EL SANMIGUELINO»).
+
+**Bloques con enlace.** Además de notas, la lista de un newsletter admite
+bloques propios (`{ tipo: "bloque", titulo, texto, enlace, boton, imagen? }`)
+en la misma columna Json `boletines.notas`, sin migración. Se guardan copiados,
+no por referencia. El enlace tiene que ser `https://`. Si es de YouTube, el
+editor pone sola la miniatura `hq720` (16:9) y, si el video no la tiene
+—YouTube manda un cuadrito de 120 px en vez de un error—, cae a `hqdefault`.
+Las fotos subidas van al mismo bucket que las de las notas
+(`src/components/admin/subir-foto.ts`). En el correo, las imágenes del bucket
+pasan por el optimizador del sitio y las de afuera van directas.
+
 ### Borrador con IA
 
 «Armar con IA» (en el editor) usa la misma clave de OpenRouter que Migue y su

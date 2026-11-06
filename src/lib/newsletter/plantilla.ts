@@ -30,12 +30,72 @@ export interface NotaDelBoletin {
   imagen?: { src: string; alt: string };
 }
 
+/**
+ * Un bloque propio del newsletter, que no es una nota del diario: un título,
+ * un texto, una imagen opcional y un enlace a cualquier lado. Nació para
+ * avisar de las «Entrevistas con El Sanmiguelino» de YouTube, pero sirve para
+ * cualquier cosa que viva fuera del diario.
+ *
+ * Lo escribe una persona en el panel, no la IA, y se guarda copiado (no por
+ * referencia, como las notas): no hay otro lugar de donde leerlo.
+ */
+export interface BloqueDelBoletin {
+  tipo: "bloque";
+  /** Para distinguirlo en el editor; no sale en el correo. */
+  id: string;
+  titulo: string;
+  texto: string;
+  /** Siempre https. */
+  enlace: string;
+  /** El texto del botón: «Ver la entrevista». */
+  boton: string;
+  imagen?: { src: string; alt: string };
+}
+
+/** Lo que va en el cuerpo, en orden: notas del diario y bloques propios. */
+export type PiezaDelBoletin = NotaDelBoletin | BloqueDelBoletin;
+
+export function esBloque(p: object): p is BloqueDelBoletin {
+  return (p as { tipo?: unknown }).tipo === "bloque";
+}
+
 export interface DatosDelBoletin {
   asunto: string;
   preencabezado: string;
   introduccion: string;
-  notas: NotaDelBoletin[];
+  notas: PiezaDelBoletin[];
   cierre: string;
+}
+
+/**
+ * La miniatura de un video de YouTube, a partir de su dirección. null si no es
+ * un video de YouTube. Así un bloque que lleva a una entrevista tiene foto sin
+ * que nadie tenga que subirla.
+ *
+ * Es la ancha (`hq720`, 16:9): la común (`hqdefault`) es 4:3 y trae franjas
+ * negras arriba y abajo. No todos los videos tienen la ancha; el editor lo
+ * nota al mostrarla y cae a la común (ver `FilaBloque`).
+ */
+export function miniaturaDeYoutube(enlace: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(enlace);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.replace(/^www\.|^m\./, "");
+  let id: string | null = null;
+  if (host === "youtu.be") id = u.pathname.slice(1).split("/")[0] || null;
+  else if (host === "youtube.com") {
+    if (u.pathname === "/watch") id = u.searchParams.get("v");
+    else {
+      const m = u.pathname.match(/^\/(shorts|live|embed)\/([^/?#]+)/);
+      id = m?.[2] ?? null;
+    }
+  }
+  return id && /^[\w-]{6,20}$/.test(id)
+    ? `https://i.ytimg.com/vi/${id}/hq720.jpg`
+    : null;
 }
 
 export interface CorreoArmado {
@@ -83,8 +143,26 @@ export function enlaceDeNota(slug: string): string {
  * programa que no entiende WebP le llega JPG.
  */
 export function imagenParaCorreo(src: string): string {
-  return `${SITIO}/_next/image?url=${encodeURIComponent(src)}&w=1200&q=75`;
+  // Las fotos del diario (las del bucket y las de /public) pasan por el
+  // optimizador. Una imagen de afuera —la miniatura de YouTube de un bloque—
+  // va directa: el optimizador sólo acepta las del bucket, y la de YouTube ya
+  // viene del tamaño justo.
+  const delDiario =
+    src.startsWith("/") || src.includes("/storage/v1/object/public/");
+  return delDiario
+    ? `${SITIO}/_next/image?url=${encodeURIComponent(src)}&w=1200&q=75`
+    : src;
 }
+
+/** El logo, en PNG: Gmail no muestra SVG. Se genera desde
+ *  `scripts/marca/logo-sanmiguelino-color.svg` con `npm run marca:iconos`. */
+export const LOGO_DEL_CORREO = {
+  src: `${SITIO}/correo/logo-sanmiguelino.png`,
+  /** Ancho al que se muestra; el archivo tiene el doble, para pantallas
+   *  densas. */
+  ancho: 360,
+  alto: 37,
+};
 
 /** Párrafos separados por una línea en blanco, con la negrita y la cursiva del
  *  editor de notas (`**así**` y `*así*`). */
@@ -129,10 +207,13 @@ const FILETE = `<div style="border-top:1px solid ${COLOR.filete};font-size:0;lin
 
 function cabecera(): string {
   return fila(
-    `<a href="${SITIO}" style="text-decoration:none;color:${COLOR.tinta};">` +
-      `<div style="font-family:${SERIF};font-size:34px;line-height:1.1;font-weight:bold;letter-spacing:-0.5px;color:${COLOR.tinta};text-align:center;">El Sanmiguelino</div></a>` +
-      `<div style="margin-top:10px;border-top:3px solid ${COLOR.tinta};border-bottom:1px solid ${COLOR.tinta};height:2px;font-size:0;line-height:0;">&nbsp;</div>` +
-      `<div style="margin-top:8px;font-family:${SANS};font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${COLOR.tinta3};text-align:center;">Novedades del diario de la Municipalidad de San Miguel de Tucumán</div>`,
+    // El logo es una imagen: si el programa de correo bloquea las imágenes,
+    // queda su texto alternativo con la tipografía más parecida que hay.
+    `<a href="${SITIO}" style="text-decoration:none;color:${COLOR.acento};"><div style="text-align:center;">` +
+      `<img src="${LOGO_DEL_CORREO.src}" width="${LOGO_DEL_CORREO.ancho}" height="${LOGO_DEL_CORREO.alto}" alt="EL SANMIGUELINO" style="display:inline-block;width:${LOGO_DEL_CORREO.ancho}px;max-width:100%;height:auto;border:0;font-family:${SANS};font-size:28px;font-weight:bold;letter-spacing:0.5px;color:${COLOR.acento};">` +
+      `</div></a>` +
+      `<div style="margin-top:14px;border-top:3px solid ${COLOR.tinta};border-bottom:1px solid ${COLOR.tinta};height:2px;font-size:0;line-height:0;">&nbsp;</div>` +
+      `<div style="margin-top:8px;font-family:${SANS};font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${COLOR.tinta3};text-align:center;">Novedades del suplemento mensual de la Municipalidad de San Miguel de Tucumán</div>`,
     "28px 24px 24px 24px",
   );
 }
@@ -189,6 +270,28 @@ function bloqueDeNota(nota: NotaDelBoletin, primera: boolean): string {
   );
 }
 
+function bloquePropio(b: BloqueDelBoletin, primera: boolean): string {
+  const url = escapar(b.enlace);
+  const foto = b.imagen
+    ? `<a href="${url}" style="text-decoration:none;"><img src="${escapar(imagenParaCorreo(b.imagen.src))}" alt="${escapar(b.imagen.alt)}" width="552" style="display:block;width:100%;max-width:552px;height:auto;border:0;margin:0 0 14px 0;"></a>`
+    : "";
+  const boton =
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 22px 0;"><tr>` +
+    `<td style="background:${COLOR.acento};"><a href="${url}" style="display:inline-block;padding:11px 18px;font-family:${SANS};font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;">${escapar(b.boton || "Ver más")} &rarr;</a></td>` +
+    `</tr></table>`;
+  return fila(
+    (primera ? "" : FILETE + `<div style="height:22px;line-height:22px;font-size:0;">&nbsp;</div>`) +
+      foto +
+      (b.titulo
+        ? `<h2 style="margin:0 0 8px 0;font-family:${SERIF};font-size:23px;line-height:1.2;font-weight:bold;color:${COLOR.tinta};"><a href="${url}" style="color:${COLOR.tinta};text-decoration:none;">${escapar(b.titulo)}</a></h2>`
+        : "") +
+      (b.texto
+        ? `<p style="margin:0 0 12px 0;font-family:${SERIF};font-size:16px;line-height:1.55;color:${COLOR.tinta2};">${enLinea(b.texto)}</p>`
+        : "") +
+      boton,
+  );
+}
+
 const MOTIVO_BOLETIN =
   "Recibís este correo porque te anotaste para recibir las novedades de El Sanmiguelino.";
 
@@ -199,22 +302,33 @@ export function armarBoletin(
   const filas =
     cabecera() +
     (datos.introduccion.trim() ? fila(bloqueDeParrafos(datos.introduccion), "0 24px 8px 24px") : "") +
-    datos.notas.map((n, i) => bloqueDeNota(n, i === 0)).join("") +
+    datos.notas
+      .map((n, i) => (esBloque(n) ? bloquePropio(n, i === 0) : bloqueDeNota(n, i === 0)))
+      .join("") +
     (datos.cierre.trim() ? fila(FILETE + `<div style="height:20px;line-height:20px;font-size:0;">&nbsp;</div>` + bloqueDeParrafos(datos.cierre, 16)) : "") +
     pie(enlaceBaja, MOTIVO_BOLETIN);
 
   const texto = [
     "EL SANMIGUELINO",
-    "Novedades del diario de la Municipalidad de San Miguel de Tucumán",
+    "Novedades del suplemento mensual de la Municipalidad de San Miguel de Tucumán",
     "",
     ...parrafos(datos.introduccion).map(textoPlano).flatMap((p) => [p, ""]),
-    ...datos.notas.flatMap((n) => [
-      `${n.seccion.toUpperCase()}`,
-      n.titulo,
-      ...(n.resumen ? [textoPlano(n.resumen)] : []),
-      `Leer la nota: ${enlaceDeNota(n.slug)}`,
-      "",
-    ]),
+    ...datos.notas.flatMap((n) =>
+      esBloque(n)
+        ? [
+            ...(n.titulo ? [n.titulo] : []),
+            ...(n.texto ? [textoPlano(n.texto)] : []),
+            `${n.boton || "Ver más"}: ${n.enlace}`,
+            "",
+          ]
+        : [
+            `${n.seccion.toUpperCase()}`,
+            n.titulo,
+            ...(n.resumen ? [textoPlano(n.resumen)] : []),
+            `Leer la nota: ${enlaceDeNota(n.slug)}`,
+            "",
+          ],
+    ),
     ...parrafos(datos.cierre).map(textoPlano).flatMap((p) => [p, ""]),
     "--",
     MOTIVO_BOLETIN,
@@ -247,7 +361,7 @@ export function armarConfirmacion(datos: {
     cabecera() +
     fila(
       `<p style="margin:0 0 16px 0;font-family:${SERIF};font-size:17px;line-height:1.6;color:${COLOR.tinta};">${escapar(saludo)}</p>` +
-        `<p style="margin:0 0 16px 0;font-family:${SERIF};font-size:17px;line-height:1.6;color:${COLOR.tinta};">Pediste recibir por correo las novedades de El Sanmiguelino, el diario de la Municipalidad. Para empezar a recibirlas, confirmá que este correo es tuyo:</p>` +
+        `<p style="margin:0 0 16px 0;font-family:${SERIF};font-size:17px;line-height:1.6;color:${COLOR.tinta};">Pediste recibir por correo las novedades de El Sanmiguelino, el suplemento mensual de la Municipalidad. Para empezar a recibirlas, confirmá que este correo es tuyo:</p>` +
         boton +
         `<p style="margin:0 0 24px 0;font-family:${SANS};font-size:13px;line-height:1.6;color:${COLOR.tinta3};">Si no fuiste vos, ignorá este mensaje: sin tu confirmación no te vamos a escribir. El enlace vence en 30 días.</p>`,
     ) +
@@ -258,7 +372,7 @@ export function armarConfirmacion(datos: {
   const texto = [
     saludo,
     "",
-    "Pediste recibir por correo las novedades de El Sanmiguelino, el diario de la Municipalidad. Para empezar a recibirlas, confirmá que este correo es tuyo:",
+    "Pediste recibir por correo las novedades de El Sanmiguelino, el suplemento mensual de la Municipalidad. Para empezar a recibirlas, confirmá que este correo es tuyo:",
     "",
     datos.enlace,
     "",

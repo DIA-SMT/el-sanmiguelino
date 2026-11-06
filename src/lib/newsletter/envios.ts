@@ -2,11 +2,12 @@ import "server-only";
 import { db } from "@/lib/db";
 import { SITIO_URL } from "@/lib/compartir";
 import { abrirCorreo, enviadosUltimas24h, topeDiario } from "@/lib/correo/enviar";
-import { resolverNotas, type NotaElegida } from "@/lib/repos/boletines";
+import { aPiezas, resolverNotas } from "@/lib/repos/boletines";
 import { pedirConfirmacionesPendientes } from "@/lib/repos/suscripciones";
 import { firmarEnlace, secretoDeEnlaces } from "@/lib/newsletter/enlaces";
 import {
   armarBoletin,
+  esBloque,
   type DatosDelBoletin,
   type NotaDelBoletin,
 } from "@/lib/newsletter/plantilla";
@@ -305,11 +306,14 @@ async function iniciarProgramados(
   let iniciados = 0;
   let cancelados = 0;
   for (const b of listos) {
-    const elegidas = (Array.isArray(b.notas) ? b.notas : []) as unknown as NotaElegida[];
+    const elegidas = aPiezas(b.notas);
     const { notas } = await resolverNotas(elegidas);
-    if (notas.length === 0) {
+    const soloTexto =
+      elegidas.length === 0 && Boolean(b.introduccion.trim() || b.cierre.trim());
+    if (notas.length === 0 && !soloTexto) {
       // Se borraron todas sus notas entre que se programó y su hora. Mandar un
       // correo vacío no tiene sentido: se detiene y el panel dice por qué.
+      // (Uno que se armó de puro texto, sin notas, sí sale.)
       const r = await db().boletin.updateMany({
         where: { id: b.id, estado: "programado" },
         data: {
@@ -327,13 +331,17 @@ async function iniciarProgramados(
       preencabezado: b.preencabezado,
       introduccion: b.introduccion,
       cierre: b.cierre,
-      notas: notas.map((n) => ({
-        slug: n.slug,
-        seccion: n.seccion,
-        titulo: n.titulo,
-        resumen: n.resumen,
-        ...(n.imagen ? { imagen: n.imagen } : {}),
-      })),
+      notas: notas.map((n) =>
+        esBloque(n)
+          ? n
+          : {
+              slug: n.slug,
+              seccion: n.seccion,
+              titulo: n.titulo,
+              resumen: n.resumen,
+              ...(n.imagen ? { imagen: n.imagen } : {}),
+            },
+      ),
     };
     const empezo = await db().$transaction(async (tx) => {
       // El estado en el filtro: si dos vueltas llegan juntas, una sola lo

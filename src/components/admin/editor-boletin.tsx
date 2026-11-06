@@ -27,6 +27,8 @@ import {
   Smartphone,
   Sparkles,
   Trash2,
+  ImagePlus,
+  Link as LinkIcon,
   Users,
   X,
 } from "lucide-react";
@@ -53,7 +55,14 @@ import {
   clasesDeCampo,
 } from "@/components/admin/piezas";
 import { SITIO_URL } from "@/lib/compartir";
-import { armarBoletin } from "@/lib/newsletter/plantilla";
+import {
+  armarBoletin,
+  esBloque,
+  miniaturaDeYoutube,
+  type BloqueDelBoletin,
+  type PiezaDelBoletin,
+} from "@/lib/newsletter/plantilla";
+import { FalloDeSubida, subirFoto } from "@/components/admin/subir-foto";
 import type { Boletin, NotaCandidata } from "@/lib/repos/boletines";
 import { cn } from "@/lib/utils";
 
@@ -83,10 +92,25 @@ const BAJA_DE_PRUEBA = `${SITIO_URL.origin}/newsletter/baja?prueba=1`;
  *  pruebas se las manda siempre al mismo correo. */
 const CLAVE_PRUEBA = "sm-newsletter-prueba";
 
-interface Elegida {
-  slug: string;
-  /** Texto propio; vacío = la bajada de la nota. */
-  resumen: string;
+/** Una pieza del cuerpo: una nota del diario (por slug, con su texto propio;
+ *  vacío = la bajada) o un bloque propio con enlace. */
+type Elegida =
+  | { tipo?: undefined; slug: string; resumen: string }
+  | BloqueDelBoletin;
+
+const claveDe = (e: Elegida) => (esBloque(e) ? `bloque:${e.id}` : e.slug);
+const slugsDe = (lista: Elegida[]) =>
+  new Set(lista.flatMap((e) => (esBloque(e) ? [] : [e.slug])));
+
+function bloqueNuevo(): BloqueDelBoletin {
+  return {
+    tipo: "bloque",
+    id: Math.random().toString(36).slice(2, 10),
+    titulo: "",
+    texto: "",
+    enlace: "",
+    boton: "Ver más",
+  };
 }
 
 /** Sin tildes y en minúscula, para buscar «educacion» y encontrar
@@ -137,7 +161,7 @@ export function EditorBoletin({
       preencabezado: boletin.preencabezado,
       introduccion: boletin.introduccion,
       cierre: boletin.cierre,
-      notas: boletin.notas.filter((n) => fichas.has(n.slug)),
+      notas: boletin.notas.filter((n) => esBloque(n) || fichas.has(n.slug)) as Elegida[],
     }),
     [boletin, fichas],
   );
@@ -214,7 +238,9 @@ export function EditorBoletin({
         preencabezado: diferido.preencabezado,
         introduccion: diferido.introduccion,
         cierre: diferido.cierre,
-        notas: diferido.notas.flatMap((e) => {
+        notas: diferido.notas.flatMap((e): PiezaDelBoletin[] => {
+          // Un bloque a medio escribir (sin enlace) no se dibuja: así sale.
+          if (esBloque(e)) return e.enlace ? [e] : [];
           const f = fichas.get(e.slug);
           return f ? [{ ...f, resumen: e.resumen.trim() || f.bajada }] : [];
         }),
@@ -233,7 +259,7 @@ export function EditorBoletin({
    * `notasCandidatas()`.
    */
   const ediciones = useMemo(() => {
-    const elegido = new Set(elegidas.map((e) => e.slug));
+    const elegido = slugsDe(elegidas);
     const lista: { nombre: string; disponibles: number }[] = [];
     for (const n of candidatas) {
       let e = lista.find((x) => x.nombre === n.edicion);
@@ -263,7 +289,7 @@ export function EditorBoletin({
   const [confirmandoIA, setConfirmandoIA] = useState(false);
 
   const resultados = useMemo(() => {
-    const elegido = new Set(elegidas.map((e) => e.slug));
+    const elegido = slugsDe(elegidas);
     const q = normalizar(busqueda.trim());
     return candidatas
       .filter((n) => !elegido.has(n.slug))
@@ -405,9 +431,13 @@ export function EditorBoletin({
         setIntroduccion(b.introduccion);
         setCierre(b.cierre);
         setElegidas(
-          b.notas
-            .filter((n) => fichas.has(n.slug))
-            .map((n) => ({ slug: n.slug, resumen: n.resumen })),
+          // Los bloques propios no los toca la IA: quedan al final.
+          [
+            ...b.notas
+              .filter((n) => fichas.has(n.slug))
+              .map((n) => ({ slug: n.slug, resumen: n.resumen })),
+            ...elegidas.filter(esBloque),
+          ],
         );
         setAvisoIA(b.descartes);
       } catch {
@@ -459,6 +489,9 @@ export function EditorBoletin({
   }
 
   const llenas = elegidas.length >= TOPE_NOTAS;
+  /** Un newsletter puede ser sólo texto (un aviso), pero no estar vacío. */
+  const sinContenido =
+    elegidas.length === 0 && !introduccion.trim() && !cierre.trim();
 
   return (
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -656,16 +689,42 @@ export function EditorBoletin({
         >
           {elegidas.length === 0 ? (
             <p className="rounded-panel-2 bg-panel-tarjeta-2 px-4 py-5 text-center text-panel-sm text-panel-tinta-3">
-              Todavía no elegiste ninguna. Buscalas abajo.
+              Todavía no hay nada. Agregá notas del diario o un bloque con enlace.
             </p>
           ) : (
             <ol className="grid gap-3">
               {elegidas.map((e, i) => {
+                if (esBloque(e)) {
+                  return (
+                    <FilaBloque
+                      key={claveDe(e)}
+                      bloque={e}
+                      numero={i + 1}
+                      primero={i === 0}
+                      ultimo={i === elegidas.length - 1}
+                      alMover={(paso) => mover(i, paso)}
+                      alSacar={() => {
+                        tocar();
+                        setElegidas((l) => l.filter((x) => claveDe(x) !== claveDe(e)));
+                      }}
+                      alCambiar={(cambios) => {
+                        tocar();
+                        setElegidas((l) =>
+                          l.map((x) =>
+                            claveDe(x) === claveDe(e) && esBloque(x)
+                              ? { ...x, ...cambios }
+                              : x,
+                          ),
+                        );
+                      }}
+                    />
+                  );
+                }
                 const f = fichas.get(e.slug);
                 if (!f) return null;
                 return (
                   <li
-                    key={e.slug}
+                    key={claveDe(e)}
                     className="rounded-panel-2 border border-panel-borde bg-panel-tarjeta-2 p-3"
                   >
                     <div className="flex items-start gap-3">
@@ -710,7 +769,7 @@ export function EditorBoletin({
                           type="button"
                           onClick={() => {
                             tocar();
-                            setElegidas((l) => l.filter((x) => x.slug !== e.slug));
+                            setElegidas((l) => l.filter((x) => claveDe(x) !== claveDe(e)));
                           }}
                           aria-label={`Sacar «${f.titulo}»`}
                           className={clasesDeBotonIcono({
@@ -741,7 +800,9 @@ export function EditorBoletin({
                         const valor = ev.target.value;
                         setElegidas((l) =>
                           l.map((x) =>
-                            x.slug === e.slug ? { ...x, resumen: valor } : x,
+                            claveDe(x) === claveDe(e) && !esBloque(x)
+                              ? { ...x, resumen: valor }
+                              : x,
                           ),
                         );
                       }}
@@ -752,6 +813,25 @@ export function EditorBoletin({
               })}
             </ol>
           )}
+
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={llenas}
+              onClick={() => {
+                tocar();
+                setElegidas((l) => [...l, bloqueNuevo()]);
+              }}
+              className={clasesDeBoton({ tamano: "chico" })}
+            >
+              <LinkIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              Agregar un bloque con enlace
+            </button>
+            <span className={ayudaCampo}>
+              Para lo que no es una nota del diario: una entrevista en YouTube,
+              una inscripción, un evento. Con título, texto, foto y un botón.
+            </span>
+          </div>
 
           <div className="mt-5 border-t border-panel-borde pt-4">
             <h3 className={etiqueta}>Agregar notas del diario</h3>
@@ -939,18 +1019,27 @@ export function EditorBoletin({
                 />
                 <button
                   type="submit"
-                  disabled={enCurso || elegidas.length === 0}
+                  disabled={enCurso || sinContenido}
                   className={clasesDeBoton()}
                 >
                   <Send className="h-4 w-4" aria-hidden="true" />
                   Enviar prueba
                 </button>
               </div>
-              <span className={ayudaCampo}>
-                Guarda y manda lo guardado a esa dirección, con «[Prueba]» en
-                el asunto. Sale desde sanmiguelino@smt.gob.ar. Su enlace de
-                baja no da de baja a nadie.
-              </span>
+              {sinContenido ? (
+                // El botón apagado solo no decía nada: se veía gris y nadie
+                // sabía por qué. Pasó con el primer newsletter de prueba.
+                <span className={cn(ayudaCampo, "font-medium text-panel-tinta-2")}>
+                  Para probarlo, escribile una introducción o agregale al
+                  menos una nota o un bloque con enlace.
+                </span>
+              ) : (
+                <span className={ayudaCampo}>
+                  Guarda y manda lo guardado a esa dirección, con «[Prueba]» en
+                  el asunto. Sale desde sanmiguelino@smt.gob.ar. Su enlace de
+                  baja no da de baja a nadie.
+                </span>
+              )}
             </form>
 
             <div className="border-t border-panel-borde pt-4">
@@ -1087,7 +1176,7 @@ export function EditorBoletin({
                   <button
                     type="button"
                     onClick={pedirEnvio}
-                    disabled={enCurso || elegidas.length === 0}
+                    disabled={enCurso || sinContenido}
                     className={clasesDeBoton({ tono: "primario" })}
                   >
                     {modoEnvio === "ahora" ? (
@@ -1097,6 +1186,12 @@ export function EditorBoletin({
                     )}
                     {modoEnvio === "ahora" ? "Enviar ahora" : "Programar envío"}
                   </button>
+                  {sinContenido && (
+                    <span className={cn(ayudaCampo, "font-medium text-panel-tinta-2")}>
+                      Primero escribile una introducción o agregale al menos
+                      una nota o un bloque con enlace.
+                    </span>
+                  )}
                 </div>
               </>
             )}
@@ -1452,5 +1547,245 @@ export function VistaPrevia({
         </Dialog.Portal>
       </Dialog.Root>
     </SeccionPanel>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Un bloque propio, en la lista
+--------------------------------------------------------------------------- */
+
+/**
+ * Un bloque con enlace: título, texto, botón, enlace y foto. Si el enlace es un
+ * video de YouTube y todavía no tiene foto, se pone sola la miniatura del
+ * video; se puede sacar o cambiar por otra.
+ */
+function FilaBloque({
+  bloque,
+  numero,
+  primero,
+  ultimo,
+  alMover,
+  alSacar,
+  alCambiar,
+}: {
+  bloque: BloqueDelBoletin;
+  numero: number;
+  primero: boolean;
+  ultimo: boolean;
+  alMover: (paso: -1 | 1) => void;
+  alSacar: () => void;
+  alCambiar: (cambios: Partial<BloqueDelBoletin>) => void;
+}) {
+  const [subiendo, setSubiendo] = useState<string | null>(null);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+  const id = `nl-bloque-${bloque.id}`;
+  const nombre = bloque.titulo || "el bloque";
+  const campoHundido = clasesDeCampo("hundida");
+  const enlaceRaro =
+    bloque.enlace !== "" && !/^https:\/\/\S+\.\S+/.test(bloque.enlace);
+
+  async function elegirFoto(archivo: File | undefined) {
+    if (!archivo) return;
+    setErrorFoto(null);
+    setSubiendo("Subiendo…");
+    try {
+      const url = await subirFoto(archivo, "newsletter", (p) =>
+        setSubiendo(`Subiendo ${p}%…`),
+      );
+      alCambiar({ imagen: { src: url, alt: bloque.titulo } });
+    } catch (e) {
+      setErrorFoto(
+        e instanceof FalloDeSubida
+          ? e.message
+          : "El servidor no aceptó la subida. Lo más probable es que se haya vencido tu sesión: recargá la página.",
+      );
+    } finally {
+      setSubiendo(null);
+    }
+  }
+
+  return (
+    <li className="rounded-panel-2 border border-panel-borde bg-panel-tarjeta-2 p-3">
+      <div className="flex items-start gap-3">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-panel-3 bg-panel-wash text-panel-xs font-semibold tabular-nums text-accent">
+          {numero}
+        </span>
+        <p className="min-w-0 flex-1 pt-1 text-panel-xs font-semibold uppercase tracking-wide text-panel-tinta-3">
+          Bloque con enlace
+        </p>
+        <div className="flex shrink-0 gap-1">
+          <button
+            type="button"
+            onClick={() => alMover(-1)}
+            disabled={primero}
+            aria-label={`Subir «${nombre}»`}
+            className={clasesDeBotonIcono({ sobre: "hundida" })}
+          >
+            <ArrowUp className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => alMover(1)}
+            disabled={ultimo}
+            aria-label={`Bajar «${nombre}»`}
+            className={clasesDeBotonIcono({ sobre: "hundida" })}
+          >
+            <ArrowDown className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={alSacar}
+            aria-label={`Sacar «${nombre}»`}
+            className={clasesDeBotonIcono({ tono: "destructivo", sobre: "hundida" })}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        <div>
+          <label htmlFor={`${id}-enlace`} className={etiqueta}>
+            Enlace
+          </label>
+          <input
+            id={`${id}-enlace`}
+            type="url"
+            inputMode="url"
+            value={bloque.enlace}
+            placeholder="https://www.youtube.com/watch?v=…"
+            onChange={(ev) => {
+              const enlace = ev.target.value.trim();
+              const miniatura = miniaturaDeYoutube(enlace);
+              alCambiar({
+                enlace,
+                // La miniatura del video, si todavía no hay foto.
+                ...(!bloque.imagen && miniatura
+                  ? { imagen: { src: miniatura, alt: bloque.titulo } }
+                  : {}),
+              });
+            }}
+            className={cn(campoHundido, "mt-1.5")}
+          />
+          {enlaceRaro && (
+            <span className={cn(ayudaCampo, "text-[var(--grafico-alerta)]")}>
+              Tiene que ser una dirección completa que empiece con https://
+            </span>
+          )}
+        </div>
+        <div>
+          <label htmlFor={`${id}-titulo`} className={etiqueta}>
+            Título
+          </label>
+          <input
+            id={`${id}-titulo`}
+            value={bloque.titulo}
+            maxLength={150}
+            placeholder="Entrevistas con El Sanmiguelino"
+            onChange={(ev) =>
+              alCambiar({
+                titulo: ev.target.value,
+                ...(bloque.imagen
+                  ? { imagen: { ...bloque.imagen, alt: ev.target.value } }
+                  : {}),
+              })
+            }
+            className={cn(campoHundido, "mt-1.5")}
+          />
+        </div>
+        <div>
+          <label htmlFor={`${id}-texto`} className={etiqueta}>
+            Texto
+          </label>
+          <textarea
+            id={`${id}-texto`}
+            rows={2}
+            value={bloque.texto}
+            maxLength={600}
+            onChange={(ev) => alCambiar({ texto: ev.target.value })}
+            className={cn(campoHundido, "mt-1.5")}
+          />
+        </div>
+        <div>
+          <label htmlFor={`${id}-boton`} className={etiqueta}>
+            Texto del botón
+          </label>
+          <input
+            id={`${id}-boton`}
+            value={bloque.boton}
+            maxLength={40}
+            placeholder="Ver la entrevista"
+            onChange={(ev) => alCambiar({ boton: ev.target.value })}
+            className={cn(campoHundido, "mt-1.5")}
+          />
+        </div>
+        <div>
+          <span className={etiqueta}>Foto</span>
+          {bloque.imagen ? (
+            <div className="mt-1.5 flex flex-wrap items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- miniatura chica de una imagen de afuera (YouTube) o del bucket */}
+              <img
+                src={bloque.imagen.src}
+                alt=""
+                className="h-16 w-28 rounded-panel-3 border border-panel-borde object-cover"
+                onLoad={(ev) => {
+                  // No todos los videos tienen la miniatura ancha (hq720).
+                  // Cuando falta, YouTube no da un error: manda un cuadrito
+                  // gris de 120 px. Si llega eso, va la común, que existe
+                  // siempre.
+                  if (
+                    bloque.imagen?.src.endsWith("/hq720.jpg") &&
+                    ev.currentTarget.naturalWidth < 300
+                  ) {
+                    alCambiar({
+                      imagen: {
+                        ...bloque.imagen,
+                        src: bloque.imagen.src.replace("/hq720.jpg", "/hqdefault.jpg"),
+                      },
+                    });
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => alCambiar({ imagen: undefined })}
+                className={clasesDeBoton({ tono: "fantasma", tamano: "chico" })}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+                Sacar la foto
+              </button>
+            </div>
+          ) : (
+            <label
+              className={cn(
+                clasesDeBoton({ tamano: "chico" }),
+                "mt-1.5 cursor-pointer",
+              )}
+            >
+              <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />
+              {subiendo ?? "Subir una foto"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                disabled={Boolean(subiendo)}
+                onChange={(ev) => {
+                  void elegirFoto(ev.target.files?.[0]);
+                  ev.target.value = "";
+                }}
+              />
+            </label>
+          )}
+          {errorFoto && (
+            <span
+              className={cn(ayudaCampo, "text-[var(--grafico-alerta)]")}
+              role="alert"
+            >
+              {errorFoto}
+            </span>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }

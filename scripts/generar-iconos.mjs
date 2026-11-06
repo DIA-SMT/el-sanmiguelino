@@ -243,3 +243,26 @@ await writeFile(path.join(ICONOS_APP, "icono-mascara-512.png"), mascara);
 console.log(
   `mascara-512  ${mascara.length} bytes  (512px, sobre blanco, marca al ${Math.round(ocupa * 100)}%)`,
 );
+
+/*
+ * El logo de la cabecera del newsletter. Va en PNG porque Gmail no muestra
+ * SVG, y al doble del ancho al que se ve en el correo (360 px) para que no se
+ * vea borroso en pantallas densas. Sale del logotipo del diario en su color
+ * institucional, recortado al dibujo (el SVG trae un lienzo de 1920×1080).
+ * Su ancho y alto mostrados están en `LOGO_DEL_CORREO`
+ * (src/lib/newsletter/plantilla.ts): si cambia la proporción, cambiarlos ahí.
+ */
+const CORREO = path.join(raiz, "public", "correo");
+await mkdir(CORREO, { recursive: true });
+const logoCorreo = await sharp(
+  path.join(raiz, "scripts", "marca", "logo-sanmiguelino-color.svg"),
+  { density: 300 },
+)
+  .trim()
+  .resize({ width: 720 })
+  .png({ compressionLevel: 9 })
+  .toBuffer({ resolveWithObject: true });
+await writeFile(path.join(CORREO, "logo-sanmiguelino.png"), logoCorreo.data);
+console.log(
+  `logo-correo  ${logoCorreo.data.length} bytes  (${logoCorreo.info.width}×${logoCorreo.info.height}px)`,
+);
