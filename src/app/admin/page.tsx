@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   Clock,
+  Eye,
   FileText,
   Layers,
   Pencil,
@@ -21,8 +22,37 @@ import { requerirAdmin } from "@/lib/auth/dal";
 import { listarRegistro } from "@/lib/repos/auditoria";
 import { getIndice, getResumenEdicion, repoEscribe } from "@/lib/repos/edicion";
 import { MoverNota } from "@/components/admin/mover-nota";
+import {
+  ElegirEdicionNotas,
+  type EdicionParaElegir,
+} from "@/components/admin/elegir-edicion-notas";
+import { edicionEnFoco } from "@/lib/auth/vista-previa";
+import { fechaHablada } from "@/lib/fecha-edicion";
+import { db } from "@/lib/db";
 
 export const metadata = { title: "Notas" };
+
+/**
+ * Las ediciones para el selector, de la más nueva a la más vieja, con su
+ * estado dicho en palabras. El reloj se lee acá adentro, en una función con
+ * nombre, como en Suscripciones: la página se arma una vez por pedido.
+ */
+async function edicionesParaElegir(): Promise<EdicionParaElegir[]> {
+  const filas = await db().edicion.findMany({
+    orderBy: [{ anio: "desc" }, { numero: "desc" }],
+    select: { slug: true, mes: true, numero: true, publicaEn: true },
+  });
+  const ahora = Date.now();
+  return filas.map((e) => ({
+    slug: e.slug,
+    nombre: `${e.mes} · N.º ${e.numero}`,
+    estado: !e.publicaEn
+      ? "sin fecha"
+      : e.publicaEn.getTime() > ahora
+        ? `sale el ${fechaHablada(e.publicaEn)}`
+        : "publicada",
+  }));
+}
 
 /**
  * Listado de notas de la edición en curso.
@@ -44,14 +74,20 @@ export const metadata = { title: "Notas" };
 export default async function AdminNotas() {
   await requerirAdmin();
   const puedeEditar = repoEscribe();
-  const [edicion, indice, registro] = await Promise.all([
+  const [edicion, indice, registro, ediciones, enFoco] = await Promise.all([
     getResumenEdicion(),
     getIndice(),
     // Cinco renglones: es un vistazo, no el registro. Si la base no contesta
     // la pantalla de notas no se cae por esto —se trabaja igual sin saber qué
     // hicieron los demás—, y la tarjeta queda vacía.
     listarRegistro(5).catch(() => []),
+    // Sin base no hay otras ediciones que elegir: el selector no aparece.
+    puedeEditar ? edicionesParaElegir() : Promise.resolve([]),
+    edicionEnFoco(),
   ]);
+  // Si la cookie apunta a una edición que ya no existe, el repo cae a la que
+  // está en la calle: el selector tiene que decir lo mismo.
+  const foco = enFoco && enFoco === edicion.slug ? enFoco : null;
 
   const minutos = indice.reduce((total, n) => total + n.minutosLectura, 0);
   const secciones = [...new Set(indice.map((n) => n.seccion))];
@@ -86,6 +122,22 @@ export default async function AdminNotas() {
           estuviera parado el que mira. El `mb-6` del banner es el mismo
           número, así que la escalera arranca desde arriba. */}
       <div className="grid gap-6">
+        {ediciones.length > 1 && (
+          <div className="grid gap-3">
+            <ElegirEdicionNotas ediciones={ediciones} enFoco={foco} />
+            {foco && (
+              <Aviso icono={Eye} tono="var(--grafico-diario)">
+                <strong className="font-semibold text-panel-tinta">
+                  Estás trabajando en {edicion.mes}.
+                </strong>{" "}
+                Mientras tanto, el diario también te muestra esta edición a vos
+                (a los lectores no). Para volver, elegí «La que está en la
+                calle».
+              </Aviso>
+            )}
+          </div>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <TarjetaDato
             icono={FileText}

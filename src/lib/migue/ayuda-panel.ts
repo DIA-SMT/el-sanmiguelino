@@ -80,6 +80,11 @@ export const AYUDA: Record<
           "Párrafo, Subtítulo, Cita, Destacado, Ficha de datos, Foto, Lista e Interactivo. Con «Agregar bloque» sumás uno, y cada bloque se puede mover o borrar. El cuerpo no puede quedar vacío.",
       },
       {
+        pregunta: "¿Cómo edito las notas de otra edición?",
+        respuesta:
+          "Arriba de la lista, en «Edición», elegí la que quieras: la que se está armando o una anterior. La lista pasa a mostrar sus notas y cada una se edita como siempre. Mientras tanto el diario también te muestra esa edición a vos (a los lectores no). Para volver, elegí «La que está en la calle».",
+      },
+      {
         pregunta: "¿Cómo elijo dónde va la nota en la edición?",
         respuesta:
           "Con «Ubicación en la edición»: «Primera (va a la tapa)» o «Después de» otra nota. Si cambiás la «Edición», la nota pasa al final de esa edición. Las páginas de un PDF no se pueden mover.",
