@@ -134,24 +134,18 @@ export function enlaceDeNota(slug: string): string {
 }
 
 /**
- * La foto, pasada por el optimizador de imágenes del sitio y con dirección
- * completa (un correo no tiene "sitio actual" contra el cual resolver `/fotos`).
+ * La foto, con dirección completa: un correo no tiene "sitio actual" contra el
+ * cual resolver `/notas/...`.
  *
- * El optimizador hace dos cosas que un correo agradece: la achica a 1200 px
- * —el doble de 600, para pantallas densas— en vez de mandar el original de
- * 8 MB, y elige el formato según lo que acepta quien la pide, así que a un
- * programa que no entiende WebP le llega JPG.
+ * Hasta el 2026-11-17 pasaba por el optimizador de imágenes del sitio, que la
+ * achicaba y le daba JPG a quien no entiende WebP. Vercel se quedó sin cupo de
+ * imágenes optimizadas (402) y las fotos salían rotas en el correo, así que
+ * ahora va directa (ver `images.unoptimized` en next.config.ts). El costo: un
+ * programa que no muestra WebP —Outlook de escritorio— no ve las fotos que
+ * están en ese formato; Gmail, el celular y Apple Mail sí.
  */
 export function imagenParaCorreo(src: string): string {
-  // Las fotos del diario (las del bucket y las de /public) pasan por el
-  // optimizador. Una imagen de afuera —la miniatura de YouTube de un bloque—
-  // va directa: el optimizador sólo acepta las del bucket, y la de YouTube ya
-  // viene del tamaño justo.
-  const delDiario =
-    src.startsWith("/") || src.includes("/storage/v1/object/public/");
-  return delDiario
-    ? `${SITIO}/_next/image?url=${encodeURIComponent(src)}&w=1200&q=75`
-    : src;
+  return src.startsWith("/") ? `${SITIO}${src}` : src;
 }
 
 /** El logo, en PNG: Gmail no muestra SVG. Se genera desde

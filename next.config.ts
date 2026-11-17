@@ -98,6 +98,22 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    /**
+     * **Sin el optimizador de Vercel.** El 2026-11-17 las fotos nuevas de las
+     * notas dejaron de verse: el optimizador respondía 402 "Payment required"
+     * porque el plan Hobby se quedó sin cupo de imágenes optimizadas del mes.
+     * Las que ya estaban en su caché seguían saliendo; cualquier foto nueva o
+     * cambiada salía rota, y parecía un problema del archivo.
+     *
+     * Ahora cada `<Image>` pide la foto directo al bucket. Lo que se pierde:
+     * el recorte automático por ancho de pantalla (por eso el panel achica la
+     * foto antes de subirla, ver `components/admin/subir-foto.ts`) y que el
+     * service worker la guarde para leer sin conexión (sólo guarda lo del
+     * mismo sitio). Para volver al optimizador alcanza con sacar esta línea,
+     * con un plan que tenga cupo.
+     */
+    unoptimized: true,
+
     /* Lista blanca obligatoria desde Next 16: sin esto, cualquier `quality`
      * distinto del default es un 400. `localPatterns` NO se define: definirlo
      * bloquea con 400 todo lo que no esté listado. */

@@ -40,17 +40,62 @@ export function extensionDeImagen(bytes: Uint8Array): string | null {
  *  RECHACE una Server Action, que es otra cosa y se cuenta distinto. */
 export class FalloDeSubida extends Error {}
 
+/** El lado más largo de una foto subida desde el panel. Alcanza para una
+ *  pantalla grande en alta densidad y deja la foto en unos cientos de KB. */
+const LADO_MAXIMO = 2000;
+/** Debajo de esto no se toca: ya es liviana. */
+const PESO_SIN_TOCAR = 600 * 1024;
+
+/**
+ * Achica la foto en el navegador antes de subirla, si hace falta.
+ *
+ * Desde el 2026-11-17 las fotos se sirven tal cual se suben (Vercel dejó de
+ * optimizarlas, ver `images.unoptimized` en next.config.ts): una foto de
+ * teléfono de 8 MB llegaría así a cada lector. Acá se lleva a 2000 px y JPEG
+ * —que se ve en todos lados, también en los correos— si pesa más de 600 KB o
+ * es más grande que eso. Si el navegador no puede (formato raro, poca
+ * memoria), se sube la original: achicar es una mejora, no un requisito.
+ */
+export async function achicarFoto(archivo: File): Promise<File> {
+  try {
+    const imagen = await createImageBitmap(archivo);
+    const lado = Math.max(imagen.width, imagen.height);
+    if (archivo.size <= PESO_SIN_TOCAR && lado <= LADO_MAXIMO) {
+      imagen.close();
+      return archivo;
+    }
+    const escala = Math.min(1, LADO_MAXIMO / lado);
+    const ancho = Math.round(imagen.width * escala);
+    const alto = Math.round(imagen.height * escala);
+    const lienzo = new OffscreenCanvas(ancho, alto);
+    const ctx = lienzo.getContext("2d");
+    if (!ctx) return archivo;
+    // Fondo blanco: un PNG con transparencia en JPEG quedaría negro.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, ancho, alto);
+    ctx.drawImage(imagen, 0, 0, ancho, alto);
+    imagen.close();
+    const blob = await lienzo.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+    if (blob.size >= archivo.size) return archivo;
+    const nombre = archivo.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], nombre, { type: "image/jpeg" });
+  } catch {
+    return archivo;
+  }
+}
+
 /**
  * Sube la foto y devuelve su dirección pública ya verificada. Tira
  * `FalloDeSubida` con un mensaje para mostrar; si tira otra cosa, lo más
  * probable es que se haya vencido la sesión.
  */
 export async function subirFoto(
-  archivo: File,
+  original: File,
   nombre: string,
   alAvanzar: (porcentaje: number) => void = () => {},
 ): Promise<string> {
-  if (archivo.size === 0) throw new FalloDeSubida("El archivo está vacío.");
+  if (original.size === 0) throw new FalloDeSubida("El archivo está vacío.");
+  const archivo = await achicarFoto(original);
   if (archivo.size > MAXIMO_BYTES_FOTO) {
     throw new FalloDeSubida(
       `La foto pesa ${(archivo.size / 1024 / 1024).toFixed(1)} MB y el máximo ` +

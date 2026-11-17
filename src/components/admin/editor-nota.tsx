@@ -18,6 +18,7 @@ import {
   firmarSubidaFotoAction,
   guardarNotaAction,
 } from "@/app/admin/acciones";
+import { achicarFoto } from "@/components/admin/subir-foto";
 import {
   clasesDeBoton,
   clasesDeBotonIcono,
@@ -569,7 +570,7 @@ export function EditorNota({
    * pantalla ofrece ocho.
    */
   async function subirArchivo(
-    archivo: File,
+    original: File,
     destino: string,
   ): Promise<string | null> {
     setErrorFoto(null);
@@ -580,10 +581,14 @@ export function EditorNota({
     // `verificarFotoSubida()`, porque son las únicas que no se pueden saltear
     // desde el navegador. La diferencia es que estas se enteran antes de
     // esperar ocho megas de subida.
-    if (archivo.size === 0) {
+    if (original.size === 0) {
       setErrorFoto("El archivo está vacío.");
       return null;
     }
+    // Las fotos se sirven tal cual se suben (sin optimizador desde el
+    // 2026-11-17): una de teléfono se achica acá antes de subirla.
+    setSubiendo("Preparando la foto…");
+    const archivo = await achicarFoto(original);
     if (archivo.size > MAXIMO_BYTES_FOTO) {
       setErrorFoto(
         `La foto pesa ${(archivo.size / 1024 / 1024).toFixed(1)} MB y el ` +

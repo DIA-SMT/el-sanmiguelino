@@ -222,8 +222,8 @@ no por referencia. El enlace tiene que ser `https://`. Si es de YouTube, el
 editor pone sola la miniatura `hq720` (16:9) y, si el video no la tiene
 —YouTube manda un cuadrito de 120 px en vez de un error—, cae a `hqdefault`.
 Las fotos subidas van al mismo bucket que las de las notas
-(`src/components/admin/subir-foto.ts`). En el correo, las imágenes del bucket
-pasan por el optimizador del sitio y las de afuera van directas.
+(`src/components/admin/subir-foto.ts`). Todas las imágenes del correo van
+directas (ver «Fotos sin optimizador», abajo).
 
 ### Borrador con IA
 
@@ -310,6 +310,28 @@ Para sacarlo: `select cron.unschedule('newsletter-cola');`.
 (`20261105120000_newsletter_envios`, sólo agrega), después el código, después
 el cron. Si el cron se instala antes que el código, cada minuto recibe un 401
 (el proxy viejo no conoce la ruta) y no pasa nada.
+
+## Fotos sin optimizador
+
+**Desde el 2026-11-17 el sitio no usa el optimizador de imágenes de Vercel**
+(`images.unoptimized` en `next.config.ts`). El plan Hobby se quedó sin cupo de
+imágenes optimizadas del mes y el optimizador respondía *402 Payment
+required*: las fotos que ya tenía en caché seguían saliendo y cualquier foto
+nueva o cambiada salía rota. Parecía un problema del archivo (se probó con JPG
+y más livianas) y no lo era.
+
+Ahora cada foto se pide directo al bucket de Supabase. Lo que se pierde:
+
+- El recorte por ancho de pantalla. Para compensar, el panel achica en el
+  navegador las fotos de más de 600 KB o 2000 px antes de subirlas
+  (`achicarFoto()` en `src/components/admin/subir-foto.ts`), a JPEG 2000 px.
+- El guardado de fotos para leer sin conexión: el service worker sólo guarda lo
+  del mismo sitio. Las páginas siguen guardándose; las fotos, no.
+- En el newsletter, las fotos en WebP no se ven en Outlook de escritorio (sí en
+  Gmail, en el celular y en Apple Mail).
+
+Para volver al optimizador alcanza con sacar `unoptimized: true`, con un plan
+que tenga cupo (Vercel Pro).
 
 ## Dónde mirar si algo no cierra
 
