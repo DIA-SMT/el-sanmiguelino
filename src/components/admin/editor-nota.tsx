@@ -134,6 +134,11 @@ const TIPOS: { valor: BloqueNota["tipo"]; nombre: string; ayuda: string }[] = [
   },
 ];
 
+/** El nombre de un tipo de bloque, como lo dice el menú: "Interactivo". */
+function nombreDeTipo(tipo: BloqueNota["tipo"]): string {
+  return (TIPOS.find((t) => t.valor === tipo)?.nombre ?? tipo).toLowerCase();
+}
+
 /**
  * Convierte un bloque a otro tipo **conservando lo que se pueda**.
  *
@@ -424,6 +429,19 @@ export function EditorNota({
   const [imagenCredito, setImagenCredito] = useState(
     nota?.imagen?.credito ?? "",
   );
+  /**
+   * Con qué abre la nota: la foto de apertura, o directo el primer bloque del
+   * cuerpo (un interactivo, una cita, un párrafo).
+   *
+   * Antes no había manera de decirlo: la foto ya era opcional para el
+   * servidor, pero la pantalla sólo ofrecía cargarla, y la redacción entendió
+   * —con razón— que toda nota tenía que empezar con una foto. Una nota
+   * nueva arranca con foto, que es lo más común; una que ya existe, como
+   * esté guardada.
+   */
+  const [abreCon, setAbreCon] = useState<"foto" | "cuerpo">(
+    !nota || nota.imagen ? "foto" : "cuerpo",
+  );
   /** `null` cuando no hay ninguna subida en curso; si no, un rótulo con el
    *  avance. Una foto de ocho megas por una conexión municipal tarda, y un
    *  "Subiendo…" quieto durante un minuto se lee como colgado: lo más razonable
@@ -440,6 +458,11 @@ export function EditorNota({
   const [destinoSubida, setDestinoSubida] = useState<string | null>(null);
   const [cuerpo, setCuerpo] = useState<BloqueNota[]>(
     nota?.cuerpo ?? [{ tipo: "parrafo", texto: "" }],
+  );
+
+  /** Dónde está el primer interactivo, si no es ya el primer bloque. */
+  const interactivoNoPrimero = cuerpo.findIndex(
+    (b, i) => i > 0 && b.tipo === "interactivo",
   );
 
   function editarBloque(i: number, cambios: Partial<BloqueNota>) {
@@ -714,12 +737,17 @@ export function EditorNota({
           titulo,
           bajada,
           cuerpo,
-          // Se manda la imagen si hay CUALQUIERA de los tres campos, no sólo si
-          // hay alt. Antes, borrar el alt para reescribirlo tiraba también el
-          // archivo y el epígrafe, y bastaba con guardar en el medio para
-          // perderlos. Que falte el alt lo decide el servidor, con un mensaje.
+          // Si abre con el cuerpo, no se manda foto: la nota se guarda sin
+          // ella. Los campos quedan en pantalla por si se vuelve a elegir
+          // «Una foto» antes de salir.
+          //
+          // Si abre con foto, se manda si hay CUALQUIERA de los tres campos,
+          // no sólo si hay alt. Antes, borrar el alt para reescribirlo tiraba
+          // también el archivo y el epígrafe, y bastaba con guardar en el
+          // medio para perderlos. Lo que falte lo dice el servidor.
           imagen:
-            imagenSrc.trim() || imagenAlt.trim() || imagenEpigrafe.trim()
+            abreCon === "foto" &&
+            (imagenSrc.trim() || imagenAlt.trim() || imagenEpigrafe.trim())
               ? {
                   src: imagenSrc,
                   alt: imagenAlt,
@@ -957,9 +985,60 @@ export function EditorNota({
 
       <SeccionPanel
         id="foto-de-la-nota"
-        titulo="Foto"
-        bajada="La imagen que abre la nota. Se sube acá, pero recién queda publicada cuando guardás."
+        titulo="Cómo abre la nota"
+        bajada="Con una foto arriba, o directo con el cuerpo: por ejemplo, con un interactivo."
       >
+        <fieldset className="mb-4 flex flex-wrap gap-x-6 gap-y-2">
+          <legend className="sr-only">La nota abre con</legend>
+          <label className="flex items-center gap-2 text-panel-sm text-panel-tinta">
+            <input
+              type="radio"
+              name="nota-abre-con"
+              checked={abreCon === "foto"}
+              onChange={() => alEditar(setAbreCon)("foto")}
+            />
+            Una foto
+          </label>
+          <label className="flex items-center gap-2 text-panel-sm text-panel-tinta">
+            <input
+              type="radio"
+              name="nota-abre-con"
+              checked={abreCon === "cuerpo"}
+              onChange={() => alEditar(setAbreCon)("cuerpo")}
+            />
+            Sin foto: directo con el cuerpo
+          </label>
+        </fieldset>
+
+        {abreCon === "cuerpo" ? (
+          <div className="grid gap-3">
+            <p className="text-panel-sm text-panel-tinta-2">
+              La nota arranca con el primer bloque del cuerpo
+              {cuerpo[0] ? ` (hoy: ${nombreDeTipo(cuerpo[0].tipo)})` : ""}.
+              Para que abra con otro, subilo con las flechas hasta el primer
+              lugar.
+            </p>
+            {interactivoNoPrimero >= 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuardado(false);
+                    setSucio(true);
+                    setCuerpo((prev) => [
+                      prev[interactivoNoPrimero],
+                      ...prev.filter((_, k) => k !== interactivoNoPrimero),
+                    ]);
+                  }}
+                  className={botonSecundario}
+                >
+                  <ArrowUp className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  Poner el interactivo primero
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="nota-imagen-src" className={etiqueta}>
@@ -1022,7 +1101,8 @@ export function EditorNota({
               placeholder="Qué se ve en la foto, para quien no puede verla"
             />
             <span id="nota-imagen-alt-ayuda" className={ayudaCampo}>
-              Sin esto no hay foto: es lo que lee un lector de pantalla.
+              Obligatorio: es lo que lee un lector de pantalla. Si queda vacío,
+              se usa el epígrafe.
             </span>
           </div>
 
@@ -1054,6 +1134,7 @@ export function EditorNota({
             />
           </div>
         </div>
+        )}
       </SeccionPanel>
 
       {/* El cuerpo no va adentro de una tarjeta: cada bloque ES una tarjeta, y

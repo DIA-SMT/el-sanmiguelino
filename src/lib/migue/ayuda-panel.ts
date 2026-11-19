@@ -85,6 +85,11 @@ export const AYUDA: Record<
           "Arriba de la lista, en «Edición», elegí la que quieras: la que se está armando o una anterior. La lista pasa a mostrar sus notas y cada una se edita como siempre. Mientras tanto el diario también te muestra esa edición a vos (a los lectores no). Para volver, elegí «La que está en la calle».",
       },
       {
+        pregunta: "¿Una nota puede empezar sin foto, por ejemplo con un interactivo?",
+        respuesta:
+          "Sí. En «Cómo abre la nota» elegí «Sin foto: directo con el cuerpo». La nota arranca con el primer bloque del cuerpo; si la nota tiene un interactivo, tocá «Poner el interactivo primero». Si elegís «Una foto», hace falta el archivo y el «Texto alternativo» (o el epígrafe).",
+      },
+      {
         pregunta: "¿Cómo elijo dónde va la nota en la edición?",
         respuesta:
           "Con «Ubicación en la edición»: «Primera (va a la tapa)» o «Después de» otra nota. Si cambiás la «Edición», la nota pasa al final de esa edición. Las páginas de un PDF no se pueden mover.",

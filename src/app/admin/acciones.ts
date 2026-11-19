@@ -281,6 +281,36 @@ function validarBloque(v: unknown, i: number): BloqueNota {
  *  y de la que cuelgan los comentarios. */
 const SLUG_VALIDO = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/** La foto que abre la nota, validada. Tira con un mensaje para la pantalla. */
+function fotoDeApertura(
+  imagen: Record<string, unknown>,
+): NonNullable<NotaBorrador["imagen"]> {
+  if (!textoNoVacio(imagen.src)) {
+    throw new Error(
+      "La foto de apertura no tiene archivo. Subí una foto, o elegí «Sin " +
+        "foto: directo con el cuerpo».",
+    );
+  }
+  // Como en el recuadro: si no hay texto alternativo, sirve el epígrafe.
+  const alt = textoNoVacio(imagen.alt)
+    ? imagen.alt
+    : textoNoVacio(imagen.epigrafe)
+      ? imagen.epigrafe
+      : null;
+  if (!alt) {
+    throw new Error(
+      "La foto de apertura no dice qué se ve. Completá el «Texto " +
+        "alternativo»: es lo que lee un lector de pantalla.",
+    );
+  }
+  return {
+    src: imagen.src,
+    alt,
+    epigrafe: textoNoVacio(imagen.epigrafe) ? imagen.epigrafe : "",
+    ...(textoNoVacio(imagen.credito) ? { credito: imagen.credito } : {}),
+  };
+}
+
 export async function guardarNotaAction(
   borrador: unknown,
 ): Promise<ResultadoGuardar> {
@@ -330,18 +360,17 @@ export async function guardarNotaAction(
       // Si no viene, el repo la manda a la edición en foco, como antes. Que
       // exista de verdad lo verifica el repo, que es quien tiene la base.
       ...(textoNoVacio(edicionSlug) ? { edicionSlug } : {}),
-      ...(esObjeto(imagen) && textoNoVacio(imagen.alt)
-        ? {
-            imagen: {
-              alt: imagen.alt,
-              epigrafe: textoNoVacio(imagen.epigrafe) ? imagen.epigrafe : "",
-              ...(textoNoVacio(imagen.src) ? { src: imagen.src } : {}),
-              ...(textoNoVacio(imagen.credito)
-                ? { credito: imagen.credito }
-                : {}),
-            },
-          }
-        : {}),
+      /*
+       * La foto de apertura es opcional: sin `imagen`, la nota abre con el
+       * cuerpo. Pero si viene, tiene que estar entera —archivo y algo que
+       * diga qué se ve—, con la misma regla que la foto del recuadro.
+       *
+       * Antes se guardaba sólo si tenía texto alternativo, sin avisar: quien
+       * subía la foto y se olvidaba de ese campo la perdía en silencio al
+       * guardar. Y con texto pero sin archivo se guardaba igual, y el lector
+       * veía un recuadro de relleno en lugar de foto.
+       */
+      ...(esObjeto(imagen) ? { imagen: fotoDeApertura(imagen) } : {}),
     };
 
     /*
