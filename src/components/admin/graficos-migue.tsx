@@ -164,13 +164,13 @@ const MESES_LARGOS = [
  * en hora de Tucumán del lado del servidor; volver a pasarlo por una zona
  * horaria sólo puede romperlo.
  */
-function diaCorto(dia: string): string {
+export function diaCorto(dia: string): string {
   const [, mes, num] = dia.split("-");
   return `${Number(num)} ${MESES[Number(mes) - 1] ?? ""}`;
 }
 
 /** "2026-08-28" → "28 de agosto". Para el texto que se lee en voz alta. */
-function diaLargo(dia: string): string {
+export function diaLargo(dia: string): string {
   const [, mes, num] = dia.split("-");
   return `${Number(num)} de ${MESES_LARGOS[Number(mes) - 1] ?? ""}`;
 }
@@ -205,7 +205,7 @@ function enPorciento(valor: number, base: number): string {
  * Con `max = 0` devuelve 1: sin esto la escala dividiría por cero y una serie
  * entera plana en cero saldría en NaN.
  */
-function techoLindo(max: number): number {
+export function techoLindo(max: number): number {
   if (max <= 1) return 1;
   const magnitud = 10 ** Math.floor(Math.log10(max));
   for (const base of [1, 1.2, 1.4, 1.5, 2, 3, 4, 5, 6, 8, 10]) {

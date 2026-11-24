@@ -28,6 +28,7 @@ export type PantallaDelPanel =
   | "migue"
   | "newsletter"
   | "suscripciones"
+  | "visitas"
   | "usuarios"
   | "auditoria";
 
@@ -232,6 +233,27 @@ export const AYUDA: Record<
         pregunta: "¿Quiénes lo recibirían?",
         respuesta:
           "Sólo quienes confirmaron su correo con el enlace que les llega al anotarse. Los que figuran como «Falta que confirmen» no lo reciben hasta que confirmen. La lista se toma en el momento en que el newsletter empieza a salir.",
+      },
+    ],
+  },
+
+  visitas: {
+    nombre: "Visitas",
+    preguntas: [
+      {
+        pregunta: "¿Qué cuenta una visita?",
+        respuesta:
+          "Cada vez que alguien abre una página del diario: la tapa, una nota, una edición, el archivo o el buscador. No cuenta robots ni a quienes administran el panel, y si alguien recarga la misma página enseguida, cuenta una sola vez.",
+      },
+      {
+        pregunta: "¿Cuántas personas leyeron el diario?",
+        respuesta:
+          "Eso no se sabe, y es a propósito: el contador no guarda quién lee, así que no puede distinguir a una persona que vuelve de otra nueva. Lo que muestra son páginas abiertas.",
+      },
+      {
+        pregunta: "¿Desde cuándo hay números?",
+        respuesta:
+          "Desde que se puso el contador. Lo de antes no se registró. La fecha de inicio está en la tarjeta «En total».",
       },
     ],
   },

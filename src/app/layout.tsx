@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo_Black, Newsreader, Poppins } from "next/font/google";
 import { FondoPanorama } from "@/components/fondo-panorama";
 import { PuenteServiceWorker } from "@/components/pwa/puente-service-worker";
+import { ContadorDeVisitas } from "@/components/contador-visitas";
 import { OPEN_GRAPH_BASE, SITIO_URL } from "@/lib/compartir";
 import "./globals.css";
 
@@ -101,6 +102,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <FondoPanorama />
         {children}
         <PuenteServiceWorker />
+        <ContadorDeVisitas />
       </body>
     </html>
   );

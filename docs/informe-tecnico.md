@@ -333,6 +333,26 @@ Ahora cada foto se pide directo al bucket de Supabase. Lo que se pierde:
 Para volver al optimizador alcanza con sacar `unoptimized: true`, con un plan
 que tenga cupo (Vercel Pro).
 
+## Visitas
+
+Desde el 2026-11-24 el diario cuenta cuántas veces se abre cada página, y el
+panel lo muestra en **Visitas**.
+
+- **Cómo cuenta:** al abrir una página del diario, el navegador manda la ruta a
+  `POST /api/visita` (`ContadorDeVisitas`, en el layout raíz). Así sólo cuentan
+  las páginas que alguien abrió de verdad, no las precargas ni los robots.
+- **Qué guarda:** la tabla `visitas` tiene día (hora de Tucumán), ruta y
+  cantidad. **Nada que identifique a quien lee**: ni usuario, ni IP, ni cookie.
+  Por eso no hay "lectores únicos".
+- **Qué no cuenta:** robots (por el `User-Agent`), administradores con sesión, y
+  la misma página desde la misma IP dentro de la media hora (en memoria del
+  servidor, nunca en la base). Una nota o edición que no existe no suma.
+- **Límite:** el endpoint es público; alguien podría inflar a mano las visitas de
+  una página que existe. Es un indicador, no una auditoría.
+- **Ojo en desarrollo:** una copia local con `DATABASE_URL` apuntando a la base
+  real suma sus propias visitas a la base real. Para probar, usar el panel sin
+  abrir el diario, o una base aparte.
+
 ## Dónde mirar si algo no cierra
 
 - `docs/panel-administracion.md` — el plan y la historia del panel, etapa por

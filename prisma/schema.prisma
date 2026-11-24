@@ -664,3 +664,24 @@ model Usuario {
   @@index([ultimoIngreso])
   @@map("usuarios")
 }
+
+/// Cuántas veces se abrió cada página del diario, por día (hora de Tucumán).
+///
+/// **No guarda quién.** Ni usuario, ni IP, ni navegador, ni cookie: una fila
+/// es "esta página, este día, tantas veces", y nada más. Es la misma idea que
+/// `ConsultaMigue`, que guarda la pregunta pero no quién la hizo. Por eso
+/// tampoco se puede saber cuántas PERSONAS distintas leyeron: para eso habría
+/// que reconocer a cada lector, y un diario del Estado no necesita hacerlo.
+///
+/// La suma la hace `POST /api/visita`, que no cuenta robots ni a quienes
+/// administran el panel. Ver `src/lib/repos/visitas.ts`.
+model Visita {
+  dia      DateTime @db.Date
+  /// "/", "/diario", "/nota/<slug>", "/edicion/<slug>"... Ver `rutaContable()`.
+  ruta     String
+  cantidad Int      @default(0)
+
+  @@id([dia, ruta])
+  @@index([ruta])
+  @@map("visitas")
+}

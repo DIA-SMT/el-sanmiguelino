@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Bot,
   CalendarClock,
+  ChartColumn,
   FileText,
   History,
   Mailbox,
@@ -45,6 +46,7 @@ const SECCIONES = [
   { href: "/admin/migue", icono: Bot, texto: "Migue" },
   { href: "/admin/newsletter", icono: Send, texto: "Newsletter" },
   { href: "/admin/suscripciones", icono: Mailbox, texto: "Suscripciones" },
+  { href: "/admin/visitas", icono: ChartColumn, texto: "Visitas" },
   { href: "/admin/usuarios", icono: Users, texto: "Usuarios" },
   // Última y no primera: no se entra al panel a mirar el registro, se entra a
   // trabajar. Se va a buscar cuando algo no cierra.
