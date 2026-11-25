@@ -14,6 +14,7 @@ import type { ErrorIngreso } from "@/lib/auth/cidituc/errores";
 import { SESSION_COOKIE, TTL_SESION_SEG } from "@/lib/auth/cookie";
 import { DESTINO_POR_DEFECTO, destinoSeguro } from "@/lib/auth/destino";
 import { crearToken } from "@/lib/auth/session";
+import { origenPublico } from "@/lib/origen-publico";
 
 /**
  * El ingreso por Cidituc, de punta a punta.
@@ -63,8 +64,9 @@ const OPCIONES_COOKIE = {
  * se les pone NUESTRO origen.
  */
 function interna(request: NextRequest, ruta: string) {
-  const url = request.nextUrl.clone();
-  const destino = new URL(ruta, url.origin);
+  const origen = origenPublico(request);
+  const destino = new URL(ruta, origen);
+  const url = new URL(origen);
   url.pathname = destino.pathname;
   url.search = destino.search;
   url.hash = destino.hash;

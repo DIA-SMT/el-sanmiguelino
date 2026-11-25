@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, cookieMuerta } from "@/lib/auth/cookie";
+import { origenPublico } from "@/lib/origen-publico";
 
 /**
  * El proxy del diario. **Leer es libre**: ninguna página de lectura pide sesión.
@@ -68,10 +69,8 @@ export function proxy(request: NextRequest) {
   }
 
   if (tieneSesion && pathname === "/") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/diario";
-    url.search = "";
-    return NextResponse.redirect(url);
+    // Con el origen público: el de `nextUrl` detrás de nginx es localhost.
+    return NextResponse.redirect(new URL("/diario", origenPublico(request)));
   }
 
   if (muerta) {
