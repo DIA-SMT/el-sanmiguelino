@@ -49,6 +49,12 @@ El diario escucha **sólo en 127.0.0.1:3015**: todo entra por nginx.
 `/archivos/.subiendo/` (los temporales de las subidas) no se sirve: lo frena
 el `location ~ /\.`.
 
+El `location /` tiene que seguir mandando `Host`, `X-Forwarded-Host` y
+`X-Forwarded-Proto`: detrás de nginx, Next cree que el sitio es
+`localhost:3015`, y las redirecciones del ingreso con Ciudad Digital arman el
+dominio con esos encabezados (`src/lib/origen-publico.ts`). Sin ellos, después
+de ingresar el navegador termina en `https://localhost:3015/…`.
+
 ## Desplegar una versión nueva
 
 ```bash
