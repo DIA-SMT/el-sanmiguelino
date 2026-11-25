@@ -10,17 +10,18 @@ archivos en Supabase.
 | Qué | Dónde |
 | --- | --- |
 | Usuario del sistema | `sanmiguelino` (sin login por contraseña) |
-| Carpeta | `/srv/sanmiguelino` (`751`), con `versiones/`, `compartido/` (`750`) y `registros/` |
+| Carpeta | `/srv/sanmiguelino` (`751`), con `versiones/`, `compartido/` (`751`: nginx atraviesa hasta `archivos/`; el `.env` es `600`) y `registros/` |
 | Versión en uso | `/srv/sanmiguelino/actual` → `versiones/<fecha>-<commit>` |
 | Variables | `/srv/sanmiguelino/compartido/.env` (`600`), enlazado en cada versión |
 | Archivos (fotos, PDF, audio) | `/srv/sanmiguelino/compartido/archivos` (`ARCHIVOS_DIR`), fuera de las versiones |
 | Base | PostgreSQL 16 local, base y rol `sanmiguelino` |
-| Proceso | pm2 (`pm2-sanmiguelino` en systemd), `next start -p 3011 -H 127.0.0.1` |
+| Proceso | pm2 (`pm2-sanmiguelino` en systemd), `next start -p 3015 -H 127.0.0.1` |
 | Sitio | nginx `/etc/nginx/sites-available/sanmiguelino` |
 | Cola del newsletter | `/etc/cron.d/newsletter-sanmiguelino`, cada minuto |
-| Respaldo | `/etc/cron.d/respaldo-sanmiguelino`, 7:00, a `/srv/respaldos/sanmiguelino` |
+| Respaldo | `/etc/cron.d/respaldo-sanmiguelino`, 7:00: base, archivos (`rsync --link-dest`) y configuración, 14 días, en `/srv/respaldos/sanmiguelino` |
+| Dirección de prueba | `https://sanmiguelino.195-35-42-168.sslip.io` (el ingreso no anda ahí: Ciudad Digital vuelve al dominio real) |
 
-El diario escucha **sólo en 127.0.0.1:3011**: todo entra por nginx.
+El diario escucha **sólo en 127.0.0.1:3015**: todo entra por nginx.
 
 ## nginx: lo que este sitio necesita además de la guía
 

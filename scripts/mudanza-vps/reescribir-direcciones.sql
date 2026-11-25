@@ -29,6 +29,15 @@ UPDATE boletines SET contenido = replace(contenido::text, :'origen', '/archivos/
 UPDATE correos_salientes SET html = replace(html, :'origen', :'sitio' || '/archivos/')
   WHERE html LIKE '%' || :'origen' || '%';
 
+-- Las fotos de los correos pasaban por el optimizador
+-- (`/_next/image?url=<dirección codificada>`): ahí la dirección de Supabase
+-- está escrita con %3A y %2F, y el reemplazo de arriba no la ve.
+UPDATE correos_salientes
+  SET html = replace(html,
+    replace(replace(:'origen', ':', '%3A'), '/', '%2F'),
+    '%2Farchivos%2F')
+  WHERE html LIKE '%' || replace(replace(:'origen', ':', '%3A'), '/', '%2F') || '%';
+
 SELECT
   (SELECT count(*) FROM notas WHERE "imagenSrc" LIKE '%supabase.co%' OR cuerpo::text LIKE '%supabase.co%')
   + (SELECT count(*) FROM ediciones WHERE "pdfUrl" LIKE '%supabase.co%')
