@@ -1,6 +1,7 @@
 import { open } from "node:fs/promises";
 import path from "node:path";
 import { cache } from "react";
+import { PREFIJO, cabeza, claveDeUrl } from "@/lib/archivos";
 
 /**
  * Cuánto mide una imagen, leyendo su encabezado.
@@ -115,9 +116,17 @@ async function medirLocal(ruta: string): Promise<Medidas | null> {
   }
 }
 
+/** Las fotos del depósito (`/archivos/…`, en el disco del servidor desde la
+ *  mudanza a la VPS): se miden leyendo los primeros 64 KB, como las de /public. */
+async function medirDelDeposito(url: string): Promise<Medidas | null> {
+  const { bytes } = await cabeza(claveDeUrl(url), 65536);
+  return valida(leerEncabezado(bytes));
+}
+
 export const medirImagen = cache(
   async (url: string): Promise<Medidas | null> => {
     try {
+      if (url.startsWith(PREFIJO)) return await medirDelDeposito(url);
       if (url.startsWith("/")) return await medirLocal(url);
       if (!url.startsWith("http")) return null;
       const res = await fetch(url, {

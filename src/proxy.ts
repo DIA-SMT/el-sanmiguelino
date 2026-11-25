@@ -92,7 +92,12 @@ export const config = {
   // favicon: el navegador los pide solo y, en el caso del manifest, sin cookies.
   // Con el gate encima, el diario dejaba de ser instalable sin un solo error a
   // la vista. Llevan `$` para no eximir nada que sólo empiece igual.
+  //
+  // `archivos/` (fotos, PDF y audio del depósito) y `api/archivos/subir` van
+  // fuera por otra razón: el proxy copia el cuerpo del pedido, y la subida de
+  // un PDF de decenas de MB tiene que ir directo a disco. Las dos se cuidan
+  // solas: los archivos son públicos y la subida lleva su firma.
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest$|sw\\.js$|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|archivos/|api/archivos/subir$|favicon\\.ico|manifest\\.webmanifest$|sw\\.js$|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)",
   ],
 };

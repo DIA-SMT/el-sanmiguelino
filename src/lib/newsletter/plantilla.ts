@@ -145,7 +145,13 @@ export function enlaceDeNota(slug: string): string {
  * están en ese formato; Gmail, el celular y Apple Mail sí.
  */
 export function imagenParaCorreo(src: string): string {
-  return src.startsWith("/") ? `${SITIO}${src}` : src;
+  // Las del diario (el depósito y /public) pasan por el optimizador, que en
+  // la VPS no tiene cupo: la achica a 1200 px y le da JPG a quien no entiende
+  // WebP (Outlook). Las de afuera —la miniatura de YouTube de un bloque— van
+  // directas: el optimizador sólo acepta las propias.
+  return src.startsWith("/")
+    ? `${SITIO}/_next/image?url=${encodeURIComponent(src)}&w=1200&q=75`
+    : src;
 }
 
 /** El logo, en PNG: Gmail no muestra SVG. Se genera desde

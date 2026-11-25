@@ -42,6 +42,7 @@ import { zonasDeInfografia, type ZonaVectorial } from "@/lib/pdf/vectores";
 import { maquetarConModelo } from "@/lib/pdf/maquetador";
 import { consultaOpenRouter, modeloQueMaqueta } from "@/lib/pdf/maquetador-openrouter";
 import { subirImagen } from "@/lib/storage";
+import { PREFIJO, claveDeUrl, leer } from "@/lib/archivos";
 
 /** Debajo de esto no es una figura: es un logo, una viñeta o un filete. En
  *  puntos cuadrados; la foto más chica del diario mide 296×171 = 50.616. */
@@ -263,17 +264,31 @@ export async function digitalizarPdf(
   const arranque = Date.now();
   const signal = AbortSignal.timeout(240_000);
 
-  const respuesta = await fetch(url, {
-    cache: "no-store",
-    signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
-  });
-  if (!respuesta.ok) {
-    throw new Error(
-      `No se pudo bajar el PDF del bucket (${respuesta.status}). ` +
-        "Sin el archivo no hay nada que digitalizar.",
-    );
+  // Desde la mudanza a la VPS el PDF está en el disco del servidor
+  // (`/archivos/pdf/…`): se lee de ahí. Una dirección completa —una edición
+  // vieja que todavía apunte afuera— se sigue bajando como antes.
+  let datos: Uint8Array;
+  if (url.startsWith(PREFIJO)) {
+    try {
+      datos = await leer(claveDeUrl(url));
+    } catch {
+      throw new Error(
+        "No se encontró el PDF de la edición. Sin el archivo no hay nada que digitalizar.",
+      );
+    }
+  } else {
+    const respuesta = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    });
+    if (!respuesta.ok) {
+      throw new Error(
+        `No se pudo bajar el PDF (${respuesta.status}). ` +
+          "Sin el archivo no hay nada que digitalizar.",
+      );
+    }
+    datos = new Uint8Array(await respuesta.arrayBuffer());
   }
-  const datos = new Uint8Array(await respuesta.arrayBuffer());
 
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const raiz = raizDePdfjs();

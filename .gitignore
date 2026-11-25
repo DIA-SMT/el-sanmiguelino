@@ -48,3 +48,6 @@ next-env.d.ts
 # postinstall. Son cinco megas que ya viven en node_modules y que cambian con
 # la versión del paquete: se generan, no se versionan.
 /public/pdfjs/
+
+# El depósito de archivos de una copia de desarrollo (ver src/lib/archivos.ts)
+/.archivos/
